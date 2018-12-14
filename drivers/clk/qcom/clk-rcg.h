@@ -161,6 +161,7 @@ struct clk_rcg2 {
 	u32			parked_cfg;
 	u8			flags;
 #define FORCE_ENABLE_RCG	BIT(0)
+#define HW_CLK_CTRL_MODE	BIT(1)
 };
 
 #define to_clk_rcg2(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg2, clkr)

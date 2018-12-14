@@ -440,6 +440,8 @@ static int __clk_rcg2_configure(struct clk_rcg2 *rcg, const struct freq_tbl *f,
 	cfg |= rcg->parent_map[index].cfg << CFG_SRC_SEL_SHIFT;
 	if (rcg->mnd_width && f->n && (f->m != f->n))
 		cfg |= CFG_MODE_DUAL_EDGE;
+	if (rcg->flags & HW_CLK_CTRL_MODE)
+		cfg |= CFG_HW_CLK_CTRL_MASK;
 
 	*_cfg &= ~mask;
 	*_cfg |= cfg;
