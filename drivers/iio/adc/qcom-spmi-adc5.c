@@ -154,6 +154,7 @@ struct adc5_chip {
 	struct completion	complete;
 	struct mutex		lock;
 	const struct adc5_data	*data;
+	int			irq_eoc;
 };
 
 static int adc5_read(struct adc5_chip *adc, u16 offset, u8 *data, int len)
@@ -971,7 +972,7 @@ static int adc5_probe(struct platform_device *pdev)
 	struct adc5_chip *adc;
 	struct regmap *regmap;
 	const char *irq_name;
-	int ret, irq_eoc;
+	int ret;
 	u32 reg;
 
 	regmap = dev_get_regmap(dev->parent, NULL);
@@ -991,6 +992,8 @@ static int adc5_probe(struct platform_device *pdev)
 	adc->dev = dev;
 	adc->base = reg;
 
+	dev_set_drvdata(&pdev->dev, adc);
+
 	init_completion(&adc->complete);
 	mutex_init(&adc->lock);
 
@@ -998,17 +1001,17 @@ static int adc5_probe(struct platform_device *pdev)
 	if (ret)
 		return dev_err_probe(dev, ret, "adc get dt data failed\n");
 
-	irq_eoc = platform_get_irq(pdev, 0);
-	if (irq_eoc < 0) {
-		if (irq_eoc == -EPROBE_DEFER || irq_eoc == -EINVAL)
-			return irq_eoc;
+	adc->irq_eoc = platform_get_irq(pdev, 0);
+	if (adc->irq_eoc < 0) {
+		if (adc->irq_eoc == -EPROBE_DEFER || adc->irq_eoc == -EINVAL)
+			return adc->irq_eoc;
 		adc->poll_eoc = true;
 	} else {
 		irq_name = "pm-adc5";
 		if (adc->data->name)
 			irq_name = adc->data->name;
 
-		ret = devm_request_irq(dev, irq_eoc, adc5_isr, 0,
+		ret = devm_request_irq(dev, adc->irq_eoc, adc5_isr, 0,
 				       irq_name, adc);
 		if (ret)
 			return ret;
@@ -1025,10 +1028,39 @@ static int adc5_probe(struct platform_device *pdev)
 	return devm_iio_device_register(dev, indio_dev);
 }
 
+static int __maybe_unused adc_restore(struct device *dev)
+{
+	int ret = 0;
+	struct adc5_chip *adc = dev_get_drvdata(dev);
+
+	if (adc->irq_eoc > 0)
+		ret = devm_request_irq(dev, adc->irq_eoc, adc5_isr, 0,
+				       "pm-adc5", adc);
+
+	return ret;
+}
+
+static int __maybe_unused adc_freeze(struct device *dev)
+{
+	struct adc5_chip *adc = dev_get_drvdata(dev);
+
+	if (adc->irq_eoc > 0)
+		devm_free_irq(dev, adc->irq_eoc, adc);
+
+	return 0;
+}
+
+static const struct dev_pm_ops __maybe_unused adc_pm_ops = {
+	.freeze = pm_ptr(adc_freeze),
+	.thaw = pm_ptr(adc_restore),
+	.restore = pm_ptr(adc_restore),
+};
+
 static struct platform_driver adc5_driver = {
 	.driver = {
 		.name = "qcom-spmi-adc5",
 		.of_match_table = adc5_match_table,
+		.pm = pm_ptr(&adc_pm_ops),
 	},
 	.probe = adc5_probe,
 };
