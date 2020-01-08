@@ -202,3 +202,6 @@ config INTERCONNECT_QCOM_SM8450
 
 config INTERCONNECT_QCOM_SMD_RPM
 	tristate
+
+config INTERCONNECT_QCOM_QOS
+	tristate
