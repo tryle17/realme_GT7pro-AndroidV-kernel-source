@@ -268,6 +268,10 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 	reset->regmap = regmap;
 	reset->reset_map = desc->resets;
 
+	ret = clk_regulator_init(&pdev->dev, desc);
+	if (ret)
+		return ret;
+
 	if (desc->num_resets) {
 		ret = devm_reset_controller_register(dev, &reset->rcdev);
 		if (ret)
