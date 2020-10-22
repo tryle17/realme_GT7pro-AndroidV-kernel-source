@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/qti-regmap-debugfs.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
 
@@ -601,6 +602,8 @@ static int i2c_pmic_probe(struct i2c_client *client,
 	chip->regmap = devm_regmap_init_i2c(client, &i2c_pmic_regmap_config);
 	if (!chip->regmap)
 		return -ENODEV;
+
+	devm_regmap_qti_debugfs_register(chip->dev, chip->regmap);
 
 	i2c_set_clientdata(client, chip);
 	if (!of_property_read_bool(chip->dev->of_node, "interrupt-controller"))
