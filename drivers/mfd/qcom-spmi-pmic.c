@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2014, 2017-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2017-2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/regmap.h>
 #include <linux/of_platform.h>
+#include <linux/qti-regmap-debugfs.h>
 #include <soc/qcom/qcom-spmi-pmic.h>
 
 #define PMIC_REV2		0x101
@@ -258,6 +259,8 @@ static int pmic_spmi_probe(struct spmi_device *sdev)
 			return ret;
 	}
 	spmi_device_set_drvdata(sdev, ctx);
+
+	devm_regmap_qti_debugfs_register(&sdev->dev, regmap);
 
 	return devm_of_platform_populate(&sdev->dev);
 }
