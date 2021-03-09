@@ -32,7 +32,7 @@
 /* MAX_MARGIN_LEVELS should be one less than MAX_CLUSTERS */
 #define MAX_MARGIN_LEVELS (MAX_CLUSTERS - 1)
 
-extern struct static_key_true walt_disabled;
+extern bool walt_disabled;
 
 enum task_event {
 	PUT_PREV_TASK	= 0,
@@ -732,6 +732,7 @@ extern void sched_update_hyst_times(void);
 extern enum sched_boost_policy sched_boost_policy(void);
 extern void walt_rt_init(void);
 extern void walt_cfs_init(void);
+extern void walt_pause_init(void);
 extern void walt_fixup_init(void);
 extern int walt_find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 					int sync, int sibling_count_hint);
