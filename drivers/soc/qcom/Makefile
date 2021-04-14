@@ -40,4 +40,5 @@ obj-$(CONFIG_QCOM_PANEL_EVENT_NOTIFIER) += panel_event_notifier.o
 obj-$(CONFIG_QTI_PMIC_GLINK) += qti_pmic_glink.o
 obj-$(CONFIG_QTI_ALTMODE_GLINK) += altmode-glink.o
 obj-$(CONFIG_QTI_BATTERY_GLINK_DEBUG) += qti_battery_debug.o
+obj-$(CONFIG_QTI_CHARGER_ULOG_GLINK) += charger-ulog-glink.o
 obj-$(CONFIG_QTI_PMIC_PON_LOG) += pmic-pon-log.o
