@@ -24,7 +24,7 @@ struct walt_ncc_data {
 
 static struct walt_ncc_data ncc_data[MAX_CLUSTERS];
 
-u64 walt_get_ncc_gclk_cycle_counter(int cpu)
+u64 walt_get_ncc_gclk_cycle_counter(int cpu, u64 wc)
 {
 	struct gclk_counter *ncc_counter;
 	struct walt_ncc_data *data;

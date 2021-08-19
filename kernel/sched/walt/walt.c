@@ -57,7 +57,7 @@ static u64 sched_clock_last;
 static bool walt_clock_suspended;
 DECLARE_COMPLETION(walt_get_cycle_counts_cb_completion);
 bool use_cycle_counter;
-u64 (*walt_get_cycle_counts_cb)(int cpu);
+u64 (*walt_get_cycle_counts_cb)(int cpu, u64 wc);
 
 static DEFINE_MUTEX(cluster_lock);
 static u64 walt_load_reported_window;
@@ -456,7 +456,7 @@ static inline u64 read_cycle_counter(int cpu, u64 wallclock)
 	struct walt_rq *wrq = &per_cpu(walt_rq, cpu);
 
 	if (wrq->last_cc_update != wallclock) {
-		wrq->cycles = walt_get_cycle_counts_cb(cpu);
+		wrq->cycles = walt_get_cycle_counts_cb(cpu, wallclock);
 		wrq->last_cc_update = wallclock;
 	}
 
@@ -2975,11 +2975,12 @@ static void walt_init_cycle_counter(void)
 	char *walt_cycle_cntr_path = "/soc/walt";
 	struct device_node *np = NULL;
 
-	if (soc_enable_sw_cycle_counter)
-		return;
-
-	np = of_find_node_by_path(walt_cycle_cntr_path);
-	of_platform_populate(np, NULL, NULL, NULL);
+	if (soc_enable_sw_cycle_counter) {
+		walt_cycle_counter_init();
+	} else {
+		np = of_find_node_by_path(walt_cycle_cntr_path);
+		of_platform_populate(np, NULL, NULL, NULL);
+	}
 
 	wait_for_completion_interruptible(&walt_get_cycle_counts_cb_completion);
 	return;

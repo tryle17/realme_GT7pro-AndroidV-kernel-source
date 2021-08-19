@@ -180,7 +180,7 @@ extern struct walt_sched_cluster *sched_cluster[WALT_NR_CPUS];
 extern cpumask_t part_haltable_cpus;
 /*END SCHED.H PORT*/
 
-extern u64 (*walt_get_cycle_counts_cb)(int cpu);
+extern u64 (*walt_get_cycle_counts_cb)(int cpu, u64 wc);
 extern int walt_cpufreq_cycle_cntr_driver_register(void);
 extern int walt_gclk_cycle_counter_driver_register(void);
 
@@ -895,6 +895,8 @@ extern int walt_find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 					int sync, int sibling_count_hint);
 extern int walt_find_cluster_packing_cpu(int start_cpu);
 extern bool walt_choose_packing_cpu(int packing_cpu, struct task_struct *p);
+extern void walt_cycle_counter_init(void);
+extern u64 walt_cpu_cycle_counter(int cpu, u64 wc);
 
 static inline unsigned int cpu_max_possible_freq(int cpu)
 {

@@ -35,7 +35,7 @@ struct walt_cpufreq_data {
 
 static struct walt_cpufreq_data cpufreq_data[MAX_CLUSTERS];
 
-u64 walt_cpufreq_get_cpu_cycle_counter(int cpu)
+u64 walt_cpufreq_get_cpu_cycle_counter(int cpu, u64 wc)
 {
 	const struct walt_cpufreq_soc_data *soc_data;
 	struct cpufreq_counter *cpu_counter;
