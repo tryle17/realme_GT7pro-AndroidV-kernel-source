@@ -195,7 +195,7 @@ EXPORT_SYMBOL(clk_post_change_regmap);
 int clk_prepare_regmap(struct clk_hw *hw)
 {
 	struct clk_regmap *rclk = to_clk_regmap(hw);
-	int rate = clk_hw_get_rate(hw);
+	unsigned long rate = clk_hw_get_rate(hw);
 	int vdd_level;
 
 	if (!rclk->vdd_data.rate_max)
