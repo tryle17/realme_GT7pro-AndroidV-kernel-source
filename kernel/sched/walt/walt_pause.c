@@ -66,7 +66,7 @@ int walt_pause_cpus(struct cpumask *cpus)
 	/* only actually pause online CPUs */
 	cpumask_and(cpus, cpus, cpu_online_mask);
 
-	ret = pause_cpus(cpus);
+	//ret = pause_cpus(cpus);
 	if (ret < 0) {
 		dec_test_ref_counts(&saved_cpus);
 		pr_err("pause_cpus failure ret=%d cpus=%*pbl\n", ret,
@@ -91,7 +91,7 @@ int walt_resume_cpus(struct cpumask *cpus)
 	/* only actually resume online CPUs */
 	cpumask_and(cpus, cpus, cpu_online_mask);
 
-	ret = resume_cpus(cpus);
+	// ret = resume_cpus(cpus);
 	if (ret < 0) {
 		inc_ref_counts(&saved_cpus);
 		pr_err("resume_cpus failure ret=%d cpus=%*pbl\n", ret,
@@ -131,7 +131,7 @@ static void walt_pause_online_workfn(struct work_struct *work)
 		return;
 
 	/* will wait for existing hp operations to complete */
-	ret = pause_cpus(&re_pause_cpus);
+	// ret = pause_cpus(&re_pause_cpus);
 	if (ret < 0) {
 		pr_err("pause_cpus during online failure ret=%d cpus=%*pb1\n", ret,
 		       cpumask_pr_args(&re_pause_cpus));
