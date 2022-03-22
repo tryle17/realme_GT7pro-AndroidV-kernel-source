@@ -358,7 +358,9 @@ static int glink_rpm_probe(struct platform_device *pdev)
 
 	enable_irq(rpm->irq);
 
-	return 0;
+	ret = qcom_glink_native_start(glink);
+
+	return ret;
 }
 
 static void glink_rpm_remove(struct platform_device *pdev)
