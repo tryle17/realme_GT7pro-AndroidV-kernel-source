@@ -1392,6 +1392,8 @@ static struct qcom_icc_node qup0_core_slave = {
 	.id = SLAVE_QUP_CORE_0,
 	.channels = 1,
 	.buswidth = 4,
+	.init_peak = INT_MAX,
+	.init_avg  = INT_MAX,
 	.noc_ops = &qcom_qnoc4_ops,
 	.num_links = 0,
 };
@@ -1401,6 +1403,8 @@ static struct qcom_icc_node qup1_core_slave = {
 	.id = SLAVE_QUP_CORE_1,
 	.channels = 1,
 	.buswidth = 4,
+	.init_peak = INT_MAX,
+	.init_avg  = INT_MAX,
 	.noc_ops = &qcom_qnoc4_ops,
 	.num_links = 0,
 };
@@ -1410,6 +1414,8 @@ static struct qcom_icc_node qup2_core_slave = {
 	.id = SLAVE_QUP_CORE_2,
 	.channels = 1,
 	.buswidth = 4,
+	.init_peak = INT_MAX,
+	.init_avg  = INT_MAX,
 	.noc_ops = &qcom_qnoc4_ops,
 	.num_links = 0,
 };
@@ -1995,6 +2001,8 @@ static struct qcom_icc_node qns_mem_noc_hf = {
 	.id = SLAVE_MNOC_HF_MEM_NOC,
 	.channels = 2,
 	.buswidth = 32,
+	.init_peak = INT_MAX,
+	.init_avg  = INT_MAX,
 	.noc_ops = &qcom_qnoc4_ops,
 	.num_links = 1,
 	.links = { MASTER_MNOC_HF_MEM_NOC },
@@ -2366,7 +2374,6 @@ static struct qcom_icc_bcm bcm_mc0 = {
 static struct qcom_icc_bcm bcm_mm0 = {
 	.name = "MM0",
 	.voter_idx = VOTER_IDX_HLOS,
-	.keepalive_early = true,
 	.num_nodes = 1,
 	.nodes = { &qns_mem_noc_hf },
 };
@@ -2385,7 +2392,6 @@ static struct qcom_icc_bcm bcm_mm1 = {
 static struct qcom_icc_bcm bcm_qup0 = {
 	.name = "QUP0",
 	.voter_idx = VOTER_IDX_HLOS,
-	.keepalive = true,
 	.vote_scale = 1,
 	.num_nodes = 1,
 	.nodes = { &qup0_core_slave },
@@ -2394,7 +2400,6 @@ static struct qcom_icc_bcm bcm_qup0 = {
 static struct qcom_icc_bcm bcm_qup1 = {
 	.name = "QUP1",
 	.voter_idx = VOTER_IDX_HLOS,
-	.keepalive = true,
 	.vote_scale = 1,
 	.num_nodes = 1,
 	.nodes = { &qup1_core_slave },
@@ -2403,7 +2408,6 @@ static struct qcom_icc_bcm bcm_qup1 = {
 static struct qcom_icc_bcm bcm_qup2 = {
 	.name = "QUP2",
 	.voter_idx = VOTER_IDX_HLOS,
-	.keepalive = true,
 	.vote_scale = 1,
 	.num_nodes = 1,
 	.nodes = { &qup2_core_slave },
@@ -3333,7 +3337,7 @@ static struct platform_driver qnoc_driver = {
 	.driver = {
 		.name = "qnoc-pineapple",
 		.of_match_table = qnoc_of_match,
-		.sync_state = qcom_icc_rpmh_sync_state,
+		.sync_state = icc_sync_state,
 	},
 };
 
