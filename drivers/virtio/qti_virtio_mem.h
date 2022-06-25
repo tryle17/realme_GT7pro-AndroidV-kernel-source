@@ -105,6 +105,12 @@ struct virtio_mem {
 	/* If set, the driver is in SBM, otherwise in BBM. */
 	bool in_sbm;
 
+	/*
+	 * Indicates the virtio_mem driver should enable memory encryption on
+	 * any transferred memory regions.
+	 */
+	bool use_memory_encryption;
+
 	union {
 		struct {
 			/* Id of the first memory block of this device. */
