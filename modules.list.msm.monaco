@@ -36,3 +36,6 @@ rtc-pm8xxx.ko
 proxy-consumer.ko
 stub-regulator.ko
 debug-regulator.ko
+qcom-apcs-ipc-mailbox.ko
+qcom_glink_rpm.ko
+qcom_glink.ko
