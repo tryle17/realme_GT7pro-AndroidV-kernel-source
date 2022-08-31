@@ -2568,6 +2568,8 @@ void clk_lucid_evo_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 {
 	u32 lval = config->l;
 
+	regmap_update_bits(regmap, PLL_USER_CTL(pll), PLL_OUT_MASK, PLL_OUT_MASK);
+
 	if (trion_pll_is_enabled(pll, regmap))
 		return;
 
@@ -2633,11 +2635,6 @@ static int alpha_pll_lucid_evo_enable(struct clk_hw *hw)
 	if (ret)
 		return ret;
 
-	/* Enable the PLL outputs */
-	ret = regmap_update_bits(regmap, PLL_USER_CTL(pll), PLL_OUT_MASK, PLL_OUT_MASK);
-	if (ret)
-		return ret;
-
 	/* Enable the global PLL outputs */
 	ret = regmap_update_bits(regmap, PLL_MODE(pll), PLL_OUTCTRL, PLL_OUTCTRL);
 	if (ret)
@@ -2667,11 +2664,6 @@ static void _alpha_pll_lucid_evo_disable(struct clk_hw *hw, bool reset)
 
 	/* Disable the global PLL output */
 	ret = regmap_update_bits(regmap, PLL_MODE(pll), PLL_OUTCTRL, 0);
-	if (ret)
-		return;
-
-	/* Disable the PLL outputs */
-	ret = regmap_update_bits(regmap, PLL_USER_CTL(pll), PLL_OUT_MASK, 0);
 	if (ret)
 		return;
 
