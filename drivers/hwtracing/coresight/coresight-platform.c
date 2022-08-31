@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2012, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/acpi.h>
@@ -204,6 +205,17 @@ int of_coresight_get_atid_number(struct coresight_device *csdev)
 int of_coresight_get_atid(struct coresight_device *csdev, u32 *atid, int atid_num)
 {
 	return of_property_read_u32_array(csdev->dev.parent->of_node, "atid", atid, atid_num);
+}
+
+/*
+ * of_coresight_secure: Check whether the device is a secure node
+ *
+ * Return true, it means this is a secure node.
+ */
+bool of_coresight_secure_node(struct coresight_device *csdev)
+{
+	return of_property_read_bool(csdev->dev.parent->of_node,
+					"qcom,secure-component");
 }
 
 /*
