@@ -13,6 +13,7 @@
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 #include <linux/uidgid.h>
+#include <linux/of_device.h>
 
 #include <net/sock.h>
 #include <uapi/linux/sched/types.h>
@@ -112,7 +113,7 @@ static inline struct qrtr_sock *qrtr_sk(struct sock *sk)
 	return container_of(sk, struct qrtr_sock, sk);
 }
 
-static unsigned int qrtr_local_nid = 1;
+static unsigned int qrtr_local_nid = CONFIG_QRTR_NODE_ID;
 
 /* for node ids */
 static RADIX_TREE(qrtr_nodes, GFP_ATOMIC);
@@ -1690,9 +1691,29 @@ static const struct net_proto_family qrtr_family = {
 	.create	= qrtr_create,
 };
 
+static void qrtr_update_node_id(void)
+{
+	const char *compat = "qcom,qrtr";
+	struct device_node *np = NULL;
+	u32 node_id;
+	int ret;
+
+	while ((np = of_find_compatible_node(np, NULL, compat))) {
+		ret = of_property_read_u32(np, "qcom,node-id", &node_id);
+		of_node_put(np);
+		if (ret)
+			continue;
+
+		qrtr_local_nid = node_id;
+		break;
+	}
+}
+
 static int __init qrtr_proto_init(void)
 {
 	int rc;
+
+	qrtr_update_node_id();
 
 	rc = proto_register(&qrtr_proto, 1);
 	if (rc)
