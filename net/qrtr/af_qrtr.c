@@ -14,6 +14,7 @@
 #include <linux/rwsem.h>
 #include <linux/uidgid.h>
 #include <linux/of_device.h>
+#include <linux/pm_wakeup.h>
 
 #include <net/sock.h>
 #include <uapi/linux/sched/types.h>
@@ -114,6 +115,7 @@ static inline struct qrtr_sock *qrtr_sk(struct sock *sk)
 }
 
 static unsigned int qrtr_local_nid = CONFIG_QRTR_NODE_ID;
+static unsigned int qrtr_wakeup_ms = CONFIG_QRTR_WAKEUP_MS;
 
 /* for node ids */
 static RADIX_TREE(qrtr_nodes, GFP_ATOMIC);
@@ -145,6 +147,7 @@ static DEFINE_SPINLOCK(qrtr_port_lock);
  * @task: task to run the worker thread
  * @read_data: scheduled work for recv work
  * @say_hello: scheduled work for initiating hello
+ * @ws: wakeupsource avoid system suspend
  */
 struct qrtr_node {
 	struct mutex ep_lock;
@@ -165,6 +168,10 @@ struct qrtr_node {
 	struct task_struct *task;
 	struct kthread_work read_data;
 	struct kthread_work say_hello;
+
+	struct wakeup_source *ws;
+
+	struct xarray no_wake_svc; /* services that will not wake up APPS */
 };
 
 /**
@@ -190,6 +197,64 @@ static int qrtr_bcast_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 			      struct sockaddr_qrtr *to);
 static struct qrtr_sock *qrtr_port_lookup(int port);
 static void qrtr_port_put(struct qrtr_sock *ipc);
+
+void qrtr_print_wakeup_reason(const void *data)
+{
+	const struct qrtr_hdr_v1 *v1;
+	const struct qrtr_hdr_v2 *v2;
+	struct qrtr_cb cb;
+	unsigned int size;
+	unsigned int ver;
+	int service_id;
+	size_t hdrlen;
+	u64 preview = 0;
+
+	ver = *(u8 *)data;
+	switch (ver) {
+	case QRTR_PROTO_VER_1:
+		v1 = data;
+		hdrlen = sizeof(*v1);
+		cb.src_node = le32_to_cpu(v1->src_node_id);
+		cb.src_port = le32_to_cpu(v1->src_port_id);
+		cb.dst_node = le32_to_cpu(v1->dst_node_id);
+		cb.dst_port = le32_to_cpu(v1->dst_port_id);
+
+		size = le32_to_cpu(v1->size);
+		break;
+	case QRTR_PROTO_VER_2:
+		v2 = data;
+		hdrlen = sizeof(*v2) + v2->optlen;
+		cb.src_node = le16_to_cpu(v2->src_node_id);
+		cb.src_port = le16_to_cpu(v2->src_port_id);
+		cb.dst_node = le16_to_cpu(v2->dst_node_id);
+		cb.dst_port = le16_to_cpu(v2->dst_port_id);
+
+		if (cb.src_port == (u16)QRTR_PORT_CTRL)
+			cb.src_port = QRTR_PORT_CTRL;
+		if (cb.dst_port == (u16)QRTR_PORT_CTRL)
+			cb.dst_port = QRTR_PORT_CTRL;
+
+		size = le32_to_cpu(v2->size);
+		break;
+	default:
+		return;
+	}
+
+	service_id = qrtr_get_service_id(cb.src_node, cb.src_port);
+	if (service_id < 0)
+		service_id = qrtr_get_service_id(cb.dst_node, cb.dst_port);
+
+	size = (sizeof(preview) > size) ? size : sizeof(preview);
+	memcpy(&preview, data + hdrlen, size);
+
+	pr_info("%s: src[0x%x:0x%x] dst[0x%x:0x%x] [%08x %08x] service[0x%x]\n",
+		__func__,
+		cb.src_node, cb.src_port,
+		cb.dst_node, cb.dst_port,
+		(unsigned int)preview, (unsigned int)(preview >> 32),
+		service_id);
+}
+EXPORT_SYMBOL_GPL(qrtr_print_wakeup_reason);
 
 static bool refcount_dec_and_rwsem_lock(refcount_t *r,
 					struct rw_semaphore *sem)
@@ -246,6 +311,7 @@ static void __qrtr_node_release(struct kref *kref)
 	kthread_flush_worker(&node->kworker);
 	kthread_stop(node->task);
 	skb_queue_purge(&node->rx_queue);
+	wakeup_source_unregister(node->ws);
 
 	/* Free tx flow counters */
 	radix_tree_for_each_slot(slot, &node->qrtr_tx_flow, &iter, 0) {
@@ -573,6 +639,7 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	unsigned int ver;
 	size_t hdrlen;
 	int errcode;
+	int svc_id;
 
 	if (len == 0 || len & 3)
 		return -EINVAL;
@@ -660,9 +727,11 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	/* All control packets and non-local destined data packets should be
 	 * queued to the worker for forwarding handling.
 	 */
+	svc_id = qrtr_get_service_id(cb->src_node, cb->src_port);
 	if (cb->type != QRTR_TYPE_DATA || cb->dst_node != qrtr_local_nid) {
 		skb_queue_tail(&node->rx_queue, skb);
 		kthread_queue_work(&node->kworker, &node->read_data);
+		pm_wakeup_ws_event(node->ws, qrtr_wakeup_ms, true);
 	} else {
 		ipc = qrtr_port_lookup(cb->dst_port);
 		if (!ipc) {
@@ -674,6 +743,10 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 			qrtr_port_put(ipc);
 			goto err;
 		}
+
+		/* Force wakeup based on services */
+		if (!xa_load(&node->no_wake_svc, svc_id))
+			pm_wakeup_ws_event(node->ws, qrtr_wakeup_ms, true);
 
 		qrtr_port_put(ipc);
 	}
@@ -874,13 +947,16 @@ static void qrtr_hello_work(struct kthread_work *work)
  * @ep: endpoint to register
  * @nid: desired node id; may be QRTR_EP_NID_AUTO for auto-assignment
  * @rt: flag to notify real time low latency endpoint
+ * @no_wake: array of services to not wake up
  * Return: 0 on success; negative error code on failure
  *
  * The specified endpoint must have the xmit function pointer set on call.
  */
 int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
-			   bool rt)
+			   bool rt, struct qrtr_array *no_wake)
 {
+	int rc, i;
+	size_t size;
 	struct qrtr_node *node;
 	struct sched_param param = {.sched_priority = 1};
 
@@ -910,6 +986,17 @@ int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
 	if (rt)
 		sched_setscheduler(node->task, SCHED_FIFO, &param);
 
+	xa_init(&node->no_wake_svc);
+	size = no_wake ? no_wake->size : 0;
+	for (i = 0; i < size; i++) {
+		rc = xa_insert(&node->no_wake_svc, no_wake->arr[i], node,
+			       GFP_KERNEL);
+		if (rc) {
+			kfree(node);
+			return rc;
+		}
+	}
+
 	INIT_RADIX_TREE(&node->qrtr_tx_flow, GFP_KERNEL);
 	mutex_init(&node->qrtr_tx_lock);
 
@@ -920,6 +1007,8 @@ int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
 	list_add(&node->item, &qrtr_all_epts);
 	up_write(&qrtr_epts_lock);
 	ep->node = node;
+
+	node->ws = wakeup_source_register(NULL, "qrtr_ws");
 
 	kthread_queue_work(&node->kworker, &node->say_hello);
 	return 0;

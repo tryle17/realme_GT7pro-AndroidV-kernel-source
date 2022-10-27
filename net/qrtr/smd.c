@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/rpmsg.h>
+#include <linux/rpmsg/qcom_glink.h>
 #include <linux/of.h>
 
 #include "qrtr.h"
@@ -37,6 +38,9 @@ static int qcom_smd_qrtr_callback(struct rpmsg_device *rpdev,
 		rc = 0;
 	}
 
+	if (qcom_glink_is_wakeup(true))
+		qrtr_print_wakeup_reason(data);
+
 	return rc;
 }
 
@@ -62,8 +66,10 @@ out:
 
 static int qcom_smd_qrtr_probe(struct rpmsg_device *rpdev)
 {
+	struct qrtr_array svc_arr = {NULL, 0};
 	struct qrtr_smd_dev *qdev;
 	u32 net_id;
+	int size;
 	bool rt;
 	int rc;
 
@@ -81,7 +87,19 @@ static int qcom_smd_qrtr_probe(struct rpmsg_device *rpdev)
 
 	rt = of_property_read_bool(rpdev->dev.of_node, "qcom,low-latency");
 
-	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt);
+	size = of_property_count_u32_elems(rpdev->dev.of_node, "qcom,no-wake-svc");
+	if (size > 0) {
+		svc_arr.size = size;
+		svc_arr.arr = kmalloc_array(size, sizeof(u32), GFP_KERNEL);
+		if (!svc_arr.arr)
+			return -ENOMEM;
+
+		of_property_read_u32_array(rpdev->dev.of_node, "qcom,no-wake-svc",
+					   svc_arr.arr, size);
+	}
+
+	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt, &svc_arr);
+	kfree(svc_arr.arr);
 	if (rc) {
 		dev_err(qdev->dev, "endpoint register failed: %d\n", rc);
 		return rc;
