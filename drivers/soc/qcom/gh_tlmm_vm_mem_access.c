@@ -256,13 +256,17 @@ static int gh_tlmm_vm_populate_vm_info(struct platform_device *dev, struct gh_tl
 		if (!ret) {
 			dev_err(gh_tlmm_dev, "Invalid gpio\n");
 			rc = -EINVAL;
-			goto io_sizes_error;
+			goto res_error;
 		}
 		vm_info->iomem_bases[i] = res->start;
 		vm_info->iomem_sizes[i] = resource_size(res);
 	}
 
+	kfree(res);
+	kfree(gpios);
 	return rc;
+res_error:
+	kfree(res);
 io_sizes_error:
 	kfree(vm_info->iomem_sizes);
 io_bases_error:
