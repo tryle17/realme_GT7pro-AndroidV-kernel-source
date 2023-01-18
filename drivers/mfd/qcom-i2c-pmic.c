@@ -605,6 +605,7 @@ static int i2c_pmic_probe(struct i2c_client *client)
 	devm_regmap_qti_debugfs_register(chip->dev, chip->regmap);
 
 	i2c_set_clientdata(client, chip);
+	chip->summary_irq = -EINVAL;
 	if (!of_property_read_bool(chip->dev->of_node, "interrupt-controller"))
 		goto probe_children;
 
@@ -700,6 +701,9 @@ static int __maybe_unused i2c_pmic_suspend(struct device *dev)
 	struct i2c_pmic_periph *periph;
 	int rc = 0, i;
 
+	if (chip->summary_irq < 0)
+		return 0;
+
 	for (i = 0; i < chip->num_periphs; i++) {
 		periph = &chip->periph[i];
 
@@ -732,6 +736,9 @@ static int __maybe_unused i2c_pmic_resume(struct device *dev)
 	struct i2c_pmic *chip = dev_get_drvdata(dev);
 	struct i2c_pmic_periph *periph;
 	int rc = 0, i;
+
+	if (chip->summary_irq < 0)
+		return 0;
 
 	for (i = 0; i < chip->num_periphs; i++) {
 		periph = &chip->periph[i];
