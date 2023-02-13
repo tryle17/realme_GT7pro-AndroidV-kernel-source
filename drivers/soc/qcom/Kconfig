@@ -604,6 +604,15 @@ config MINIDUMP_MAX_ENTRIES
 	  This defines maximum number of entries to be allocated for application
 	  subsytem in Minidump table.
 
+config QCOM_HUNG_TASK_ENH
+        tristate "QTI Hung Task Enhancement"
+        depends on ARCH_QCOM
+        help
+          Add options at sysfs to enhance khungtask, allow user to
+          select and monitor tasks in black/white list mode. Also
+          processes in iowait for specific situation will be monitored
+          to avoid devices long time no response.
+
 config QCOM_ICC_BWMON
 	tristate "QCOM Interconnect Bandwidth Monitor driver"
 	depends on ARCH_QCOM || COMPILE_TEST
