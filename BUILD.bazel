@@ -12,7 +12,9 @@ package(
     ],
 )
 
-define_common_kernels(target_configs = {
+load("@kernel_toolchain_info//:dict.bzl", "BRANCH")
+
+define_common_kernels(branch = BRANCH, target_configs = {
     "kernel_aarch64": {
         "module_implicit_outs": COMMON_GKI_MODULES_LIST,
     },
@@ -223,6 +225,7 @@ define_db845c(
         "sound/soc/qcom/qdsp6/snd-q6apm.ko",
         "sound/soc/qcom/qdsp6/snd-q6dsp-common.ko",
         "sound/soc/qcom/snd-soc-qcom-common.ko",
+        "sound/soc/qcom/snd-soc-qcom-sdw.ko",
         "sound/soc/qcom/snd-soc-sdm845.ko",
         "sound/soc/qcom/snd-soc-sm8250.ko",
     ],
@@ -231,6 +234,10 @@ define_db845c(
 load(":consolidate.bzl", "define_consolidate")
 
 define_consolidate()
+
+load(":msm_platforms.bzl", "define_msm_platforms")
+
+define_msm_platforms()
 
 # TODO(b/258259749): Convert rockpi4 to mixed build
 kernel_build(
@@ -318,6 +325,23 @@ copy_to_dist_dir(
         ":rockpi4_modules_install",
     ],
     dist_dir = "out/rockpi4/dist",
+    flat = True,
+)
+
+kernel_build(
+    name = "fips140",
+    outs = [],
+    base_kernel = ":kernel_aarch64",
+    build_config = "build.config.gki.aarch64.fips140",
+    module_outs = ["crypto/fips140.ko"],
+)
+
+copy_to_dist_dir(
+    name = "fips140_dist",
+    data = [
+        ":fips140",
+    ],
+    dist_dir = "out/fips140/dist",
     flat = True,
 )
 
