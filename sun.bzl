@@ -15,6 +15,8 @@ def define_sun():
         "drivers/pinctrl/qcom/pinctrl-sun.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
         "drivers/regulator/stub-regulator.ko",
+        "drivers/soc/qcom/smem.ko",
+        "drivers/soc/qcom/socinfo.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
