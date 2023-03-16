@@ -6,6 +6,7 @@ target_name = "sun"
 def define_sun():
     _sun_in_tree_modules = [
         # keep sorted
+        "drivers/power/reset/qcom-reboot-reason.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
