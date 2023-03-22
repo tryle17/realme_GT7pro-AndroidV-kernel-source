@@ -1550,6 +1550,11 @@ static int get_ddr_regions_info(void)
 
 	num_ddr_regions = get_num_ddr_regions(node);
 
+	if (!num_ddr_regions) {
+		pr_err("mem-offine: num_ddr_regions is %d\n", num_ddr_regions);
+		return -EINVAL;
+	}
+
 	ddr_regions = kcalloc(num_ddr_regions, sizeof(*ddr_regions), GFP_KERNEL);
 	if (!ddr_regions)
 		return -ENOMEM;
