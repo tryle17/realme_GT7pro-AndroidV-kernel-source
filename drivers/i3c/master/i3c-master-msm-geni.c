@@ -2437,20 +2437,13 @@ err_cleanup:
 	 *use mutex protected internal put/get sync API. Hence forcefully
 	 *disabling clocks and decrementing usage count.
 	 */
-	disable_irq(gi3c->irq);
-	ret = geni_se_resources_off(&gi3c->se);
-	if (ret)
+	ret = pm_runtime_put_sync(gi3c->se.dev);
+	if (ret < 0) {
 		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-			"%s: geni_se_resources_off failed%d\n", __func__, ret);
-	ret = geni_icc_disable(&gi3c->se);
-	if (ret)
-		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-			"%s: geni_icc_disable failed%d\n", __func__, ret);
-	pm_runtime_disable(gi3c->se.dev);
-	pm_runtime_put_noidle(gi3c->se.dev);
-	pm_runtime_set_suspended(gi3c->se.dev);
-	pm_runtime_enable(gi3c->se.dev);
-
+			"%s: error turning SE resources:%d\n", __func__, ret);
+		/* Do Force suspend */
+		return ret;
+	}
 	return ret;
 }
 
@@ -3468,15 +3461,6 @@ static int geni_i3c_probe(struct platform_device *pdev)
 			    tx_depth, gi3c->se_mode);
 	}
 
-	ret = geni_se_resources_off(&gi3c->se);
-	if (ret)
-		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-			"%s: geni_se_resources_off failed%d\n", __func__, ret);
-	ret = geni_icc_disable(&gi3c->se);
-	if (ret)
-		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-			"%s: geni_icc_disable failed%d\n", __func__, ret);
-
 	pm_runtime_set_suspended(gi3c->se.dev);
 	pm_runtime_set_autosuspend_delay(gi3c->se.dev, I3C_AUTO_SUSPEND_DELAY);
 	pm_runtime_use_autosuspend(gi3c->se.dev);
@@ -3637,20 +3621,8 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 		}
 	}
 
-	/*
-	 * Currently implemented as SWA.
-	 * Fix is present from qup-core version 4.0.0 onwards[major = 4, minor = 0].
-	 * So below SWA is not applicable from qup-core version 4.0.0 onwards.
-	 */
-	if (gi3c->ver_info.hw_major_ver < 4)
-		geni_se_common_clks_off(gi3c->se.clk, gi3c->i3c_rsc.m_ahb_clk,
-					gi3c->i3c_rsc.s_ahb_clk);
-	else
-		ret = geni_se_resources_off(&gi3c->se);
-
-	if (ret)
-		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
-			"%s geni_se_resources_off failed %d\n", __func__, ret);
+	geni_se_common_clks_off(gi3c->i3c_rsc.se_clk, gi3c->i3c_rsc.m_ahb_clk,
+				gi3c->i3c_rsc.s_ahb_clk);
 	ret = geni_icc_disable(&gi3c->se);
 	if (ret)
 		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
