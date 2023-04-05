@@ -335,6 +335,8 @@ struct geni_i3c_dev {
 	struct geni_i3c_ver_info ver_info;
 	struct msm_geni_i3c_rsc i3c_rsc;
 	struct device *wrapper_dev;
+	bool pm_ctrl_client;  /* set from DTSI by client for AON case */
+	bool probe_completed; /* client probe done flag */
 };
 
 struct geni_i3c_i2c_dev_data {
@@ -1698,6 +1700,12 @@ static int i3c_geni_runtime_get_mutex_lock(struct geni_i3c_dev *gi3c)
 	if (!pm_runtime_enabled(gi3c->se.dev))
 		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev, "PM runtime disabled\n");
 
+	if (gi3c->probe_completed && gi3c->pm_ctrl_client) {
+		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s: client controls the PM, return\n", __func__);
+		return 0;
+	}
+
 	ret = pm_runtime_get_sync(gi3c->se.dev);
 	if (ret < 0) {
 		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
@@ -1715,6 +1723,13 @@ static int i3c_geni_runtime_get_mutex_lock(struct geni_i3c_dev *gi3c)
 
 static void i3c_geni_runtime_put_mutex_unlock(struct geni_i3c_dev *gi3c)
 {
+	if (gi3c->probe_completed && gi3c->pm_ctrl_client) {
+		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s: client controls the PM, return\n", __func__);
+		mutex_unlock(&gi3c->lock);
+		return;
+	}
+
 	pm_runtime_mark_last_busy(gi3c->se.dev);
 	pm_runtime_put_autosuspend(gi3c->se.dev);
 	mutex_unlock(&gi3c->lock);
@@ -1934,9 +1949,15 @@ geni_i3c_master_priv_xfers(struct i3c_dev_desc *dev, struct i3c_priv_xfer *xfers
 	if (num_xfers <= 0)
 		return 0;
 
-	ret = i3c_geni_runtime_get_mutex_lock(gi3c);
-	if (ret)
-		return ret;
+	if (!gi3c->pm_ctrl_client) {
+		ret = i3c_geni_runtime_get_mutex_lock(gi3c);
+		if (ret) {
+			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
+				    "%s: Failed, usage_count:%d\n",
+				    __func__, atomic_read(&gi3c->se.dev->power.usage_count));
+			return ret;
+		}
+	}
 
 	geni_ios = geni_read_reg(gi3c->se.base, SE_GENI_IOS);
 	if ((geni_ios & 0x3) != 0x3) //SCL:b'1, SDA:b'0
@@ -1952,7 +1973,8 @@ geni_i3c_master_priv_xfers(struct i3c_dev_desc *dev, struct i3c_priv_xfer *xfers
 							  num_xfers);
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s ret:%d\n", __func__, ret);
-	i3c_geni_runtime_put_mutex_unlock(gi3c);
+	if (!gi3c->pm_ctrl_client)
+		i3c_geni_runtime_put_mutex_unlock(gi3c);
 
 	return ret;
 }
@@ -1979,9 +2001,15 @@ static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, const struct i2c_
 		return 0;
 	}
 
-	ret = i3c_geni_runtime_get_mutex_lock(gi3c);
-	if (ret)
-		return ret;
+	if (!gi3c->pm_ctrl_client) {
+		ret = i3c_geni_runtime_get_mutex_lock(gi3c);
+		if (ret) {
+			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
+				    "%s: Failed:%d, usage_count:%d\n",
+				    __func__, ret, atomic_read(&gi3c->se.dev->power.usage_count));
+			return ret;
+		}
+	}
 
 	qcom_geni_i3c_conf(gi3c, PUSH_PULL_MODE);
 
@@ -2005,7 +2033,9 @@ static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, const struct i2c_
 		geni_i3c_gsi_stop_on_bus(gi3c);
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "i2c: txn ret:%d\n", ret);
-	i3c_geni_runtime_put_mutex_unlock(gi3c);
+
+	if (!gi3c->pm_ctrl_client)
+		i3c_geni_runtime_put_mutex_unlock(gi3c);
 
 	return ret;
 }
@@ -2222,9 +2252,18 @@ static int geni_i3c_master_send_ccc_cmd(struct i3c_master_controller *m, struct 
 	if (!(cmd->id & I3C_CCC_DIRECT) && (cmd->ndests != 1))
 		return -EINVAL;
 
-	ret = i3c_geni_runtime_get_mutex_lock(gi3c);
-	if (ret)
-		return ret;
+	/* Call get_sync when client doesn't control PM (Regular cases) OR
+	 * when client controlls the PM and client probe didn't happened yet.
+	 */
+	if (!gi3c->pm_ctrl_client ||  !gi3c->probe_completed) {
+		ret = i3c_geni_runtime_get_mutex_lock(gi3c);
+		if (ret) {
+			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
+				    "%s: Failed:%d, usage_count:%d\n",
+				    __func__, ret, atomic_read(&gi3c->se.dev->power.usage_count));
+			return ret;
+		}
+	}
 
 	qcom_geni_i3c_conf(gi3c, OPEN_DRAIN_MODE);
 
@@ -2280,7 +2319,8 @@ static int geni_i3c_master_send_ccc_cmd(struct i3c_master_controller *m, struct 
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "i3c ccc: txn ret:%d\n", ret);
 
-	i3c_geni_runtime_put_mutex_unlock(gi3c);
+	if (!gi3c->pm_ctrl_client ||  !gi3c->probe_completed)
+		i3c_geni_runtime_put_mutex_unlock(gi3c);
 
 	return ret;
 }
@@ -2437,11 +2477,10 @@ err_cleanup:
 	 *use mutex protected internal put/get sync API. Hence forcefully
 	 *disabling clocks and decrementing usage count.
 	 */
-	ret = pm_runtime_put_sync(gi3c->se.dev);
+	ret = pm_runtime_put_sync_suspend(gi3c->se.dev);
 	if (ret < 0) {
 		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
 			"%s: error turning SE resources:%d\n", __func__, ret);
-		/* Do Force suspend */
 		return ret;
 	}
 	return ret;
@@ -3430,6 +3469,14 @@ static int geni_i3c_probe(struct platform_device *pdev)
 
 	gi3c->i3c_rsc.proto = GENI_SE_I3C;
 
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,pm-ctrl-client")) {
+		gi3c->pm_ctrl_client = true;
+		dev_info(&pdev->dev, "Client controls the I3C PM\n");
+	}
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+		    "Client controls the I3C PM, pm_ctrl_client:%d\n",
+		    gi3c->pm_ctrl_client);
+
 	se_mode = geni_read_reg(gi3c->se.base, GENI_IF_DISABLE_RO);
 	if (se_mode) {
 		ret = geni_i3c_gsi_se_init(gi3c);
@@ -3508,6 +3555,16 @@ static int geni_i3c_probe(struct platform_device *pdev)
 	geni_i3c_enable_hotjoin_irq(gi3c, true);
 
 	I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev, "I3C probed:%d\n", ret);
+
+	if (gi3c->pm_ctrl_client) {
+		/* For AON case where client controls the PM, don't use
+		 * autosuspend timer OR set the auto suspend timer value to 0.
+		 */
+		gi3c->probe_completed = true;
+		pm_runtime_set_suspended(gi3c->se.dev);
+		pm_runtime_set_autosuspend_delay(gi3c->se.dev, 0);
+		pm_runtime_use_autosuspend(gi3c->se.dev);
+	}
 	return ret;
 
 geni_resources_off:
@@ -3621,12 +3678,26 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 		}
 	}
 
+	/* resources_off = geni_se_common_clks_off + pinctrl_select_state(sleep) */
 	geni_se_common_clks_off(gi3c->i3c_rsc.se_clk, gi3c->i3c_rsc.m_ahb_clk,
 				gi3c->i3c_rsc.s_ahb_clk);
 	ret = geni_icc_disable(&gi3c->se);
 	if (ret)
 		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
 			"%s geni_icc_disable failed %d\n", __func__, ret);
+
+	/* Client calls put_syc to end the session, we can set PINs to gpio mode */
+	if (gi3c->pm_ctrl_client && gi3c->probe_completed) {
+		ret = pinctrl_select_state(gi3c->i3c_rsc.i3c_pinctrl,
+					   gi3c->i3c_rsc.i3c_gpio_sleep);
+		if (ret)
+			I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+				    "%s: pinctrl sleep state failed\n", __func__);
+		else
+			I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+				    "%s: pinctrl set to sleep state\n", __func__);
+	}
+	/* else Continue to be in active state with i3c_ibi functionality. */
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s():ret:%d\n",
 			 __func__, ret);
