@@ -7,6 +7,8 @@ target_name = "sun"
 def define_sun():
     _sun_in_tree_modules = [
         # keep sorted
+	"drivers/firmware/qcom-scm.ko",
+	"drivers/iommu/arm/arm-smmu/arm_smmu.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
     ]
 
