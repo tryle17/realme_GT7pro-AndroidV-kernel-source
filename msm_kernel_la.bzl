@@ -19,8 +19,8 @@ load(
     "get_dtb_list",
     "get_dtbo_list",
     "get_dtstree",
-    "get_vendor_ramdisk_binaries",
     "get_gki_ramdisk_prebuilt_binary",
+    "get_vendor_ramdisk_binaries",
 )
 load(":msm_common.bzl", "define_top_level_config", "gen_config_without_source_lines", "get_out_dir")
 load(":msm_dtc.bzl", "define_dtc_dist")
@@ -29,7 +29,6 @@ load(":super_image.bzl", "super_image")
 load(":image_opts.bzl", "boot_image_opts")
 load(":target_variants.bzl", "la_variants")
 load(":modules.bzl", "COMMON_GKI_MODULES_LIST")
-
 
 def _define_build_config(
         msm_target,
@@ -150,8 +149,8 @@ def _define_kernel_build(
         base_kernel = base_kernel,
         kmi_symbol_list = "android/abi_gki_aarch64_qcom" if define_abi_targets else None,
         additional_kmi_symbol_lists = ["{}_all_kmi_symbol_lists".format(base_kernel)] if define_abi_targets else None,
-        protected_exports_list = "android/abi_gki_protected_exports" if define_abi_targets else None,
-        protected_modules_list = "android/gki_protected_modules" if define_abi_targets else None,
+        protected_exports_list = "android/abi_gki_protected_exports_aarch64" if define_abi_targets else None,
+        protected_modules_list = "android/gki_aarch64_protected_modules" if define_abi_targets else None,
         collect_unstripped_modules = define_abi_targets,
         visibility = ["//visibility:public"],
     )
@@ -226,7 +225,7 @@ def _define_image_build(
           for module in {mod_list}; do
             basename "$$module" >> "$@"
           done
-        """.format(mod_list = " ".join(in_tree_module_list))
+        """.format(mod_list = " ".join(in_tree_module_list)),
     )
 
     kernel_images(
