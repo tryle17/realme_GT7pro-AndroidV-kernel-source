@@ -2680,21 +2680,24 @@ static int msm_ep_setup_ebc_trbs(struct usb_ep *ep, struct usb_request *req)
 		return -ENOMEM;
 
 	for (i = 0; i < num_trbs; i++) {
+		struct dwc3_trb tmp;
+
 		trb = &edep->ebc_trb_pool[i];
 		memset(trb, 0, sizeof(*trb));
 
 		/* Setup n TRBs pointing to valid buffers */
-		trb->bpl = scan_offset;
-		trb->bph = 0x8000;
-		trb->size = EBC_TRB_SIZE;
-		trb->ctrl = DWC3_TRBCTL_NORMAL | DWC3_TRB_CTRL_CHN |
+		tmp.bpl = scan_offset;
+		tmp.bph = 0x8000;
+		tmp.size = EBC_TRB_SIZE;
+		tmp.ctrl = DWC3_TRBCTL_NORMAL | DWC3_TRB_CTRL_CHN |
 				DWC3_TRB_CTRL_HWO;
 		if (i == (num_trbs-1)) {
-			trb->bpl = desc_offset;
-			trb->bph = 0x8000;
-			trb->size = 0;
-			trb->ctrl = DWC3_TRBCTL_LINK_TRB | DWC3_TRB_CTRL_HWO;
+			tmp.bpl = desc_offset;
+			tmp.bph = 0x8000;
+			tmp.size = 0;
+			tmp.ctrl = DWC3_TRBCTL_LINK_TRB | DWC3_TRB_CTRL_HWO;
 		}
+		memcpy(trb, &tmp, sizeof(*trb));
 		scan_offset += trb->size;
 	}
 
