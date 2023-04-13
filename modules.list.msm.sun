@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
 arm_smmu.ko
+pinctrl-msm.ko
+pinctrl-sun.ko
 qcom-reboot-reason.ko
 qcom-scm.ko
 clk-dummy.ko

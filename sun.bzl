@@ -11,6 +11,8 @@ def define_sun():
         "drivers/clk/qcom/clk-qcom.ko",
         "drivers/firmware/qcom-scm.ko",
         "drivers/iommu/arm/arm-smmu/arm_smmu.ko",
+        "drivers/pinctrl/qcom/pinctrl-msm.ko",
+        "drivers/pinctrl/qcom/pinctrl-sun.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
         "drivers/regulator/stub-regulator.ko",
     ]
