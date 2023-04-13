@@ -31,12 +31,17 @@ def define_sun():
             variant = variant,
             in_tree_module_list = mod_list,
             boot_image_opts = boot_image_opts(
-                earlycon_addr = "qcom_geni,0x00a9C000",
+                earlycon_addr = "hvc0",
                 kernel_vendor_cmdline_extras = [
                     # do not sort
-                    "console=ttyMSM0,115200n8",
-                    "qcom_geni_serial.con_enabled=1",
+                    "console=hvc0",
+                    "nowatchdog",	# disable wdog for now
+                    "hvc_dcc.enable=1",
                     "bootconfig",
+                    "printk.devkmsg=on",
+                    "loglevel=8",
+                    "nokaslr",
+                    "androidboot.first_stage_console=1",
                 ],
             ),
         )
