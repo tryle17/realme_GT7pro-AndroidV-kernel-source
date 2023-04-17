@@ -3,3 +3,5 @@
 arm_smmu.ko
 qcom-reboot-reason.ko
 qcom-scm.ko
+clk-dummy.ko
+clk-qcom.ko
