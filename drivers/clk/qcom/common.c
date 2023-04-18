@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2014, 2017-2021, The Linux Foundation.
- * All rights reserved.
+ * Copyright (c) 2013-2014, 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/export.h>
@@ -24,6 +24,7 @@
 #include "reset.h"
 #include "gdsc.h"
 #include "vdd-level.h"
+#include "clk-debug.h"
 
 struct qcom_cc {
 	struct qcom_reset_controller reset;
@@ -563,4 +564,11 @@ int qcom_cc_runtime_suspend(struct device *dev)
 }
 EXPORT_SYMBOL(qcom_cc_runtime_suspend);
 
+static void __exit qcom_clk_exit(void)
+{
+	clk_debug_exit();
+}
+module_exit(qcom_clk_exit);
+
+MODULE_DESCRIPTION("Common QCOM clock control library");
 MODULE_LICENSE("GPL v2");
