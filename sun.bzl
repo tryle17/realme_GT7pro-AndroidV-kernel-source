@@ -12,6 +12,7 @@ def define_sun():
         "drivers/firmware/qcom-scm.ko",
         "drivers/iommu/arm/arm-smmu/arm_smmu.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
+        "drivers/regulator/stub-regulator.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
