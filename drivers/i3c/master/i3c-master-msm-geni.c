@@ -1491,6 +1491,25 @@ static void geni_i3c_hotjoin(struct work_struct *work)
 		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev, "hotjoin:daa failed %d\n", ret);
 
 	pm_relax(gi3c->se.dev);
+
+	if (gi3c->pm_ctrl_client && gi3c->probe_completed) {
+		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s: Client must vote, debug from client\n", __func__);
+		return;
+	}
+
+	if (gi3c->pm_ctrl_client && !gi3c->probe_completed) {
+		/* For AON case where client controls the PM, don't use
+		 * autosuspend timer OR set the auto suspend timer value to
+		 * minimal just to give settling time to client to probed.
+		 * Here onwards, client keeps/removes the vote not the driver.
+		 */
+		pm_runtime_set_autosuspend_delay(gi3c->se.dev, 0);
+		pm_runtime_use_autosuspend(gi3c->se.dev);
+		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s: autosuspend timer only once for client\n", __func__);
+		gi3c->probe_completed = true;
+	}
 }
 
 static void geni_i3c_handle_received_ibi(struct geni_i3c_dev *gi3c)
@@ -3508,9 +3527,12 @@ static int geni_i3c_probe(struct platform_device *pdev)
 			    tx_depth, gi3c->se_mode);
 	}
 
-	pm_runtime_set_suspended(gi3c->se.dev);
-	pm_runtime_set_autosuspend_delay(gi3c->se.dev, I3C_AUTO_SUSPEND_DELAY);
-	pm_runtime_use_autosuspend(gi3c->se.dev);
+	if (!gi3c->pm_ctrl_client) {
+		//For NAON case (driver controlled PM) go for autosuspend.
+		pm_runtime_set_suspended(gi3c->se.dev);
+		pm_runtime_set_autosuspend_delay(gi3c->se.dev, I3C_AUTO_SUSPEND_DELAY);
+		pm_runtime_use_autosuspend(gi3c->se.dev);
+	}
 	pm_runtime_enable(gi3c->se.dev);
 
 	geni_ios = geni_read_reg(gi3c->se.base, SE_GENI_IOS);
@@ -3555,16 +3577,6 @@ static int geni_i3c_probe(struct platform_device *pdev)
 	geni_i3c_enable_hotjoin_irq(gi3c, true);
 
 	I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev, "I3C probed:%d\n", ret);
-
-	if (gi3c->pm_ctrl_client) {
-		/* For AON case where client controls the PM, don't use
-		 * autosuspend timer OR set the auto suspend timer value to 0.
-		 */
-		gi3c->probe_completed = true;
-		pm_runtime_set_suspended(gi3c->se.dev);
-		pm_runtime_set_autosuspend_delay(gi3c->se.dev, 0);
-		pm_runtime_use_autosuspend(gi3c->se.dev);
-	}
 	return ret;
 
 geni_resources_off:
