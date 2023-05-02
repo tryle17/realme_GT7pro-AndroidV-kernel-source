@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
 
 #ifndef __DRIVERS_INTERCONNECT_QCOM_ICC_RPMH_H__
 #define __DRIVERS_INTERCONNECT_QCOM_ICC_RPMH_H__
 
 #include <dt-bindings/interconnect/qcom,icc.h>
+#include <linux/regmap.h>
+#include <linux/platform_device.h>
 
 #define to_qcom_provider(_provider) \
 	container_of(_provider, struct qcom_icc_provider, provider)
@@ -24,7 +26,12 @@ struct qcom_icc_provider {
 	struct device *dev;
 	struct qcom_icc_bcm * const *bcms;
 	size_t num_bcms;
-	struct bcm_voter *voter;
+	struct list_head probe_list;
+	struct regmap *regmap;
+	struct clk_bulk_data *clks;
+	int num_clks;
+	struct bcm_voter **voters;
+	size_t num_voters;
 };
 
 /**
@@ -70,6 +77,9 @@ struct qcom_icc_node {
 	u64 max_peak[QCOM_ICC_NUM_BUCKETS];
 	struct qcom_icc_bcm *bcms[MAX_BCM_PER_NODE];
 	size_t num_bcms;
+	struct regmap *regmap;
+	struct qcom_icc_qosbox *qosbox;
+	const struct qcom_icc_noc_ops *noc_ops;
 };
 
 /**
@@ -102,6 +112,7 @@ struct qcom_icc_bcm {
 	struct bcm_db aux_data;
 	struct list_head list;
 	struct list_head ws_list;
+	int voter_idx;
 	size_t num_nodes;
 	struct qcom_icc_node *nodes[];
 };
@@ -113,9 +124,12 @@ struct qcom_icc_fabric {
 
 struct qcom_icc_desc {
 	struct qcom_icc_node * const *nodes;
+	const struct regmap_config *config;
 	size_t num_nodes;
 	struct qcom_icc_bcm * const *bcms;
 	size_t num_bcms;
+	char **voters;
+	size_t num_voters;
 };
 
 #define DEFINE_QNODE(_name, _id, _channels, _buswidth, ...)		\
@@ -130,10 +144,14 @@ struct qcom_icc_desc {
 
 int qcom_icc_aggregate(struct icc_node *node, u32 tag, u32 avg_bw,
 		       u32 peak_bw, u32 *agg_avg, u32 *agg_peak);
+int qcom_icc_aggregate_stub(struct icc_node *node, u32 tag, u32 avg_bw,
+			    u32 peak_bw, u32 *agg_avg, u32 *agg_peak);
 int qcom_icc_set(struct icc_node *src, struct icc_node *dst);
+int qcom_icc_set_stub(struct icc_node *src, struct icc_node *dst);
 int qcom_icc_bcm_init(struct qcom_icc_bcm *bcm, struct device *dev);
 void qcom_icc_pre_aggregate(struct icc_node *node);
 int qcom_icc_rpmh_probe(struct platform_device *pdev);
 int qcom_icc_rpmh_remove(struct platform_device *pdev);
-
+void qcom_icc_rpmh_sync_state(struct device *dev);
+int qcom_icc_get_bw_stub(struct icc_node *node, u32 *avg, u32 *peak);
 #endif
