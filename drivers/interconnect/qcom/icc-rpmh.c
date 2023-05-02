@@ -37,6 +37,7 @@ void qcom_icc_pre_aggregate(struct icc_node *node)
 	for (i = 0; i < QCOM_ICC_NUM_BUCKETS; i++) {
 		qn->sum_avg[i] = 0;
 		qn->max_peak[i] = 0;
+		qn->perf_mode[i] = false;
 	}
 
 	for (i = 0; i < qn->num_bcms; i++)
@@ -69,6 +70,8 @@ int qcom_icc_aggregate(struct icc_node *node, u32 tag, u32 avg_bw,
 		if (tag & BIT(i)) {
 			qn->sum_avg[i] += avg_bw;
 			qn->max_peak[i] = max_t(u32, qn->max_peak[i], peak_bw);
+			if (tag & QCOM_ICC_TAG_PERF_MODE && (avg_bw || peak_bw))
+				qn->perf_mode[i] = true;
 		}
 
 		if (node->init_avg || node->init_peak) {
@@ -170,8 +173,8 @@ int qcom_icc_bcm_init(struct qcom_icc_bcm *bcm, struct device *dev)
 		return -EINVAL;
 	}
 
-	bcm->aux_data.unit = le32_to_cpu(data->unit);
-	bcm->aux_data.width = le16_to_cpu(data->width);
+	bcm->aux_data.unit = max_t(u32, 1, le32_to_cpu(data->unit));
+	bcm->aux_data.width = max_t(u16, 1, le16_to_cpu(data->width));
 	bcm->aux_data.vcd = data->vcd;
 	bcm->aux_data.reserved = data->reserved;
 	INIT_LIST_HEAD(&bcm->list);
@@ -190,6 +193,72 @@ int qcom_icc_bcm_init(struct qcom_icc_bcm *bcm, struct device *dev)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(qcom_icc_bcm_init);
+
+static bool bcm_needs_qos_proxy(struct qcom_icc_bcm *bcm)
+{
+	int i;
+
+	if (bcm->voter_idx == 0)
+		for (i = 0; i < bcm->num_nodes; i++)
+			if (bcm->nodes[i]->qosbox)
+				return true;
+
+	return false;
+}
+
+static int enable_qos_deps(struct qcom_icc_provider *qp)
+{
+	struct qcom_icc_bcm *bcm;
+	struct bcm_voter *voter;
+	bool keepalive;
+	int ret, i;
+
+	for (i = 0; i < qp->num_bcms; i++) {
+		bcm = qp->bcms[i];
+		if (bcm_needs_qos_proxy(bcm)) {
+			keepalive = bcm->keepalive;
+			bcm->keepalive = true;
+
+			voter = qp->voters[bcm->voter_idx];
+			qcom_icc_bcm_voter_add(voter, bcm);
+			ret = qcom_icc_bcm_voter_commit(voter);
+
+			bcm->keepalive = keepalive;
+
+			if (ret) {
+				dev_err(qp->dev, "failed to vote BW to %s for QoS\n",
+					bcm->name);
+				return ret;
+			}
+		}
+	}
+
+	ret = clk_bulk_prepare_enable(qp->num_clks, qp->clks);
+	if (ret) {
+		dev_err(qp->dev, "failed to enable clocks for QoS\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static void disable_qos_deps(struct qcom_icc_provider *qp)
+{
+	struct qcom_icc_bcm *bcm;
+	struct bcm_voter *voter;
+	int i;
+
+	clk_bulk_disable_unprepare(qp->num_clks, qp->clks);
+
+	for (i = 0; i < qp->num_bcms; i++) {
+		bcm = qp->bcms[i];
+		if (bcm_needs_qos_proxy(bcm)) {
+			voter = qp->voters[bcm->voter_idx];
+			qcom_icc_bcm_voter_add(voter, bcm);
+			qcom_icc_bcm_voter_commit(voter);
+		}
+	}
+}
 
 static struct regmap *qcom_icc_rpmh_map(struct platform_device *pdev,
 					const struct qcom_icc_desc *desc)
@@ -236,6 +305,9 @@ int qcom_icc_rpmh_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENOMEM;
 
+	qp->stub = of_property_read_bool(pdev->dev.of_node, "qcom,stub");
+	qp->skip_qos = of_property_read_bool(pdev->dev.of_node, "qcom,skip-qos");
+
 	provider = &qp->provider;
 	provider->dev = dev;
 	provider->set = qcom_icc_set_stub;
@@ -248,19 +320,22 @@ int qcom_icc_rpmh_probe(struct platform_device *pdev)
 
 	qp->dev = dev;
 	qp->bcms = desc->bcms;
-	qp->num_bcms = desc->num_bcms;
 
-	qp->num_voters = desc->num_voters;
-	qp->voters = devm_kcalloc(&pdev->dev, qp->num_voters,
-				  sizeof(*qp->voters), GFP_KERNEL);
+	if (!qp->stub) {
+		qp->num_bcms = desc->num_bcms;
+		qp->num_voters = desc->num_voters;
 
-	if (!qp->voters)
-		return -ENOMEM;
+		qp->voters = devm_kcalloc(&pdev->dev, qp->num_voters,
+					  sizeof(*qp->voters), GFP_KERNEL);
 
-	for (i = 0; i < qp->num_voters; i++) {
-		qp->voters[i] = of_bcm_voter_get(qp->dev, desc->voters[i]);
-		if (IS_ERR(qp->voters[i]))
-			return PTR_ERR(qp->voters[i]);
+		if (!qp->voters)
+			return -ENOMEM;
+
+		for (i = 0; i < qp->num_voters; i++) {
+			qp->voters[i] = of_bcm_voter_get(qp->dev, desc->voters[i]);
+			if (IS_ERR(qp->voters[i]))
+				return PTR_ERR(qp->voters[i]);
+		}
 	}
 
 	qp->regmap = qcom_icc_rpmh_map(pdev, desc);
@@ -275,14 +350,14 @@ int qcom_icc_rpmh_probe(struct platform_device *pdev)
 	if (qp->num_clks < 0)
 		return qp->num_clks;
 
-	ret = clk_bulk_prepare_enable(qp->num_clks, qp->clks);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to enable clocks\n");
-		return ret;
-	}
-
 	for (i = 0; i < qp->num_bcms; i++)
 		qcom_icc_bcm_init(qp->bcms[i], dev);
+
+	if (!qp->skip_qos) {
+		ret = enable_qos_deps(qp);
+		if (ret)
+			return ret;
+	}
 
 	for (i = 0; i < num_nodes; i++) {
 		qn = qnodes[i];
@@ -297,7 +372,7 @@ int qcom_icc_rpmh_probe(struct platform_device *pdev)
 			goto err;
 		}
 
-		if (qn->qosbox)
+		if (qn->qosbox && !qp->skip_qos)
 			qn->noc_ops->set_qos(qn);
 
 		node->name = qn->name;
@@ -310,6 +385,9 @@ int qcom_icc_rpmh_probe(struct platform_device *pdev)
 		data->nodes[i] = node;
 	}
 
+	if (!qp->skip_qos)
+		disable_qos_deps(qp);
+
 	data->num_nodes = num_nodes;
 	platform_set_drvdata(pdev, qp);
 
@@ -317,8 +395,10 @@ int qcom_icc_rpmh_probe(struct platform_device *pdev)
 	if (of_get_child_count(dev->of_node) > 0)
 		return of_platform_populate(dev->of_node, NULL, NULL, dev);
 
-	provider->set = qcom_icc_set;
-	provider->aggregate = qcom_icc_aggregate;
+	if (!qp->stub) {
+		provider->set = qcom_icc_set;
+		provider->aggregate = qcom_icc_aggregate;
+	}
 
 	qcom_icc_debug_register(provider);
 
