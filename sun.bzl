@@ -7,8 +7,10 @@ target_name = "sun"
 def define_sun():
     _sun_in_tree_modules = [
         # keep sorted
-	"drivers/firmware/qcom-scm.ko",
-	"drivers/iommu/arm/arm-smmu/arm_smmu.ko",
+        "drivers/clk/qcom/clk-dummy.ko",
+        "drivers/clk/qcom/clk-qcom.ko",
+        "drivers/firmware/qcom-scm.ko",
+        "drivers/iommu/arm/arm-smmu/arm_smmu.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
     ]
 
@@ -37,7 +39,7 @@ def define_sun():
                 kernel_vendor_cmdline_extras = [
                     # do not sort
                     "console=hvc0",
-                    "nowatchdog",	# disable wdog for now
+                    "nowatchdog",  # disable wdog for now
                     "hvc_dcc.enable=1",
                     "bootconfig",
                     "printk.devkmsg=on",
