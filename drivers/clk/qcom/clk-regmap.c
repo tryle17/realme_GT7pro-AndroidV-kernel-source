@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2014, 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2019-2021 The Linux Foundation. All rights reserved.
  */
 
 #include <linux/device.h>
@@ -12,6 +12,7 @@
 #include "clk-regmap.h"
 
 static LIST_HEAD(clk_regmap_list);
+static DEFINE_MUTEX(clk_regmap_lock);
 
 /**
  * clk_is_enabled_regmap - standard is_enabled() for regmap users
@@ -246,14 +247,20 @@ EXPORT_SYMBOL(clk_unprepare_regmap);
 bool clk_is_regmap_clk(struct clk_hw *hw)
 {
 	struct clk_regmap *rclk;
+	bool is_regmap_clk = false;
 
 	if (hw) {
-		list_for_each_entry(rclk, &clk_regmap_list, list_node)
-			if (&rclk->hw  == hw)
-				return true;
+		mutex_lock(&clk_regmap_lock);
+		list_for_each_entry(rclk, &clk_regmap_list, list_node) {
+			if (&rclk->hw == hw) {
+				is_regmap_clk = true;
+				break;
+			}
+		}
+		mutex_unlock(&clk_regmap_lock);
 	}
 
-	return false;
+	return is_regmap_clk;
 }
 EXPORT_SYMBOL(clk_is_regmap_clk);
 
@@ -270,6 +277,7 @@ EXPORT_SYMBOL(clk_is_regmap_clk);
  */
 int devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk)
 {
+	const struct clk_ops *ops;
 	int ret;
 
 	rclk->dev = dev;
@@ -279,9 +287,20 @@ int devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk)
 	else if (dev && dev->parent)
 		rclk->regmap = dev_get_regmap(dev->parent, NULL);
 
+	if (rclk->flags & QCOM_CLK_IS_CRITICAL) {
+		ops = rclk->hw.init->ops;
+		if (ops && ops->enable)
+			ops->enable(&rclk->hw);
+
+		return 0;
+	}
+
 	ret = devm_clk_hw_register(dev, &rclk->hw);
-	if (!ret)
+	if (!ret) {
+		mutex_lock(&clk_regmap_lock);
 		list_add(&rclk->list_node, &clk_regmap_list);
+		mutex_unlock(&clk_regmap_lock);
+	}
 
 	return ret;
 }
