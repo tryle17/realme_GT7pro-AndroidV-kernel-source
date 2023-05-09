@@ -7,6 +7,7 @@
 #include <linux/clk-provider.h>
 #include <linux/regmap.h>
 #include <linux/export.h>
+#include <linux/pm_runtime.h>
 
 #include "clk-regmap.h"
 
@@ -107,7 +108,7 @@ int clk_pre_change_regmap(struct clk_hw *hw, unsigned long cur_rate,
 	int new_vdd_level;
 	int ret = 0;
 
-	if (!rclk->vdd_data.vdd_class)
+	if (!rclk->vdd_data.rate_max)
 		return 0;
 
 	new_vdd_level = clk_find_vdd_level(hw, &rclk->vdd_data, new_rate);
@@ -152,7 +153,7 @@ int clk_post_change_regmap(struct clk_hw *hw, unsigned long old_rate,
 	int cur_vdd_level;
 	int ret = 0;
 
-	if (!rclk->vdd_data.vdd_class)
+	if (!rclk->vdd_data.rate_max)
 		return 0;
 
 	cur_vdd_level = clk_find_vdd_level(hw, &rclk->vdd_data, cur_rate);
@@ -195,7 +196,7 @@ int clk_prepare_regmap(struct clk_hw *hw)
 	int rate = clk_hw_get_rate(hw);
 	int vdd_level;
 
-	if (!rclk->vdd_data.vdd_class)
+	if (!rclk->vdd_data.rate_max)
 		return 0;
 
 	vdd_level = clk_find_vdd_level(hw, &rclk->vdd_data, rate);
@@ -225,7 +226,7 @@ void clk_unprepare_regmap(struct clk_hw *hw)
 {
 	struct clk_regmap *rclk = to_clk_regmap(hw);
 
-	if (!rclk->vdd_data.vdd_class)
+	if (!rclk->vdd_data.rate_max)
 		return;
 
 	clk_unvote_vdd_level(&rclk->vdd_data, rclk->vdd_data.vdd_level);
@@ -271,6 +272,8 @@ int devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk)
 {
 	int ret;
 
+	rclk->dev = dev;
+
 	if (dev && dev_get_regmap(dev, NULL))
 		rclk->regmap = dev_get_regmap(dev, NULL);
 	else if (dev && dev->parent)
@@ -283,3 +286,24 @@ int devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(devm_clk_register_regmap);
+
+int clk_runtime_get_regmap(struct clk_regmap *rclk)
+{
+	int ret;
+
+	if (pm_runtime_enabled(rclk->dev)) {
+		ret = pm_runtime_get_sync(rclk->dev);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(clk_runtime_get_regmap);
+
+void clk_runtime_put_regmap(struct clk_regmap *rclk)
+{
+	if (pm_runtime_enabled(rclk->dev))
+		pm_runtime_put_sync(rclk->dev);
+}
+EXPORT_SYMBOL(clk_runtime_put_regmap);

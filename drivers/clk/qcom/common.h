@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2014, 2018-2019, The Linux Foundation. All rights reserved. */
+/* Copyright (c) 2014, 2018-2020, The Linux Foundation. All rights reserved. */
 
 #ifndef __QCOM_CLK_COMMON_H__
 #define __QCOM_CLK_COMMON_H__
@@ -31,6 +31,9 @@ struct qcom_cc_desc {
 	size_t num_gdscs;
 	struct clk_hw **clk_hws;
 	size_t num_clk_hws;
+	struct clk_vdd_class **clk_regulators;
+	size_t num_clk_regulators;
+	struct icc_path *path;
 };
 
 /**
@@ -75,4 +78,10 @@ extern int qcom_cc_probe_by_index(struct platform_device *pdev, int index,
 				  const struct qcom_cc_desc *desc);
 extern const struct clk_ops clk_dummy_ops;
 void qcom_cc_sync_state(struct device *dev, const struct qcom_cc_desc *desc);
+
+int qcom_cc_runtime_init(struct platform_device *pdev,
+			 struct qcom_cc_desc *desc);
+int qcom_cc_runtime_suspend(struct device *dev);
+int qcom_cc_runtime_resume(struct device *dev);
+
 #endif
