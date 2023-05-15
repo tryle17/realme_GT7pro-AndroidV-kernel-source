@@ -739,6 +739,14 @@ config SM_GCC_8450
 	  Say Y if you want to use peripheral devices such as UART,
 	  SPI, I2C, USB, SD/UFS, PCIe etc.
 
+config SM_GCC_SUN
+        tristate "SUN Global Clock Controller"
+        help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to use peripheral devices such as UART,
+	  SPI, I2C, USB, SD/UFS, PCIe etc.
+
 config SM_GPUCC_6350
 	tristate "SM6350 Graphics Clock Controller"
 	select SM_GCC_6350
