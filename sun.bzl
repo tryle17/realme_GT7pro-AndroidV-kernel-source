@@ -9,6 +9,7 @@ def define_sun():
         # keep sorted
         "drivers/clk/qcom/clk-dummy.ko",
         "drivers/clk/qcom/clk-qcom.ko",
+        "drivers/clk/qcom/gcc-sun.ko",
         "drivers/firmware/qcom-scm.ko",
         "drivers/iommu/arm/arm-smmu/arm_smmu.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
