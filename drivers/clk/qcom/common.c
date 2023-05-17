@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2014, 2017-2021, The Linux Foundation.
- * All rights reserved.
+ * Copyright (c) 2013-2014, 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/export.h>
@@ -24,6 +24,7 @@
 #include "reset.h"
 #include "gdsc.h"
 #include "vdd-level.h"
+#include "clk-debug.h"
 
 struct qcom_cc {
 	struct qcom_reset_controller reset;
@@ -245,29 +246,34 @@ static void qcom_cc_set_critical(struct device *dev, struct qcom_cc *cc)
 		if (i >= cc->num_rclks)
 			continue;
 
-		cc->rclks[i]->flags |= QCOM_CLK_IS_CRITICAL;
+		if (cc->rclks[i])
+			cc->rclks[i]->flags |= QCOM_CLK_IS_CRITICAL;
 	}
 
 	of_property_for_each_u32(dev->of_node, "qcom,critical-devices", prop, p, i) {
-		np = of_find_node_by_phandle(i);
-		if (!np)
-			continue;
-
-		cnt = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-
-		for (i = 0; i < cnt; i++) {
-			of_parse_phandle_with_args(np, "clocks", "#clock-cells",
-						   i, &args);
-			clock_idx = args.args[0];
-
-			if (args.np != dev->of_node || clock_idx >= cc->num_rclks)
+		for (np = of_find_node_by_phandle(i); np; np = of_get_parent(np)) {
+			if (!of_property_read_bool(np, "clocks")) {
+				of_node_put(np);
 				continue;
+			}
 
-			cc->rclks[clock_idx]->flags |= QCOM_CLK_IS_CRITICAL;
-			of_node_put(args.np);
+			cnt = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+
+			for (i = 0; i < cnt; i++) {
+				of_parse_phandle_with_args(np, "clocks", "#clock-cells",
+							   i, &args);
+				clock_idx = args.args[0];
+
+				if (args.np != dev->of_node || clock_idx >= cc->num_rclks)
+					continue;
+
+				if (cc->rclks[clock_idx])
+					cc->rclks[clock_idx]->flags |= QCOM_CLK_IS_CRITICAL;
+				of_node_put(args.np);
+			}
+
+			of_node_put(np);
 		}
-
-		of_node_put(np);
 	}
 }
 
@@ -444,6 +450,29 @@ int qcom_clk_get_voltage(struct clk *clk, unsigned long rate)
 }
 EXPORT_SYMBOL(qcom_clk_get_voltage);
 
+int qcom_clk_set_flags(struct clk *clk, unsigned long flags)
+{
+	struct clk_regmap *rclk;
+	struct clk_hw *hw;
+
+	if (IS_ERR_OR_NULL(clk))
+		return 0;
+
+	hw = __clk_get_hw(clk);
+	if (IS_ERR_OR_NULL(hw))
+		return -EINVAL;
+
+	if (!clk_is_regmap_clk(hw))
+		return -EINVAL;
+
+	rclk = to_clk_regmap(hw);
+	if (rclk->ops && rclk->ops->set_flags)
+		return rclk->ops->set_flags(hw, flags);
+
+	return 0;
+}
+EXPORT_SYMBOL(qcom_clk_set_flags);
+
 int qcom_cc_runtime_init(struct platform_device *pdev,
 			 struct qcom_cc_desc *desc)
 {
@@ -563,4 +592,11 @@ int qcom_cc_runtime_suspend(struct device *dev)
 }
 EXPORT_SYMBOL(qcom_cc_runtime_suspend);
 
+static void __exit qcom_clk_exit(void)
+{
+	clk_debug_exit();
+}
+module_exit(qcom_clk_exit);
+
+MODULE_DESCRIPTION("Common QCOM clock control library");
 MODULE_LICENSE("GPL v2");

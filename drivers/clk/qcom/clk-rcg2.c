@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013, 2016-2018, 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -21,6 +22,7 @@
 
 #include "clk-rcg.h"
 #include "common.h"
+#include "clk-debug.h"
 
 #define CMD_REG			0x0
 #define CMD_UPDATE		BIT(0)
@@ -117,20 +119,37 @@ static u8 clk_rcg2_get_parent(struct clk_hw *hw)
 	return __clk_rcg2_get_parent(hw, cfg);
 }
 
+static int get_update_timeout(const struct clk_rcg2 *rcg)
+{
+	int timeout = 0;
+
+	/*
+	 * The time it takes an RCG to update is roughly 3 clock cycles of the
+	 * old and new clock rates.
+	 */
+	if (rcg->current_freq)
+		timeout += 3 * (1000000 / rcg->current_freq);
+	if (rcg->configured_freq)
+		timeout += 3 * (1000000 / rcg->configured_freq);
+
+	return max(timeout, 500);
+}
+
 static int update_config(struct clk_rcg2 *rcg)
 {
-	int count, ret;
+	int timeout, count, ret;
 	u32 cmd;
 	struct clk_hw *hw = &rcg->clkr.hw;
-	const char *name = clk_hw_get_name(hw);
 
 	ret = regmap_update_bits(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG,
 				 CMD_UPDATE, CMD_UPDATE);
 	if (ret)
 		return ret;
 
+	timeout = get_update_timeout(rcg);
+
 	/* Wait for update to take effect */
-	for (count = 500; count > 0; count--) {
+	for (count = timeout; count > 0; count--) {
 		ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG, &cmd);
 		if (ret)
 			return ret;
@@ -139,7 +158,7 @@ static int update_config(struct clk_rcg2 *rcg)
 		udelay(1);
 	}
 
-	WARN(1, "%s: rcg didn't update its configuration.", name);
+	WARN_CLK(hw, 1, "rcg didn't update its configuration after %d us.", timeout);
 	return -EBUSY;
 }
 
@@ -174,7 +193,7 @@ static int clk_rcg2_set_force_enable(struct clk_hw *hw)
 		udelay(1);
 	}
 
-	WARN(1, "%s: rcg didn't turn on.", clk_hw_get_name(hw));
+	WARN_CLK(hw, 1, "rcg didn't turn on.");
 	return ret;
 }
 
@@ -380,7 +399,7 @@ static int _freq_tbl_determine_rate(struct clk_hw *hw, const struct freq_tbl *f,
 		rate =  clk_hw_get_rate(p);
 	}
 	req->best_parent_hw = p;
-	req->best_parent_rate = rate;
+	req->best_parent_rate = clk_hw_round_rate(p, rate);
 	req->rate = f->freq;
 
 	if (f->src_freq != FIXED_FREQ_SRC) {
@@ -486,7 +505,75 @@ static int clk_rcg2_configure(struct clk_rcg2 *rcg, const struct freq_tbl *f)
 	if (ret)
 		return ret;
 
+	rcg->configured_freq = f->freq;
+
 	return update_config(rcg);
+}
+
+static void clk_rcg2_list_registers(struct seq_file *f, struct clk_hw *hw)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	static struct clk_register_data *data;
+	int i, val;
+
+	static struct clk_register_data data1[] = {
+		{"CMD_RCGR", 0x0},
+		{"CFG_RCGR", 0x4},
+		{ },
+	};
+
+	static struct clk_register_data data2[] = {
+		{"CMD_RCGR", 0x0},
+		{"CFG_RCGR", 0x4},
+		{"M_VAL", 0x8},
+		{"N_VAL", 0xC},
+		{"D_VAL", 0x10},
+		{ },
+	};
+
+	static struct clk_register_data data3[] = {
+		{"CMD_RCGR", 0x0},
+		{"CFG_RCGR", 0x4},
+		{"M_VAL", 0x8},
+		{"N_VAL", 0xC},
+		{"D_VAL", 0x10},
+		{"CMD_DFSR", 0x14},
+		{ },
+	};
+
+	if (rcg->flags & DFS_SUPPORT)
+		data = data3;
+	else if (rcg->mnd_width)
+		data = data2;
+	else
+		data = data1;
+
+	for (i = 0; data[i].name != NULL; i++) {
+		regmap_read(rcg->clkr.regmap, (rcg->cmd_rcgr +
+				data[i].offset), &val);
+		clock_debug_output(f, "%20s: 0x%.8x\n", data[i].name, val);
+	}
+
+}
+
+/* Return the nth supported frequency for a given clock. */
+static long clk_rcg2_list_rate(struct clk_hw *hw, unsigned int n,
+		unsigned long fmax)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	const struct freq_tbl *f = rcg->freq_tbl;
+	size_t freq_tbl_size = 0;
+
+	if (!f)
+		return -ENXIO;
+
+	for (; f->freq; f++)
+		freq_tbl_size++;
+
+	if (n > freq_tbl_size - 1)
+		return -EINVAL;
+
+	return (rcg->freq_tbl + n)->freq;
 }
 
 static int __clk_rcg2_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -757,6 +844,21 @@ static void clk_rcg2_disable(struct clk_hw *hw)
 	clk_rcg2_clear_force_enable(hw);
 }
 
+static struct clk_regmap_ops clk_rcg2_regmap_ops = {
+	.list_rate = clk_rcg2_list_rate,
+	.list_registers = clk_rcg2_list_registers,
+};
+
+static int clk_rcg2_init(struct clk_hw *hw)
+{
+	struct clk_regmap *rclk = to_clk_regmap(hw);
+
+	if (!rclk->ops)
+		rclk->ops = &clk_rcg2_regmap_ops;
+
+	return 0;
+}
+
 const struct clk_ops clk_rcg2_ops = {
 	.prepare = clk_prepare_regmap,
 	.unprepare = clk_unprepare_regmap,
@@ -773,6 +875,8 @@ const struct clk_ops clk_rcg2_ops = {
 	.set_rate_and_parent = clk_rcg2_set_rate_and_parent,
 	.get_duty_cycle = clk_rcg2_get_duty_cycle,
 	.set_duty_cycle = clk_rcg2_set_duty_cycle,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_rcg2_ops);
 
@@ -782,6 +886,8 @@ const struct clk_ops clk_rcg2_floor_ops = {
 	.pre_rate_change = clk_pre_change_regmap,
 	.post_rate_change = clk_post_change_regmap,
 	.is_enabled = clk_rcg2_is_enabled,
+	.enable = clk_rcg2_enable,
+	.disable = clk_rcg2_disable,
 	.get_parent = clk_rcg2_get_parent,
 	.set_parent = clk_rcg2_set_parent,
 	.recalc_rate = clk_rcg2_recalc_rate,
@@ -790,6 +896,8 @@ const struct clk_ops clk_rcg2_floor_ops = {
 	.set_rate_and_parent = clk_rcg2_set_floor_rate_and_parent,
 	.get_duty_cycle = clk_rcg2_get_duty_cycle,
 	.set_duty_cycle = clk_rcg2_set_duty_cycle,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_rcg2_floor_ops);
 
@@ -930,6 +1038,8 @@ const struct clk_ops clk_edp_pixel_ops = {
 	.set_rate = clk_edp_pixel_set_rate,
 	.set_rate_and_parent = clk_edp_pixel_set_rate_and_parent,
 	.determine_rate = clk_edp_pixel_determine_rate,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_edp_pixel_ops);
 
@@ -994,6 +1104,8 @@ const struct clk_ops clk_byte_ops = {
 	.set_rate = clk_byte_set_rate,
 	.set_rate_and_parent = clk_byte_set_rate_and_parent,
 	.determine_rate = clk_byte_determine_rate,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_byte_ops);
 
@@ -1069,6 +1181,8 @@ const struct clk_ops clk_byte2_ops = {
 	.set_rate = clk_byte2_set_rate,
 	.set_rate_and_parent = clk_byte2_set_rate_and_parent,
 	.determine_rate = clk_byte2_determine_rate,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_byte2_ops);
 
@@ -1167,6 +1281,8 @@ const struct clk_ops clk_pixel_ops = {
 	.set_rate = clk_pixel_set_rate,
 	.set_rate_and_parent = clk_pixel_set_rate_and_parent,
 	.determine_rate = clk_pixel_determine_rate,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_pixel_ops);
 
@@ -1287,6 +1403,8 @@ const struct clk_ops clk_gfx3d_ops = {
 	.set_rate = clk_gfx3d_set_rate,
 	.set_rate_and_parent = clk_gfx3d_set_rate_and_parent,
 	.determine_rate = clk_gfx3d_determine_rate,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_gfx3d_ops);
 
@@ -1438,6 +1556,8 @@ const struct clk_ops clk_rcg2_shared_ops = {
 	.determine_rate = clk_rcg2_determine_rate,
 	.set_rate = clk_rcg2_shared_set_rate,
 	.set_rate_and_parent = clk_rcg2_shared_set_rate_and_parent,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_rcg2_shared_ops);
 
@@ -1587,6 +1707,8 @@ static const struct clk_ops clk_rcg2_dfs_ops = {
 	.get_parent = clk_rcg2_get_parent,
 	.determine_rate = clk_rcg2_dfs_determine_rate,
 	.recalc_rate = clk_rcg2_dfs_recalc_rate,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 
 static int clk_rcg2_enable_dfs(const struct clk_rcg_dfs_data *data,
@@ -1596,6 +1718,8 @@ static int clk_rcg2_enable_dfs(const struct clk_rcg_dfs_data *data,
 	struct clk_init_data *init = data->init;
 	u32 val;
 	int ret;
+
+	rcg->flags |= DFS_SUPPORT;
 
 	ret = regmap_read(regmap, rcg->cmd_rcgr + SE_CMD_DFSR_OFFSET, &val);
 	if (ret)
@@ -1715,5 +1839,7 @@ const struct clk_ops clk_dp_ops = {
 	.set_rate = clk_rcg2_dp_set_rate,
 	.set_rate_and_parent = clk_rcg2_dp_set_rate_and_parent,
 	.determine_rate = clk_rcg2_dp_determine_rate,
+	.init = clk_rcg2_init,
+	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_dp_ops);

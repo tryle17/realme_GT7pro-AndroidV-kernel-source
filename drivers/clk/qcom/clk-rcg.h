@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2013, 2016-2018, The Linux Foundation. All rights reserved. */
+/* Copyright (c) 2013, 2016-2018, 2020 The Linux Foundation. All rights reserved. */
 
 #ifndef __QCOM_CLK_RCG_H__
 #define __QCOM_CLK_RCG_H__
@@ -154,6 +154,7 @@ struct clk_rcg2 {
 	u8			safe_src_index;
 	const struct parent_map	*parent_map;
 	const struct freq_tbl	*freq_tbl;
+	unsigned long		configured_freq;
 	unsigned long		current_freq;
 	bool			enable_safe_config;
 	struct clk_regmap	clkr;
@@ -162,6 +163,7 @@ struct clk_rcg2 {
 	u8			flags;
 #define FORCE_ENABLE_RCG	BIT(0)
 #define HW_CLK_CTRL_MODE	BIT(1)
+#define DFS_SUPPORT		BIT(2)
 };
 
 #define to_clk_rcg2(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg2, clkr)
