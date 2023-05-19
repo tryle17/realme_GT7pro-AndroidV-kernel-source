@@ -20,7 +20,6 @@ def define_sun():
         "drivers/interconnect/qcom/icc-rpmh.ko",
         "drivers/interconnect/qcom/qnoc-qos.ko",
         "drivers/interconnect/qcom/qnoc-sun.ko",
-        "drivers/iommu/arm/arm-smmu/arm_smmu.ko",
         "drivers/mailbox/qcom-ipcc.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-sun.ko",
