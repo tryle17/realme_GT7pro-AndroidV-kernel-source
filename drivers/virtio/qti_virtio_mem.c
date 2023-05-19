@@ -29,6 +29,7 @@ static struct cdev qvm_char_dev;
 /* Protects qvm_hint_total and qvm_list */
 static DEFINE_MUTEX(qvm_lock);
 static LIST_HEAD(qvm_list);
+
 /* Sum of all hints */
 static s64 qvm_hint_total;
 
@@ -190,7 +191,6 @@ static int qti_virtio_mem_ioc_hint_create(struct qti_virtio_mem_ioc_hint_create_
 	/* ensure name is null-terminated */
 	arg->name[QTI_VIRTIO_MEM_IOC_MAX_NAME_LEN - 1] = '\0';
 
-
 	fd = qti_virtio_mem_hint_create_fd(arg->name, arg->size);
 	if (fd < 0)
 		return fd;
@@ -241,6 +241,49 @@ static const struct file_operations qti_virtio_mem_dev_fops = {
 	.compat_ioctl = compat_ptr_ioctl,
 };
 
+static ssize_t device_block_size_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	if (!virtio_mem_dev)
+		return -ENODEV;
+
+	return scnprintf(buf, PAGE_SIZE, "%lld\n", virtio_mem_dev->device_block_size);
+}
+
+static ssize_t max_plugin_threshold_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	if (!virtio_mem_dev)
+		return -ENODEV;
+
+	return scnprintf(buf, PAGE_SIZE, "%lld\n", virtio_mem_dev->region_size);
+}
+
+static ssize_t device_block_plugged_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	uint16_t device_block_plugged;
+
+	device_block_plugged = ALIGN(qvm_hint_total, virtio_mem_dev->device_block_size)
+				/ virtio_mem_dev->device_block_size;
+	return scnprintf(buf, PAGE_SIZE, "%d\n", device_block_plugged);
+}
+
+static DEVICE_ATTR_RO(device_block_size);
+static DEVICE_ATTR_RO(max_plugin_threshold);
+static DEVICE_ATTR_RO(device_block_plugged);
+
+static struct attribute *dev_attrs[] = {
+	&dev_attr_device_block_size.attr,
+	&dev_attr_max_plugin_threshold.attr,
+	&dev_attr_device_block_plugged.attr,
+	NULL,
+};
+
+static struct attribute_group dev_group = {
+	.attrs = dev_attrs,
+};
+
 static int __init qti_virtio_mem_init(void)
 {
 	int ret;
@@ -268,6 +311,13 @@ static int __init qti_virtio_mem_init(void)
 		ret = PTR_ERR(dev);
 		goto err_dev_create;
 	}
+
+	ret = sysfs_create_group(&dev->kobj, &dev_group);
+	if (ret < 0) {
+		dev_err(dev, "failed to create sysfs group\n");
+		goto err_dev_create;
+	}
+
 
 	return 0;
 err_dev_create:
