@@ -8,3 +8,5 @@ qcom-scm.ko
 clk-dummy.ko
 clk-qcom.ko
 stub-regulator.ko
+smem.ko
+socinfo.ko
