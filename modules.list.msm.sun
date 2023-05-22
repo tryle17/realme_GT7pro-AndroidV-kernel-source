@@ -11,5 +11,6 @@ debug-regulator.ko
 proxy-consumer.ko
 gcc-sun.ko
 stub-regulator.ko
+gdsc-regulator.ko
 smem.ko
 socinfo.ko
