@@ -14,6 +14,8 @@ def define_sun():
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-sun.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
+        "drivers/regulator/debug-regulator.ko",
+        "drivers/regulator/proxy-consumer.ko",
         "drivers/regulator/stub-regulator.ko",
         "drivers/soc/qcom/smem.ko",
         "drivers/soc/qcom/socinfo.ko",
