@@ -7,6 +7,8 @@ qcom-reboot-reason.ko
 qcom-scm.ko
 clk-dummy.ko
 clk-qcom.ko
+debug-regulator.ko
+proxy-consumer.ko
 stub-regulator.ko
 smem.ko
 socinfo.ko
