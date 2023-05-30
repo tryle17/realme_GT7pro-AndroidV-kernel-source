@@ -9,6 +9,8 @@ def define_sun():
         # keep sorted
         "drivers/clk/qcom/clk-dummy.ko",
         "drivers/clk/qcom/clk-qcom.ko",
+        "drivers/clk/qcom/gcc-sun.ko",
+        "drivers/clk/qcom/gdsc-regulator.ko",
         "drivers/firmware/qcom-scm.ko",
         "drivers/interconnect/icc-test.ko",
         "drivers/interconnect/qcom/icc-bcm-voter.ko",

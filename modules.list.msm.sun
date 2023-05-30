@@ -9,7 +9,9 @@ clk-dummy.ko
 clk-qcom.ko
 debug-regulator.ko
 proxy-consumer.ko
+gcc-sun.ko
 stub-regulator.ko
+gdsc-regulator.ko
 smem.ko
 socinfo.ko
 icc-test.ko
