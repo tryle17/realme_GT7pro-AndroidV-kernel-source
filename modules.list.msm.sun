@@ -12,3 +12,9 @@ proxy-consumer.ko
 stub-regulator.ko
 smem.ko
 socinfo.ko
+icc-test.ko
+icc-bcm-voter.ko
+icc-debug.ko
+icc-rpmh.ko
+qnoc-qos.ko
+qnoc-sun.ko
