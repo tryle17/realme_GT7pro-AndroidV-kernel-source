@@ -812,6 +812,15 @@ config SM_GCC_PINEAPPLE
           Say Y if you want to use peripheral devices such as UART,
           SPI, I2C, USB, SD/UFS, PCIe etc.
 
+config SM_CAMCC_SUN
+        tristate "SUN Camera Clock Controller"
+        depends on SM_GCC_SUN
+        help
+          Support for the camera clock controller on Qualcomm Technologies, Inc
+          Sun devices.
+          Say Y if you want to support camera devices and functionality such as
+          capturing pictures.
+
 config SM_GPUCC_6350
 	tristate "SM6350 Graphics Clock Controller"
 	select SM_GCC_6350
