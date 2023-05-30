@@ -11,6 +11,7 @@ debug-regulator.ko
 proxy-consumer.ko
 gcc-sun.ko
 secure_buffer.ko
+camcc-sun.ko
 stub-regulator.ko
 gdsc-regulator.ko
 smem.ko
