@@ -2814,7 +2814,7 @@ static void geni_i3c_enable_ibi_ctrl(struct geni_i3c_dev *gi3c, bool enable)
 
 		/* check if any IBI is enabled, if not then disable IBI ctrl */
 		val = geni_read_reg(gi3c->ibi.ibi_base, IBI_GPII_IBI_EN);
-		if (!val) {
+		if (val) {
 			gi3c->ibi.err = 0;
 			reinit_completion(&gi3c->ibi.done);
 
@@ -2833,6 +2833,8 @@ static void geni_i3c_enable_ibi_ctrl(struct geni_i3c_dev *gi3c, bool enable)
 			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
 					"%s: IBI ctrl disabled\n",  __func__);
 		}
+		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s: IBI ctrl disabled, val:0x%x\n",  __func__, val);
 	}
 }
 
@@ -3700,6 +3702,7 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 
 	/* Client calls put_syc to end the session, we can set PINs to gpio mode */
 	if (gi3c->pm_ctrl_client && gi3c->probe_completed) {
+		geni_i3c_enable_ibi_ctrl(gi3c, false);
 		ret = pinctrl_select_state(gi3c->i3c_rsc.i3c_pinctrl,
 					   gi3c->i3c_rsc.i3c_gpio_sleep);
 		if (ret)
@@ -3751,6 +3754,8 @@ static int geni_i3c_runtime_resume(struct device *dev)
 	}
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s(): ret:%d\n",
 			__func__, ret);
+	if (gi3c->pm_ctrl_client && gi3c->probe_completed)
+		geni_i3c_enable_ibi_ctrl(gi3c, true);
 	/* Enable TLMM I3C MODE registers */
 	return 0;
 }
