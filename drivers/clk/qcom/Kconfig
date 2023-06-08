@@ -821,6 +821,15 @@ config SM_CAMCC_SUN
           Say Y if you want to support camera devices and functionality such as
           capturing pictures.
 
+config SM_EVACC_SUN
+	tristate "SUN EVA Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the EVA clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support EVA devices to get better
+	  visual analysis.
+
 config SM_GPUCC_6350
 	tristate "SM6350 Graphics Clock Controller"
 	select SM_GCC_6350

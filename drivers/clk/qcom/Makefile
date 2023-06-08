@@ -121,6 +121,7 @@ obj-$(CONFIG_SM_GCC_SUN) += gcc-sun.o
 obj-$(CONFIG_SM_GCC_8550) += gcc-sm8550.o
 obj-$(CONFIG_SM_GCC_PINEAPPLE) += gcc-pineapple.o
 obj-$(CONFIG_SM_CAMCC_SUN) += camcc-sun.o
+obj-$(CONFIG_SM_EVACC_SUN) += evacc-sun.o
 obj-$(CONFIG_SM_GPUCC_6350) += gpucc-sm6350.o
 obj-$(CONFIG_SM_GPUCC_8150) += gpucc-sm8150.o
 obj-$(CONFIG_SM_GPUCC_8250) += gpucc-sm8250.o
