@@ -27,6 +27,7 @@
 #include <linux/bitmap.h>
 #include <linux/lockdep.h>
 #include <linux/log2.h>
+#include <linux/sched/mm.h>
 #include "qti_virtio_mem.h"
 
 #include <acpi/acpi_numa.h>
@@ -2182,6 +2183,7 @@ static void virtio_mem_run_wq(struct work_struct *work)
 	struct virtio_mem *vm = container_of(work, struct virtio_mem, wq);
 	uint64_t diff;
 	int rc;
+	unsigned int noreclaim_flag;
 
 	if (unlikely(vm->in_kdump)) {
 		dev_warn_once(&vm->vdev->dev,
@@ -2195,6 +2197,8 @@ static void virtio_mem_run_wq(struct work_struct *work)
 		return;
 
 	atomic_set(&vm->wq_active, 1);
+
+	noreclaim_flag = memalloc_noreclaim_save();
 retry:
 	rc = 0;
 
@@ -2264,6 +2268,7 @@ retry:
 	}
 
 	atomic_set(&vm->wq_active, 0);
+	memalloc_noreclaim_restore(noreclaim_flag);
 }
 
 static enum hrtimer_restart virtio_mem_timer_expired(struct hrtimer *timer)
