@@ -7,6 +7,10 @@ target_name = "pineapple"
 def define_pineapple():
     _pineapple_in_tree_modules = [
         # keep sorted
+        "drivers/clk/qcom/clk-dummy.ko",
+        "drivers/clk/qcom/clk-qcom.ko",
+        "drivers/clk/qcom/gcc-pineapple.ko",
+        "drivers/clk/qcom/gdsc-regulator.ko",
         "drivers/firmware/qcom-scm.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-pineapple.ko",
