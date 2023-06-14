@@ -50,12 +50,12 @@ def define_sun():
             variant = variant,
             in_tree_module_list = mod_list,
             boot_image_opts = boot_image_opts(
-                earlycon_addr = "hvc0",
+                earlycon_addr = "qcom_geni,0x00a9c000",
                 kernel_vendor_cmdline_extras = [
                     # do not sort
-                    "console=hvc0",
+                    "console=ttyMSM0,115200n8",
                     "nowatchdog",  # disable wdog for now
-                    "hvc_dcc.enable=1",
+                    "qcom_geni_serial.con_enabled=1",
                     "bootconfig",
                     "printk.devkmsg=on",
                     "loglevel=8",
