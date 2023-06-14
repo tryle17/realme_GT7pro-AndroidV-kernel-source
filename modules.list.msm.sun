@@ -32,3 +32,6 @@ qnoc-qos.ko
 qnoc-sun.ko
 qcom_hwspinlock.ko
 ufs_qcom.ko
+dwc3-msm.ko
+phy-generic.ko
+phy-qcom-emu.ko

@@ -44,6 +44,9 @@ def define_sun():
         "drivers/soc/qcom/smem.ko",
         "drivers/soc/qcom/socinfo.ko",
         "drivers/ufs/host/ufs_qcom.ko",
+        "drivers/usb/dwc3/dwc3-msm.ko",
+        "drivers/usb/phy/phy-generic.ko",
+        "drivers/usb/phy/phy-qcom-emu.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
