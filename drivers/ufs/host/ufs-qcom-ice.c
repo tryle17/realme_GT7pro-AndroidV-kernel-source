@@ -158,6 +158,14 @@ static void qcom_ice_optimization_enable(struct ufs_qcom_host *host)
 	udelay(5);
 }
 
+void ufs_qcom_ice_disable(struct ufs_qcom_host *host)
+{
+}
+
+void ufs_qcom_ice_debug(struct ufs_qcom_host *host)
+{
+}
+
 int ufs_qcom_ice_enable(struct ufs_qcom_host *host)
 {
 	if (!(host->hba->caps & UFSHCD_CAP_CRYPTO))
