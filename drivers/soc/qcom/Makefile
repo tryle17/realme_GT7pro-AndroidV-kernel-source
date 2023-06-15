@@ -33,3 +33,4 @@ obj-$(CONFIG_QCOM_ICC_BWMON)	+= icc-bwmon.o
 obj-$(CONFIG_QCOM_SECURE_BUFFER) += secure_buffer.o
 obj-$(CONFIG_QCOM_RAMDUMP) += qcom_ramdump.o
 obj-$(CONFIG_QTI_PMIC_GLINK) += qti_pmic_glink.o
+obj-$(CONFIG_QTI_ALTMODE_GLINK) += altmode-glink.o
