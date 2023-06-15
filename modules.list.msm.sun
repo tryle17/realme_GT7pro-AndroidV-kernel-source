@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+phy-qcom-ufs.ko
+phy-qcom-ufs-qrbtc-sdm845.ko
 llcc-qcom.ko
 pinctrl-msm.ko
 pinctrl-sun.ko
@@ -14,6 +16,7 @@ secure_buffer.ko
 camcc-sun.ko
 evacc-sun.ko
 stub-regulator.ko
+sg.ko
 gdsc-regulator.ko
 smem.ko
 socinfo.ko
@@ -24,3 +27,4 @@ icc-rpmh.ko
 qcom-ipcc.ko
 qnoc-qos.ko
 qnoc-sun.ko
+ufs_qcom.ko
