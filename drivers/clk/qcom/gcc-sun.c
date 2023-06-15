@@ -1861,21 +1861,6 @@ static struct clk_branch gcc_disp_hf_axi_clk = {
 	},
 };
 
-static struct clk_branch gcc_eva_ahb_clk = {
-	.halt_reg = 0x9f004,
-	.halt_check = BRANCH_HALT_VOTED,
-	.hwcg_reg = 0x9f004,
-	.hwcg_bit = 1,
-	.clkr = {
-		.enable_reg = 0x9f004,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gcc_eva_ahb_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
 static struct clk_branch gcc_eva_axi0_clk = {
 	.halt_reg = 0x9f008,
 	.halt_check = BRANCH_HALT_SKIP,
@@ -1901,19 +1886,6 @@ static struct clk_branch gcc_eva_axi0c_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_eva_axi0c_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
-static struct clk_branch gcc_eva_xo_clk = {
-	.halt_reg = 0x9f01c,
-	.halt_check = BRANCH_HALT,
-	.clkr = {
-		.enable_reg = 0x9f01c,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gcc_eva_xo_clk",
 			.ops = &clk_branch2_ops,
 		},
 	},
@@ -3479,10 +3451,8 @@ static struct clk_regmap *gcc_sun_clocks[] = {
 	[GCC_DDRSS_GPU_AXI_CLK] = &gcc_ddrss_gpu_axi_clk.clkr,
 	[GCC_DDRSS_PCIE_SF_QTB_CLK] = &gcc_ddrss_pcie_sf_qtb_clk.clkr,
 	[GCC_DISP_HF_AXI_CLK] = &gcc_disp_hf_axi_clk.clkr,
-	[GCC_EVA_AHB_CLK] = &gcc_eva_ahb_clk.clkr,
 	[GCC_EVA_AXI0_CLK] = &gcc_eva_axi0_clk.clkr,
 	[GCC_EVA_AXI0C_CLK] = &gcc_eva_axi0c_clk.clkr,
-	[GCC_EVA_XO_CLK] = &gcc_eva_xo_clk.clkr,
 	[GCC_GP1_CLK] = &gcc_gp1_clk.clkr,
 	[GCC_GP1_CLK_SRC] = &gcc_gp1_clk_src.clkr,
 	[GCC_GP2_CLK] = &gcc_gp2_clk.clkr,
@@ -3730,6 +3700,8 @@ static int gcc_sun_probe(struct platform_device *pdev)
 	 *	gcc_camera_ahb_clk
 	 *	gcc_camera_xo_clk
 	 *	gcc_disp_ahb_clk
+	 *	gcc_eva_ahb_clk
+	 *	gcc_eva_xo_clk
 	 *	gcc_gpu_cfg_ahb_clk
 	 *	gcc_video_ahb_clk
 	 *	gcc_video_xo_clk
@@ -3737,6 +3709,8 @@ static int gcc_sun_probe(struct platform_device *pdev)
 	regmap_update_bits(regmap, 0x26004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x26034, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x27004, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x9F004, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x9F01C, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x71004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x32004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x32038, BIT(0), BIT(0));
