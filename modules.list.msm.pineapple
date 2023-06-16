@@ -7,3 +7,8 @@ clk-dummy.ko
 gcc-pineapple.ko
 clk-qcom.ko
 gdsc-regulator.ko
+icc-bcm-voter.ko
+icc-debug.ko
+icc-rpmh.ko
+qnoc-pineapple.ko
+qnoc-qos.ko

@@ -12,6 +12,11 @@ def define_pineapple():
         "drivers/clk/qcom/gcc-pineapple.ko",
         "drivers/clk/qcom/gdsc-regulator.ko",
         "drivers/firmware/qcom-scm.ko",
+        "drivers/interconnect/qcom/icc-bcm-voter.ko",
+        "drivers/interconnect/qcom/icc-debug.ko",
+        "drivers/interconnect/qcom/icc-rpmh.ko",
+        "drivers/interconnect/qcom/qnoc-pineapple.ko",
+        "drivers/interconnect/qcom/qnoc-qos.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-pineapple.ko",
     ]
