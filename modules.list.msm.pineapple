@@ -3,3 +3,7 @@
 pinctrl-msm.ko
 pinctrl-pineapple.ko
 qcom-scm.ko
+clk-dummy.ko
+gcc-pineapple.ko
+clk-qcom.ko
+gdsc-regulator.ko
