@@ -7,6 +7,7 @@ target_name = "sun"
 def define_sun():
     _sun_in_tree_modules = [
         # keep sorted
+        "drivers/clk/qcom/camcc-sun.ko",
         "drivers/clk/qcom/clk-dummy.ko",
         "drivers/clk/qcom/clk-qcom.ko",
         "drivers/clk/qcom/gcc-sun.ko",
