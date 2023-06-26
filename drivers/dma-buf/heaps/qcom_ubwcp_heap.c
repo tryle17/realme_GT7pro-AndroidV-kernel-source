@@ -6,7 +6,6 @@
 #include <linux/dma-buf.h>
 #include <linux/dma-heap.h>
 #include <linux/ubwcp_dma_heap.h>
-#include <trace/hooks/dmabuf.h>
 #include <linux/msm_dma_iommu_mapping.h>
 
 #include <linux/qcom-dma-mapping.h>
@@ -367,41 +366,12 @@ static const struct dma_heap_ops ubwcp_heap_ops = {
 	.allocate = ubwcp_allocate,
 };
 
-static void ignore_vmap_bounds_check(void *unused, struct dma_buf *dmabuf, bool *result)
-{
-	struct ubwcp_buffer *buffer;
-
-	if (dmabuf->ops != &ubwcp_ops.dma_ops) {
-		*result = false;
-		return;
-	}
-
-	buffer = container_of(dmabuf->priv, struct ubwcp_buffer, qcom_sg_buf);
-
-	if (buffer->is_linear)
-		*result = false;
-	else
-		*result = true;
-}
-
 int qcom_ubwcp_heap_create(char *name, bool movable)
 {
 	struct dma_heap_export_info exp_info;
 	struct dma_heap *heap;
 	struct qcom_ubwcp_heap *ubwcp_heap;
-	static bool vmap_registered;
 	int ret;
-
-	/* This function should only be called once */
-	if (!vmap_registered) {
-		ret = register_trace_android_vh_ignore_dmabuf_vmap_bounds(ignore_vmap_bounds_check,
-								  NULL);
-		if (ret) {
-			pr_err("%s: Unable to register vmap bounds tracehook\n", __func__);
-			goto out;
-		}
-		vmap_registered = true;
-	}
 
 	sys_heap = dma_heap_find("qcom,system");
 	if (!sys_heap) {
