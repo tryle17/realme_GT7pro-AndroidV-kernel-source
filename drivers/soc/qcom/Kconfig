@@ -261,6 +261,15 @@ config QCOM_APR
 	  used by audio driver to configure QDSP6
 	  ASM, ADM and AFE modules.
 
+config QCOM_RAMDUMP
+	tristate "Qualcomm Technologies, Inc. Ramdump driver"
+	default n
+	help
+	  This option enables the QTI ramdump driver. The ramdump driver
+	  provides APIs to collect ramdumps which can be extracted from
+	  userspace. Say 'Y' here to enable this driver. It's safe to say
+	  'N' here if you don't plan on collecting ramdumps.
+
 config QCOM_ICC_BWMON
 	tristate "QCOM Interconnect Bandwidth Monitor driver"
 	depends on ARCH_QCOM || COMPILE_TEST
