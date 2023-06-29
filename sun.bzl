@@ -28,6 +28,7 @@ def define_sun():
         "drivers/regulator/proxy-consumer.ko",
         "drivers/regulator/stub-regulator.ko",
         "drivers/soc/qcom/llcc-qcom.ko",
+        "drivers/soc/qcom/qcom_ramdump.ko",
         "drivers/soc/qcom/secure_buffer.ko",
         "drivers/soc/qcom/smem.ko",
         "drivers/soc/qcom/socinfo.ko",
