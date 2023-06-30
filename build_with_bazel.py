@@ -238,6 +238,10 @@ class BazelBuilder:
         if self.skip_list:
             self.user_opts.extend(["--//msm-kernel:skip_{}=true".format(s) for s in self.skip_list])
 
+        self.user_opts.extend([
+            "--user_kmi_symbol_lists=//msm-kernel:android/abi_gki_aarch64_qcom",
+        ])
+
         device_user_opts = self.user_opts + ["--config=android_arm64"]
 
         logging.info("Building device targets...")
