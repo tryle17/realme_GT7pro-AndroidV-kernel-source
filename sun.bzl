@@ -45,6 +45,10 @@ def define_sun():
         "drivers/soc/qcom/socinfo.ko",
         "drivers/ufs/host/ufs_qcom.ko",
         "drivers/usb/dwc3/dwc3-msm.ko",
+        "drivers/usb/gadget/function/usb_f_ccid.ko",
+        "drivers/usb/gadget/function/usb_f_cdev.ko",
+        "drivers/usb/gadget/function/usb_f_gsi.ko",
+        "drivers/usb/gadget/function/usb_f_qdss.ko",
         "drivers/usb/phy/phy-generic.ko",
         "drivers/usb/phy/phy-qcom-emu.ko",
     ]
