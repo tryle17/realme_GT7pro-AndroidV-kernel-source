@@ -48,6 +48,7 @@ def define_sun():
         "drivers/soc/qcom/mdt_loader.ko",
         "drivers/soc/qcom/mem_buf/mem_buf.ko",
         "drivers/soc/qcom/mem_buf/mem_buf_dev.ko",
+        "drivers/soc/qcom/panel_event_notifier.ko",
         "drivers/soc/qcom/qcom_aoss.ko",
         "drivers/soc/qcom/qcom_ramdump.ko",
         "drivers/soc/qcom/secure_buffer.ko",
