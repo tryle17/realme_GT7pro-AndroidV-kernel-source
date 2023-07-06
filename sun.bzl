@@ -10,6 +10,7 @@ def define_sun():
         "drivers/bus/mhi/devices/mhi_dev_satellite.ko",
         "drivers/bus/mhi/devices/mhi_dev_uci.ko",
         "drivers/bus/mhi/host/mhi.ko",
+        "drivers/clk/qcom/cambistmclkcc-sun.ko",
         "drivers/clk/qcom/camcc-sun.ko",
         "drivers/clk/qcom/clk-dummy.ko",
         "drivers/clk/qcom/clk-qcom.ko",
