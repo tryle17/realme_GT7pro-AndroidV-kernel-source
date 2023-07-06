@@ -893,6 +893,15 @@ config SM_DISPCC_SUN
 	  Say Y if you want to support display devices and functionality such as
 	  splash screen.
 
+config SM_CAMBISTMCLKCC_SUN
+	tristate "SUN CAMBISTMCLK Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the CAMBISTMCLK clock controller on Qualcomm Technologies,
+	  Inc Sun devices.
+	  Say Y if you want to support camera devices for a better low-latency
+	  clock.
+
 config SM_GPUCC_6350
 	tristate "SM6350 Graphics Clock Controller"
 	select SM_GCC_6350
