@@ -208,6 +208,7 @@ static struct platform_driver qcom_hwspinlock_driver = {
 	.driver		= {
 		.name	= "qcom_hwspinlock",
 		.of_match_table = qcom_hwspinlock_of_match,
+		.suppress_bind_attrs = true,
 	},
 };
 
