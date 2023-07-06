@@ -21,17 +21,21 @@ def define_sun():
         "drivers/interconnect/qcom/qnoc-qos.ko",
         "drivers/interconnect/qcom/qnoc-sun.ko",
         "drivers/mailbox/qcom-ipcc.ko",
+        "drivers/phy/qualcomm/phy-qcom-ufs.ko",
+        "drivers/phy/qualcomm/phy-qcom-ufs-qrbtc-sdm845.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-sun.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
         "drivers/regulator/debug-regulator.ko",
         "drivers/regulator/proxy-consumer.ko",
         "drivers/regulator/stub-regulator.ko",
+        "drivers/scsi/sg.ko",
         "drivers/soc/qcom/llcc-qcom.ko",
         "drivers/soc/qcom/qcom_ramdump.ko",
         "drivers/soc/qcom/secure_buffer.ko",
         "drivers/soc/qcom/smem.ko",
         "drivers/soc/qcom/socinfo.ko",
+        "drivers/ufs/host/ufs_qcom.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
