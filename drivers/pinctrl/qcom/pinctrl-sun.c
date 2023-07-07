@@ -593,8 +593,8 @@ enum sun_functions {
 	msm_mux_audio_ext_mclk0,
 	msm_mux_audio_ext_mclk1,
 	msm_mux_audio_ref_clk,
-	msm_mux_cam_aon_mclk2,
-	msm_mux_cam_aon_mclk4,
+	msm_mux_cam_asc_mclk2,
+	msm_mux_cam_asc_mclk4,
 	msm_mux_cam_mclk,
 	msm_mux_cci_async_in0,
 	msm_mux_cci_async_in1,
@@ -827,8 +827,10 @@ enum sun_functions {
 	msm_mux_sdc41,
 	msm_mux_sdc42,
 	msm_mux_sdc43,
-	msm_mux_sdc4_clk,
-	msm_mux_sdc4_cmd,
+	msm_mux_sdc4_clk_mira,
+	msm_mux_sdc4_clk_mirb,
+	msm_mux_sdc4_cmd_mira,
+	msm_mux_sdc4_cmd_mirb,
 	msm_mux_tb_trig_sdc2,
 	msm_mux_tb_trig_sdc4,
 	msm_mux_tmess_prng0,
@@ -875,9 +877,8 @@ static const char *const gpio_groups[] = {
 	"gpio30", "gpio31", "gpio32", "gpio33", "gpio34", "gpio35",
 	"gpio36", "gpio37", "gpio38", "gpio39", "gpio40", "gpio41",
 	"gpio42", "gpio43", "gpio44", "gpio45", "gpio46", "gpio47",
-	"gpio48", "gpio49", "gpio50", "gpio51", "gpio52", "gpio53",
-	"gpio54", "gpio55", "gpio56", "gpio57", "gpio58", "gpio59",
-	"gpio60", "gpio61", "gpio62", "gpio63", "gpio64", "gpio65",
+	"gpio52", "gpio53", "gpio54", "gpio55", "gpio56", "gpio57",
+	"gpio58", "gpio59", "gpio62", "gpio63", "gpio64", "gpio65",
 	"gpio66", "gpio67", "gpio68", "gpio69", "gpio70", "gpio71",
 	"gpio72", "gpio73", "gpio74", "gpio75", "gpio76", "gpio77",
 	"gpio78", "gpio79", "gpio80", "gpio81", "gpio82", "gpio83",
@@ -946,10 +947,10 @@ static const char *const audio_ext_mclk1_groups[] = {
 static const char *const audio_ref_clk_groups[] = {
 	"gpio124",
 };
-static const char *const cam_aon_mclk2_groups[] = {
+static const char *const cam_asc_mclk2_groups[] = {
 	"gpio91",
 };
-static const char *const cam_aon_mclk4_groups[] = {
+static const char *const cam_asc_mclk4_groups[] = {
 	"gpio93",
 };
 static const char *const cam_mclk_groups[] = {
@@ -1651,22 +1652,28 @@ static const char *const sd_write_protect_groups[] = {
 	"gpio85",
 };
 static const char *const sdc40_groups[] = {
-	"gpio36",
+	"gpio36", "gpio49",
 };
 static const char *const sdc41_groups[] = {
-	"gpio37",
+	"gpio37", "gpio51",
 };
 static const char *const sdc42_groups[] = {
-	"gpio38",
+	"gpio38", "gpio60",
 };
 static const char *const sdc43_groups[] = {
-	"gpio39",
+	"gpio39", "gpio61",
 };
-static const char *const sdc4_clk_groups[] = {
+static const char *const sdc4_clk_mira_groups[] = {
 	"gpio150",
 };
-static const char *const sdc4_cmd_groups[] = {
+static const char *const sdc4_clk_mirb_groups[] = {
+	"gpio50",
+};
+static const char *const sdc4_cmd_mira_groups[] = {
 	"gpio151",
+};
+static const char *const sdc4_cmd_mirb_groups[] = {
+	"gpio48",
 };
 static const char *const tb_trig_sdc2_groups[] = {
 	"gpio89",
@@ -1787,8 +1794,8 @@ static const struct msm_function sun_functions[] = {
 	FUNCTION(audio_ext_mclk0),
 	FUNCTION(audio_ext_mclk1),
 	FUNCTION(audio_ref_clk),
-	FUNCTION(cam_aon_mclk2),
-	FUNCTION(cam_aon_mclk4),
+	FUNCTION(cam_asc_mclk2),
+	FUNCTION(cam_asc_mclk4),
 	FUNCTION(cam_mclk),
 	FUNCTION(cci_async_in0),
 	FUNCTION(cci_async_in1),
@@ -2021,8 +2028,10 @@ static const struct msm_function sun_functions[] = {
 	FUNCTION(sdc41),
 	FUNCTION(sdc42),
 	FUNCTION(sdc43),
-	FUNCTION(sdc4_clk),
-	FUNCTION(sdc4_cmd),
+	FUNCTION(sdc4_clk_mira),
+	FUNCTION(sdc4_clk_mirb),
+	FUNCTION(sdc4_cmd_mira),
+	FUNCTION(sdc4_cmd_mirb),
 	FUNCTION(tb_trig_sdc2),
 	FUNCTION(tb_trig_sdc4),
 	FUNCTION(tmess_prng0),
@@ -2161,14 +2170,14 @@ static const struct msm_pingroup sun_groups[] = {
 			NA, NA, 0, -1),
 	[47] = PINGROUP(47, qup1_se3_l3, dp_hot, NA, NA, NA, NA, NA, NA, NA, NA,
 			NA, 0, -1),
-	[48] = PINGROUP(48, qup1_se4_l0, ibi_i3c, NA, NA, NA, NA, NA, NA, NA,
+	[48] = PINGROUP(48, qup1_se4_l0, ibi_i3c, sdc4_cmd_mirb, NA, NA, NA, NA,
+			NA, NA, NA, NA, 0, -1),
+	[49] = PINGROUP(49, qup1_se4_l1, ibi_i3c, sdc40, NA, NA, NA, NA, NA, NA,
 			NA, NA, 0, -1),
-	[49] = PINGROUP(49, qup1_se4_l1, ibi_i3c, NA, NA, NA, NA, NA, NA, NA,
-			NA, NA, 0, -1),
-	[50] = PINGROUP(50, qup1_se4_l2, aoss_cti, NA, NA, NA, NA, NA, NA, NA,
-			NA, NA, 0, -1),
-	[51] = PINGROUP(51, qup1_se4_l3, aoss_cti, NA, NA, NA, NA, NA, NA, NA,
-			NA, NA, 0, -1),
+	[50] = PINGROUP(50, qup1_se4_l2, aoss_cti, sdc4_clk_mirb, NA, NA, NA,
+			NA, NA, NA, NA, NA, 0, -1),
+	[51] = PINGROUP(51, qup1_se4_l3, aoss_cti, sdc41, NA, NA, NA, NA, NA,
+			NA, NA, NA, 0, -1),
 	[52] = PINGROUP(52, qup1_se5_l0, qspi0, ddr_pxi2, NA, NA, NA, NA, NA,
 			NA, NA, NA, 0, -1),
 	[53] = PINGROUP(53, qup1_se5_l1, qspi1, NA, ddr_pxi3, NA, NA, NA, NA,
@@ -2185,10 +2194,10 @@ static const struct msm_pingroup sun_groups[] = {
 			NA, NA, 0, -1),
 	[59] = PINGROUP(59, qup1_se6_l3, usb_phy, vsense_trigger_mirnat, NA, NA,
 			NA, NA, NA, NA, NA, NA, 0, -1),
-	[60] = PINGROUP(60, qup1_se7_l0, aoss_cti, NA, NA, NA, NA, NA, NA, NA,
-			NA, NA, 0, -1),
-	[61] = PINGROUP(61, qup1_se7_l1, usb_phy, aoss_cti, NA, NA, NA, NA, NA,
+	[60] = PINGROUP(60, qup1_se7_l0, aoss_cti, sdc42, NA, NA, NA, NA, NA,
 			NA, NA, NA, 0, -1),
+	[61] = PINGROUP(61, qup1_se7_l1, usb_phy, aoss_cti, sdc43, NA, NA, NA,
+			NA, NA, NA, NA, 0, -1),
 	[62] = PINGROUP(62, qup1_se7_l2, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 			0, -1),
 	[63] = PINGROUP(63, qup1_se7_l3, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA,
@@ -2246,11 +2255,11 @@ static const struct msm_pingroup sun_groups[] = {
 			NA, NA, 0, -1),
 	[90] = PINGROUP(90, cam_mclk, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0,
 			-1),
-	[91] = PINGROUP(91, cam_aon_mclk2, NA, NA, NA, NA, NA, NA, NA, NA, NA,
+	[91] = PINGROUP(91, cam_asc_mclk2, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 			NA, 0, -1),
 	[92] = PINGROUP(92, cam_mclk, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0,
 			-1),
-	[93] = PINGROUP(93, cam_aon_mclk4, NA, NA, NA, NA, NA, NA, NA, NA, NA,
+	[93] = PINGROUP(93, cam_asc_mclk4, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 			NA, 0, -1),
 	[94] = PINGROUP(94, cam_mclk, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0,
 			-1),
@@ -2364,10 +2373,10 @@ static const struct msm_pingroup sun_groups[] = {
 			 NA, NA, NA, NA, NA, 0, -1),
 	[149] = PINGROUP(149, coex_uart1_tx, cmu_rng1, qdss_gpio9, NA, NA, NA,
 			 NA, NA, NA, NA, NA, 0, -1),
-	[150] = PINGROUP(150, NA, vfr_0, coex_uart2_rx, cmu_rng2, sdc4_clk, NA,
-			 NA, NA, NA, NA, NA, 0, -1),
-	[151] = PINGROUP(151, NA, coex_uart2_tx, cmu_rng3, sdc4_cmd, NA, NA, NA,
-			 NA, NA, NA, NA, 0, -1),
+	[150] = PINGROUP(150, NA, vfr_0, coex_uart2_rx, cmu_rng2, sdc4_clk_mira,
+			 NA, NA, NA, NA, NA, NA, 0, -1),
+	[151] = PINGROUP(151, NA, coex_uart2_tx, cmu_rng3, sdc4_cmd_mira, NA,
+			 NA, NA, NA, NA, NA, NA, 0, -1),
 	[152] = PINGROUP(152, nav_gpio2, NA, qdss_gpio10, NA, NA, NA, NA, NA,
 			 NA, NA, NA, 0, -1),
 	[153] = PINGROUP(153, cci_i2c_scl4, NA, NA, NA, NA, NA, NA, NA, NA, NA,
@@ -2544,6 +2553,7 @@ static const struct msm_pinctrl_soc_data sun_tlmm = {
 	.nqup_regs = ARRAY_SIZE(sun_qup_regs),
 	.wakeirq_map = sun_pdc_map,
 	.nwakeirq_map = ARRAY_SIZE(sun_pdc_map),
+	.egpio_func = 11,
 };
 
 static const struct of_device_id sun_tlmm_of_match[] = {
