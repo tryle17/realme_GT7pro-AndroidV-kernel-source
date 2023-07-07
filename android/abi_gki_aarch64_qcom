@@ -764,6 +764,7 @@
   dev_pm_domain_attach_by_name
   dev_pm_domain_detach
   dev_pm_genpd_add_notifier
+  dev_pm_genpd_get_next_hrtimer
   dev_pm_genpd_remove_notifier
   dev_pm_genpd_set_next_wakeup
   dev_pm_genpd_set_performance_state
@@ -2004,6 +2005,7 @@
   log_post_write_mmio
   log_read_mmio
   log_write_mmio
+  loops_per_jiffy
   lowpan_header_compress
   lowpan_header_decompress
   lowpan_nhc_add
