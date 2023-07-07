@@ -27,4 +27,5 @@ icc-rpmh.ko
 qcom-ipcc.ko
 qnoc-qos.ko
 qnoc-sun.ko
+qcom_hwspinlock.ko
 ufs_qcom.ko

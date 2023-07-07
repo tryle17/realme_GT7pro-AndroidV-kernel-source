@@ -14,6 +14,7 @@ def define_sun():
         "drivers/clk/qcom/gcc-sun.ko",
         "drivers/clk/qcom/gdsc-regulator.ko",
         "drivers/firmware/qcom-scm.ko",
+        "drivers/hwspinlock/qcom_hwspinlock.ko",
         "drivers/interconnect/icc-test.ko",
         "drivers/interconnect/qcom/icc-bcm-voter.ko",
         "drivers/interconnect/qcom/icc-debug.ko",
