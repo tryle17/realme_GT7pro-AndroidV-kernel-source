@@ -19,6 +19,9 @@ def define_pineapple():
         "drivers/interconnect/qcom/qnoc-qos.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-pineapple.ko",
+        "drivers/soc/qcom/cmd-db.ko",
+        "drivers/soc/qcom/crm.ko",
+        "drivers/soc/qcom/qcom_rpmh.ko",
     ]
 
     _pineapple_consolidate_in_tree_modules = _pineapple_in_tree_modules + [

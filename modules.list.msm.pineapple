@@ -12,3 +12,6 @@ icc-debug.ko
 icc-rpmh.ko
 qnoc-pineapple.ko
 qnoc-qos.ko
+crm.ko
+cmd-db.ko
+qcom_rpmh.ko
