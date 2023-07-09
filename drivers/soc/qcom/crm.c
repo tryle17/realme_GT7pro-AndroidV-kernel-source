@@ -9,7 +9,9 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
+#if IS_ENABLED(CONFIG_IPC_LOGGING)
 #include <linux/ipc_logging.h>
+#endif
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/module.h>
@@ -404,7 +406,9 @@ int crm_channel_switch_complete(const struct crm_drv *drv, u32 ch)
 		ret = -EBUSY;
 
 	trace_crm_switch_channel(drv->name, ch, ret);
+#if IS_ENABLED(CONFIG_IPC_LOGGING)
 	ipc_log_string(drv->ipc_log_ctx, "Switch Channel: ch: %u ret: %d", ch, ret);
+#endif
 
 	return ret;
 }
@@ -463,9 +467,11 @@ static void crm_flush_cache(struct crm_drv *drv, struct crm_vcd *vcd, u32 ch, u3
 			reg = crm_get_pwr_state_reg(j);
 			write_crm_reg(drv, reg, ch, vcd_type, i, vcd->cache[i][j]);
 			trace_crm_write_vcd_votes(drv->name, vcd_type, i, j, vcd->cache[i][j]);
+#if IS_ENABLED(CONFIG_IPC_LOGGING)
 			ipc_log_string(drv->ipc_log_ctx,
 				       "Flush: type: %u resource_idx:%u pwr_state: %u data: %#x",
 				       vcd_type, i, j, vcd->cache[i][j]);
+#endif
 		}
 	}
 }
@@ -562,9 +568,11 @@ static irqreturn_t crm_vote_complete_irq(int irq, void *p)
 
 				write_crm_reg(drv, IRQ_CLEAR, 0, j, k, IRQ_CLEAR_BIT);
 				trace_crm_irq(drv->name, j, k, irq_status);
+#if IS_ENABLED(CONFIG_IPC_LOGGING)
 				ipc_log_string(drv->ipc_log_ctx,
 					       "IRQ: type: %u resource_idx:%u irq_status: %lu"
 						, j, k, irq_status);
+#endif
 
 				votes = &vcd->sw_votes[k];
 				if (!votes->in_progress) {
@@ -655,9 +663,11 @@ static int crm_send_cmd(struct crm_drv *drv, u32 vcd_type, const struct crm_cmd 
 
 	spin_unlock_irqrestore(&drv->lock, flags);
 	trace_crm_write_vcd_votes(drv->name, vcd_type, resource_idx, pwr_state, data);
+#if IS_ENABLED(CONFIG_IPC_LOGGING)
 	ipc_log_string(drv->ipc_log_ctx,
 		       "Write: type: %u resource_idx:%u pwr_state: %u data: %#x",
 		       vcd_type, resource_idx, pwr_state, data);
+#endif
 
 	if (compl && wait) {
 		time_left = CRM_TIMEOUT_MS;
@@ -688,9 +698,11 @@ static void crm_cache_vcd_votes(struct crm_drv *drv, u32 vcd_type, const struct 
 	spin_unlock(&drv->cache_lock);
 
 	trace_crm_cache_vcd_votes(drv->name, vcd_type, resource_idx, pwr_state, data);
+#if IS_ENABLED(CONFIG_IPC_LOGGING)
 	ipc_log_string(drv->ipc_log_ctx,
 		       "Cache: type: %u resource_idx:%u pwr_state: %u data: %#x",
 		       vcd_type, resource_idx, pwr_state, data);
+#endif
 
 }
 
@@ -1021,9 +1033,11 @@ static struct crm_drv *crm_probe_get_drvs(struct crm_drv_top *crm, int num_drvs,
 		spin_lock_init(&drvs[i].lock);
 		spin_lock_init(&drvs[i].cache_lock);
 
+#if IS_ENABLED(CONFIG_IPC_LOGGING)
 		drvs[i].ipc_log_ctx = ipc_log_context_create(
 						CRM_DRV_IPC_LOG_SIZE,
 						drvs[i].name, 0);
+#endif
 
 		drvs[i].offsets = chn_regs;
 		drvs[i].num_channels = crm->num_channels;
