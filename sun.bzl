@@ -26,6 +26,7 @@ def define_sun():
         "drivers/iommu/qcom_iommu_debug.ko",
         "drivers/iommu/qcom_iommu_util.ko",
         "drivers/mailbox/qcom-ipcc.ko",
+        "drivers/nvmem/nvmem_qfprom.ko",
         "drivers/phy/qualcomm/phy-qcom-ufs.ko",
         "drivers/phy/qualcomm/phy-qcom-ufs-qrbtc-sdm845.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
