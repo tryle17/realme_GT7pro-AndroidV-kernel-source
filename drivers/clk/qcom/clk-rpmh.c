@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk-provider.h>
@@ -149,10 +150,6 @@ static DEFINE_MUTEX(rpmh_clk_lock);
 			  CLK_RPMH_ARC_EN_OFFSET, _res_on, _div, false)
 
 #define DEFINE_CLK_RPMH_VRM(_name, _suffix, _res_name, _div)		\
-	__DEFINE_CLK_RPMH(_name, _name##_suffix, _res_name,		\
-			  CLK_RPMH_VRM_EN_OFFSET, 1, _div, false)
-
-#define DEFINE_CLK_RPMH_VRM_OPT(_name, _suffix, _res_name, _div)	\
 	__DEFINE_CLK_RPMH(_name, _name##_suffix, _res_name,		\
 			  CLK_RPMH_VRM_EN_OFFSET, 1, _div, true)
 
@@ -873,4 +870,4 @@ static void __exit clk_rpmh_exit(void)
 module_exit(clk_rpmh_exit);
 
 MODULE_DESCRIPTION("QCOM RPMh Clock Driver");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");
