@@ -3697,6 +3697,7 @@ static int gcc_sun_probe(struct platform_device *pdev)
 
 	/*
 	 * Keep clocks always enabled:
+	 *	gcc_cam_bist_mclk_ahb_clk
 	 *	gcc_camera_ahb_clk
 	 *	gcc_camera_xo_clk
 	 *	gcc_disp_ahb_clk
@@ -3706,6 +3707,7 @@ static int gcc_sun_probe(struct platform_device *pdev)
 	 *	gcc_video_ahb_clk
 	 *	gcc_video_xo_clk
 	 */
+	regmap_update_bits(regmap, 0xA0004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x26004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x26034, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x27004, BIT(0), BIT(0));
