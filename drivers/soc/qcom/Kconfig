@@ -381,6 +381,8 @@ config QCOM_WATCHDOG_USERSPACE_PET
 	  interval that matches the time set in the pet-time config.
 	  The feature is supported through device sysfs files.
 
+source "drivers/soc/qcom/dcvs/Kconfig"
+
 config QCOM_WCNSS_CTRL
 	tristate "Qualcomm WCNSS control driver"
 	depends on ARCH_QCOM || COMPILE_TEST
