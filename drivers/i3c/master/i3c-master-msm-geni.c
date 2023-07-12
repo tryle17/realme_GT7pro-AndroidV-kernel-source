@@ -337,6 +337,7 @@ struct geni_i3c_dev {
 	struct device *wrapper_dev;
 	bool pm_ctrl_client;  /* set from DTSI by client for AON case */
 	bool probe_completed; /* client probe done flag */
+	bool hj_in_progress; /* hotjoin in progress flag */
 };
 
 struct geni_i3c_i2c_dev_data {
@@ -1490,6 +1491,9 @@ static void geni_i3c_hotjoin(struct work_struct *work)
 	if (ret)
 		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev, "hotjoin:daa failed %d\n", ret);
 
+	if (gi3c->pm_ctrl_client)
+		gi3c->hj_in_progress = false;
+
 	pm_relax(gi3c->se.dev);
 
 	if (gi3c->pm_ctrl_client && gi3c->probe_completed) {
@@ -1507,7 +1511,8 @@ static void geni_i3c_hotjoin(struct work_struct *work)
 		pm_runtime_set_autosuspend_delay(gi3c->se.dev, 0);
 		pm_runtime_use_autosuspend(gi3c->se.dev);
 		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
-			    "%s: autosuspend timer only once for client\n", __func__);
+			    "%s: autosuspend timer only once for client, suspend done by i3c\n",
+			    __func__);
 		gi3c->probe_completed = true;
 	}
 }
@@ -1583,6 +1588,8 @@ static irqreturn_t geni_i3c_ibi_irq(int irq, void *dev)
 			cmd_done = true;
 
 		if (m_stat & HOT_JOIN_IRQ_EN) {
+			if (gi3c->pm_ctrl_client)
+				gi3c->hj_in_progress = true;
 			/* Queue worker to service hot-join request*/
 			queue_work(gi3c->hj_wq, &gi3c->hj_wd);
 		}
@@ -3679,6 +3686,15 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 {
 	struct geni_i3c_dev *gi3c = dev_get_drvdata(dev);
 	int ret;
+	u8 hj_wait_cnt = 0;
+
+	while (gi3c->pm_ctrl_client && gi3c->hj_in_progress && hj_wait_cnt <= 50) {
+		hj_wait_cnt++;
+		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s():HJ in progress, cnt:%d\n", __func__, hj_wait_cnt);
+		msleep(20);
+	}
+	hj_wait_cnt = 0;
 
 	if (gi3c->se_mode != GENI_GPI_DMA) {
 		disable_irq(gi3c->irq);
