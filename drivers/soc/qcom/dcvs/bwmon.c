@@ -1855,6 +1855,7 @@ static int qcom_bwmon_driver_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct kobject *dcvs_kobj;
 	struct hwmon_node *node;
+	unsigned long flags;
 	struct bwmon *m;
 	int ret;
 
@@ -1876,11 +1877,11 @@ static int qcom_bwmon_driver_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
+	node = m->hw.node;
 	ret = init_and_start_bwmon(pdev, m);
 	if (ret < 0)
-		return ret;
+		goto err_sysfs;
 
-	node = m->hw.node;
 	dcvs_kobj = qcom_dcvs_kobject_get(m->hw.dcvs_hw);
 	if (IS_ERR(dcvs_kobj)) {
 		ret = PTR_ERR(dcvs_kobj);
@@ -1899,6 +1900,9 @@ static int qcom_bwmon_driver_probe(struct platform_device *pdev)
 
 err_sysfs:
 	stop_monitor(&m->hw);
+	spin_lock_irqsave(&list_lock, flags);
+	list_del(&node->list);
+	spin_unlock_irqrestore(&list_lock, flags);
 	return ret;
 }
 
