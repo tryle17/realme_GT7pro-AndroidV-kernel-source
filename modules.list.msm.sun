@@ -21,6 +21,8 @@ evacc-sun.ko
 stub-regulator.ko
 sg.ko
 gdsc-regulator.ko
+cqhci.ko
+sdhci-msm.ko
 smem.ko
 socinfo.ko
 icc-test.ko
