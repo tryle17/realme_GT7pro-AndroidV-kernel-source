@@ -392,6 +392,16 @@ config QCOM_SECURE_BUFFER
 	  use this memory and no unauthorized access is made to the
 	  buffer.
 
+config QCOM_PANEL_EVENT_NOTIFIER
+	tristate "panel event notifier"
+	depends on DRM
+	help
+	  Enabling this option adds panel event notifier driver.
+	  This driver is responsible for notifying clients interested in display
+	  panel events such as panel on , panel off, fps change etc.  clients
+	  can use these notifications for power saving or align its operations
+	  with display panel power state.
+
 source "drivers/soc/qcom/mem_buf/Kconfig"
 
 config QTI_PMIC_GLINK
