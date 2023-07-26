@@ -52,6 +52,9 @@
 #define CORE_SW_RST		BIT(7)
 #define FF_CLK_SW_RST_DIS	BIT(13)
 
+#define VENDOR_SPEC_FUNC4      0x260
+#define EXTERN_FB_CLK          BIT(24)
+
 #define CORE_PWRCTL_BUS_OFF	BIT(0)
 #define CORE_PWRCTL_BUS_ON	BIT(1)
 #define CORE_PWRCTL_IO_LOW	BIT(2)
@@ -383,6 +386,7 @@ struct sdhci_msm_regs_restore {
 	u32 dll_config2;
 	u32 dll_config3;
 	u32 dll_usr_ctl;
+	u32 ext_fb_clk;
 };
 
 enum vdd_io_level {
@@ -532,6 +536,7 @@ struct sdhci_msm_host {
 	bool vqmmc_enabled;
 	void *sdhci_msm_ipc_log_ctx;
 	bool dbg_en;
+	bool enable_ext_fb_clk;
 };
 
 static struct sdhci_msm_host *sdhci_slot[2];
@@ -623,7 +628,8 @@ static void msm_set_clock_rate_for_bus_mode(struct sdhci_host *host,
 	desired_rate = clock * mult;
 
 	if (curr_ios.timing == MMC_TIMING_SD_HS &&
-			msm_host->uses_level_shifter)
+			msm_host->uses_level_shifter &&
+			!msm_host->enable_ext_fb_clk)
 		desired_rate = LEVEL_SHIFTER_HIGH_SPEED_FREQ;
 
 	rc = dev_pm_opp_set_rate(mmc_dev(host->mmc), desired_rate);
@@ -2001,6 +2007,10 @@ static bool sdhci_msm_populate_pdata(struct device *dev,
 	msm_host->uses_level_shifter =
 		of_property_read_bool(np, "qcom,uses_level_shifter");
 
+	if (msm_host->uses_level_shifter)
+		msm_host->enable_ext_fb_clk =
+			of_property_read_bool(np, "qcom,external-fb-clk");
+
 	msm_host->dll_lock_bist_fail_wa =
 		of_property_read_bool(np, "qcom,dll_lock_bist_fail_wa");
 
@@ -3264,6 +3274,8 @@ static void sdhci_msm_registers_save(struct sdhci_host *host)
 		msm_offset->core_vendor_spec_capabilities0);
 	msm_host->regs_restore.hc_caps_1 =
 		sdhci_readl(host, SDHCI_CAPABILITIES_1);
+	msm_host->regs_restore.ext_fb_clk =
+		sdhci_readl(host, VENDOR_SPEC_FUNC4);
 	msm_host->regs_restore.testbus_config = readl_relaxed(host->ioaddr +
 		msm_offset->core_testbus_config);
 	msm_host->regs_restore.dll_config = readl_relaxed(host->ioaddr +
@@ -3323,6 +3335,8 @@ static void sdhci_msm_registers_restore(struct sdhci_host *host)
 			SDHCI_INT_ENABLE);
 	sdhci_writel(host, msm_host->regs_restore.hc_28_2a,
 			SDHCI_HOST_CONTROL);
+	sdhci_writel(host, msm_host->regs_restore.ext_fb_clk,
+			VENDOR_SPEC_FUNC4);
 	writel_relaxed(msm_host->regs_restore.vendor_caps_0,
 			host->ioaddr +
 			msm_offset->core_vendor_spec_capabilities0);
@@ -4199,6 +4213,15 @@ static void sdhci_set_default_hw_caps(struct sdhci_msm_host *msm_host,
 		msm_host->cqhci_offset_changed = true;
 }
 
+static void sdhci_enable_ext_fb_clk(struct sdhci_host *host)
+{
+	u32 fb_clk;
+
+	fb_clk = sdhci_readl(host, VENDOR_SPEC_FUNC4);
+	fb_clk |= EXTERN_FB_CLK;
+	sdhci_writel(host, fb_clk, VENDOR_SPEC_FUNC4);
+}
+
 static inline void sdhci_msm_get_of_property(struct platform_device *pdev,
 		struct sdhci_host *host)
 {
@@ -4921,6 +4944,13 @@ static int sdhci_msm_setup_clocks_and_bus(struct sdhci_msm_host *msm_host)
 
 	if (!msm_host->skip_bus_bw_voting)
 		sdhci_msm_bus_voting(host, true);
+
+	/*
+	 * The flag enable_ext_fb_clk is true means select external
+	 * FB clock while false means select internal FB clock.
+	 */
+	if (msm_host->enable_ext_fb_clk)
+		sdhci_enable_ext_fb_clk(host);
 
 	return 0;
 
