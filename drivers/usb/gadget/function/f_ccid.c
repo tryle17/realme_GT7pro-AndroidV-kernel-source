@@ -1051,7 +1051,7 @@ static int ccid_alloc_chrdev_region(void)
 	int ret;
 	dev_t dev;
 
-	ccid_class = class_create(THIS_MODULE, "ccid_usb");
+	ccid_class = class_create("ccid_usb");
 	if (IS_ERR(ccid_class)) {
 		ret = PTR_ERR(ccid_class);
 		ccid_class = NULL;

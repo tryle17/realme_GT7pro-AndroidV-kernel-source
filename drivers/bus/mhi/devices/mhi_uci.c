@@ -791,7 +791,7 @@ static int mhi_uci_init(void)
 		return ret;
 
 	mhi_uci_drv.major = ret;
-	mhi_uci_drv.class = class_create(THIS_MODULE, MHI_UCI_DRIVER_NAME);
+	mhi_uci_drv.class = class_create(MHI_UCI_DRIVER_NAME);
 	if (IS_ERR(mhi_uci_drv.class))
 		return -ENODEV;
 
