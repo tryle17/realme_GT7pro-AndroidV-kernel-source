@@ -2287,8 +2287,6 @@ static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 	int err = 0;
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
-	/* Set the rpm auto suspend delay to 3s */
-	hba->host->hostt->rpm_autosuspend_delay = UFS_QCOM_AUTO_SUSPEND_DELAY;
 	/* Set the default auto-hiberate idle timer value to 5ms */
 	hba->ahit = FIELD_PREP(UFSHCI_AHIBERN8_TIMER_MASK, 5) |
 		    FIELD_PREP(UFSHCI_AHIBERN8_SCALE_MASK, 3);
