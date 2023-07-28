@@ -71,6 +71,8 @@ struct qcom_scm {
 	u64 dload_mode_addr;
 };
 
+DEFINE_SEMAPHORE(qcom_scm_sem_lock, 1);
+
 /* Each bit configures cold/warm boot address for one of the 4 CPUs */
 static const u8 qcom_scm_cpu_cold_bits[QCOM_SCM_BOOT_MAX_CPUS] = {
 	0, BIT(0), BIT(3), BIT(5)
@@ -78,6 +80,17 @@ static const u8 qcom_scm_cpu_cold_bits[QCOM_SCM_BOOT_MAX_CPUS] = {
 static const u8 qcom_scm_cpu_warm_bits[QCOM_SCM_BOOT_MAX_CPUS] = {
 	BIT(2), BIT(1), BIT(4), BIT(6)
 };
+
+
+#define QCOM_SCM_FLAG_COLDBOOT_CPU0	0x00
+#define QCOM_SCM_FLAG_COLDBOOT_CPU1	0x01
+#define QCOM_SCM_FLAG_COLDBOOT_CPU2	0x08
+#define QCOM_SCM_FLAG_COLDBOOT_CPU3	0x20
+
+#define QCOM_SCM_FLAG_WARMBOOT_CPU0	0x04
+#define QCOM_SCM_FLAG_WARMBOOT_CPU1	0x02
+#define QCOM_SCM_FLAG_WARMBOOT_CPU2	0x10
+#define QCOM_SCM_FLAG_WARMBOOT_CPU3	0x40
 
 #define QCOM_SMC_WAITQ_FLAG_WAKE_ONE	BIT(0)
 #define QCOM_SMC_WAITQ_FLAG_WAKE_ALL	BIT(1)
@@ -2467,7 +2480,10 @@ static int __qcom_multi_smc_init(struct qcom_scm *__scm,
 		}
 
 		/* Detect Multi SMC support present or not */
-		qcom_scm_query_wq_queue_info(__scm);
+		ret = qcom_scm_query_wq_queue_info(__scm);
+		if (!ret)
+			sema_init(&qcom_scm_sem_lock,
+					(int)__scm->waitq.call_ctx_cnt);
 	}
 
 	return ret;
