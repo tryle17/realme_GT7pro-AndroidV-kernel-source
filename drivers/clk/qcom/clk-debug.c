@@ -677,6 +677,14 @@ static int list_rates_show(struct seq_file *s, void *unused)
 	int i = 0, level;
 	unsigned long rate, rate_max = 0;
 
+	/*
+	 * Some RCGs don't populate their freq_tbl until the first
+	 * determine_rate() callback (e.g. DFS and CRM). Ensure this happens by
+	 * calling clk_round_rate(), which will internally call
+	 * determine_rate().
+	 */
+	clk_round_rate(hw->clk, 0);
+
 	/* Find max frequency supported within voltage constraints. */
 	if (!vdd_class) {
 		rate_max = ULONG_MAX;
