@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2014, 2018-2020, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef __QCOM_CLK_COMMON_H__
 #define __QCOM_CLK_COMMON_H__
@@ -53,6 +53,17 @@ struct clk_dummy {
 	unsigned long rrate;
 };
 
+struct crm_regs {
+	u32 cfg_rcgr;
+	u32 l_val;
+	u32 curr_perf;
+};
+
+struct crm_offsets {
+	u32 vcd;
+	u32 level;
+};
+
 /**
  * struct clk_crm - clk crm
  *
@@ -65,6 +76,8 @@ struct clk_crm {
 	const char *name;
 	struct regmap *regmap_crmc;
 	const struct device *dev;
+	struct crm_regs regs;
+	struct crm_offsets offsets;
 	bool initialized;
 };
 
