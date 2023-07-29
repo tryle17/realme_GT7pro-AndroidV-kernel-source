@@ -2135,37 +2135,46 @@ static int clk_rcg2_crmb_set_rate(struct clk_hw *hw, unsigned long rate,
 	return -EINVAL;
 }
 
-unsigned long clk_rcg2_crmb_hw_set_bw(struct clk_hw *hw,
-				      enum crm_drv_type client_type, u32 client_idx,
-				      u32 pwr_st, unsigned long rate)
+unsigned long clk_rcg2_crmb_set_crmb_rate(struct clk_hw *hw,
+					enum crm_drv_type client_type, u32 client_idx,
+					u32 nd_idx, u32 pwr_st, u32 ab_rate, u32 ib_rate)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	struct clk_crm *crm = rcg->clkr.crm;
 	struct crm_cmd cmd = {0};
 	int ret;
 
-	if (rate)
-		rate /= 1000000;
+	ab_rate /= 1000000;
+	ib_rate /= 1000000;
 
-	cmd.resource_idx = 0;
+	if (nd_idx >= rcg->clkr.crm_num_node)
+		return -EINVAL;
+
+	cmd.resource_idx = rcg->clkr.crm_base_node + nd_idx;
 	cmd.pwr_state.hw = pwr_st;
 	cmd.wait = 1;
 
-	/*
-	 * write AB for HW clients
-	 */
-	cmd.data = BCM_TCS_CMD(1, 1, rate, 0);
+	cmd.data = BCM_TCS_CMD(1, 1, ab_rate, ib_rate);
 
 	ret = crm_write_bw_vote(crm->dev, client_type, client_idx, &cmd);
 	if (ret)
-		pr_err("%s err crm_write_bw_vote rcg name %s cmd.data=0x%x ret=%d\n",
+		pr_err("%s err rcg name %s cmd.data=0x%x ret=%d\n",
 		       __func__, qcom_clk_hw_get_name(hw), cmd.data, ret);
 
 	return ret;
 }
 
+unsigned long clk_rcg2_crmb_set_crm_rate(struct clk_hw *hw,
+				       enum crm_drv_type client_type, u32 client_idx,
+				       u32 pwr_st, unsigned long rate)
+{
+	return clk_rcg2_crmb_set_crmb_rate(hw, client_type, client_idx,
+					 0, pwr_st, rate, 0);
+}
+
 static struct clk_regmap_ops clk_rcg2_crmb_regmap_ops = {
-	.set_crm_rate = clk_rcg2_crmb_hw_set_bw,
+	.set_crm_rate = clk_rcg2_crmb_set_crm_rate,
+	.set_crmb_rate = clk_rcg2_crmb_set_crmb_rate,
 	.list_rate = clk_rcg2_list_rate,
 };
 

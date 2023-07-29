@@ -537,6 +537,36 @@ int qcom_clk_crm_set_rate(struct clk *clk,
 }
 EXPORT_SYMBOL(qcom_clk_crm_set_rate);
 
+int qcom_clk_crmb_set_rate(struct clk *clk,
+			   enum crm_drv_type client_type, u32 client_idx,
+			   u32 resource_idx, u32 pwr_st, u32 ab_rate, u32 ib_rate)
+{
+	struct clk_hw *hw;
+	int ret;
+
+	if (!clk)
+		return -EINVAL;
+
+	do {
+		hw = __clk_get_hw(clk);
+
+		if (clk_is_regmap_clk(hw)) {
+			struct clk_regmap *rclk = to_clk_regmap(hw);
+
+			if (rclk->ops && rclk->ops->set_crmb_rate) {
+				ret = rclk->ops->set_crmb_rate(hw, client_type,
+							      client_idx, resource_idx, pwr_st,
+							      ab_rate, ib_rate);
+				return ret;
+			}
+		}
+
+	} while ((clk = clk_get_parent(hw->clk)));
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(qcom_clk_crmb_set_rate);
+
 int qcom_clk_get_voltage(struct clk *clk, unsigned long rate)
 {
 	struct clk_regmap *rclk;

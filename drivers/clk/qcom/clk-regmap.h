@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2014, 2019-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef __QCOM_CLK_REGMAP_H__
 #define __QCOM_CLK_REGMAP_H__
@@ -29,6 +29,8 @@ struct regmap;
  *		on success, error otherwise.
  * @set_crm_rate: Set crmc/crmb clk frequency. Returns 0
  *		on success, error otherwise.
+ * @set_crmb_rate: Set crmb clk frequency in ab, ib terms. Returns 0
+ *		on success, error otherwise.
  */
 struct clk_regmap_ops {
 	void	(*list_registers)(struct seq_file *f,
@@ -39,6 +41,9 @@ struct clk_regmap_ops {
 	unsigned long	(*calc_pll)(struct clk_hw *hw, u32 l, u64 a);
 	unsigned long	(*set_crm_rate)(struct clk_hw *hw, enum crm_drv_type client_type,
 					u32 client_idx, u32 pwr_st, unsigned long rate);
+	unsigned long	(*set_crmb_rate)(struct clk_hw *hw, enum crm_drv_type client_type,
+					 u32 client_idx, u32 resource_idx, u32 pwr_st,
+					 u32 ab_rate, u32 ib_rate);
 };
 
 /**
@@ -66,6 +71,8 @@ struct clk_regmap {
 	struct device *dev;
 	struct clk_crm *crm;
 	u8 crm_vcd;
+	u8 crm_base_node;
+	u8 crm_num_node;
 #define QCOM_CLK_IS_CRITICAL BIT(0)
 #define QCOM_CLK_BOOT_CRITICAL BIT(1)
 	unsigned long flags;
