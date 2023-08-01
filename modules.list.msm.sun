@@ -15,9 +15,12 @@ qcom_iommu_util.ko
 qcom-reboot-reason.ko
 qcom-scm.ko
 clk-dummy.ko
+cmd-db.ko
+qcom_rpmh.ko
 clk-qcom.ko
 debug-regulator.ko
 proxy-consumer.ko
+rpmh-regulator.ko
 gcc-sun.ko
 secure_buffer.ko
 camcc-sun.ko
