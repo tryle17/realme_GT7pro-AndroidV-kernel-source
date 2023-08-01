@@ -1,11 +1,27 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+cmd-db.ko
+qcom_rpmh.ko
+qcom-pdc.ko
+qcom-scm.ko
+qcom_iommu_util.ko
+iommu-logger.ko
+arm_smmu.ko
 pinctrl-msm.ko
 pinctrl-pineapple.ko
-qcom-scm.ko
-clk-dummy.ko
-gcc-pineapple.ko
 clk-qcom.ko
+clk-dummy.ko
+clk-rpmh.ko
+debug-regulator.ko
+proxy-consumer.ko
+rpmh-regulator.ko
+videocc-pineapple.ko
+camcc-pineapple.ko
+tcsrcc-pineapple.ko
+dispcc-pineapple.ko
+gpucc-pineapple.ko
+debugcc-pineapple.ko
+gcc-pineapple.ko
 gdsc-regulator.ko
 icc-bcm-voter.ko
 icc-debug.ko
@@ -13,5 +29,9 @@ icc-rpmh.ko
 qnoc-pineapple.ko
 qnoc-qos.ko
 crm.ko
-cmd-db.ko
-qcom_rpmh.ko
+phy-qcom-ufs.ko
+phy-qcom-ufs-qmp-v4-pineapple.ko
+ufs_qcom.ko
+regmap-spmi.ko
+spmi-pmic-arb.ko
+qcom-spmi-pmic.ko
