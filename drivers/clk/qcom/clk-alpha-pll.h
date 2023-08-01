@@ -21,6 +21,7 @@ enum {
 	CLK_ALPHA_PLL_TYPE_LUCID_EVO,
 	CLK_ALPHA_PLL_TYPE_LUCID_OLE,
 	CLK_ALPHA_PLL_TYPE_TAYCAN_ELU,
+	CLK_ALPHA_PLL_TYPE_PONGO_ELU,
 	CLK_ALPHA_PLL_TYPE_RIVIAN_EVO,
 	CLK_ALPHA_PLL_TYPE_RIVIAN_OLE = CLK_ALPHA_PLL_TYPE_RIVIAN_EVO,
 	CLK_ALPHA_PLL_TYPE_RIVIAN_ELU,
@@ -46,6 +47,7 @@ enum {
 	PLL_OFF_TEST_CTL_U,
 	PLL_OFF_TEST_CTL_U1,
 	PLL_OFF_TEST_CTL_U2,
+	PLL_OFF_TEST_CTL_U3,
 	PLL_OFF_STATE,
 	PLL_OFF_STATUS,
 	PLL_OFF_OPMODE,
@@ -134,6 +136,7 @@ struct alpha_pll_config {
 	u32 test_ctl_hi_val;
 	u32 test_ctl_hi1_val;
 	u32 test_ctl_hi2_val;
+	u32 test_ctl_hi3_val;
 	u32 main_output_mask;
 	u32 aux_output_mask;
 	u32 aux2_output_mask;
@@ -202,6 +205,10 @@ extern const struct clk_ops clk_alpha_pll_rivian_evo_ops;
 #define clk_alpha_pll_rivian_ole_ops clk_alpha_pll_rivian_evo_ops
 #define clk_alpha_pll_rivian_elu_ops clk_alpha_pll_rivian_evo_ops
 
+extern const struct clk_ops clk_alpha_pll_pongo_elu_ops;
+
+void clk_pongo_elu_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
+				 const struct alpha_pll_config *config);
 void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 			     const struct alpha_pll_config *config);
 void clk_fabia_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,

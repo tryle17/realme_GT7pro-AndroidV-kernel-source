@@ -884,6 +884,15 @@ config SM_EVACC_SUN
 	  Say Y if you want to support EVA devices to get better
 	  visual analysis.
 
+config SM_DISPCC_SUN
+	tristate "SUN Display Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash screen.
+
 config SM_GPUCC_6350
 	tristate "SM6350 Graphics Clock Controller"
 	select SM_GCC_6350
