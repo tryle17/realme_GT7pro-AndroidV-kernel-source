@@ -22,6 +22,7 @@ debug-regulator.ko
 proxy-consumer.ko
 rpmh-regulator.ko
 gcc-sun.ko
+gpucc-sun.ko
 secure_buffer.ko
 camcc-sun.ko
 evacc-sun.ko
