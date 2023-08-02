@@ -638,7 +638,7 @@ static int send_ack_write(void *data, u64 val)
 
 	rc = __altmode_send_data(amdev, &ack, sizeof(ack));
 	if (rc < 0) {
-		dev_err(amdev->dev, "port %d: Failed sending PAN ACK: %llu\n",
+		dev_err(amdev->dev, "port %llu: Failed sending PAN ACK: %d\n",
 				val, rc);
 		return rc;
 	}
