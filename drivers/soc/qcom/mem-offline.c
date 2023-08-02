@@ -1782,7 +1782,7 @@ static int mem_offline_driver_probe(struct platform_device *pdev)
 		goto err_free_mem_sec_state;
 	}
 
-	if (register_hotmemory_notifier(&hotplug_memory_callback_nb)) {
+	if (register_memory_notifier(&hotplug_memory_callback_nb)) {
 		pr_err("mem-offline: Registering memory hotplug notifier failed\n");
 		ret = -ENODEV;
 		goto err_sysfs_remove_group;
