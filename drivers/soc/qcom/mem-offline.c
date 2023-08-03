@@ -980,6 +980,8 @@ static ssize_t store_anon_migrate(struct kobject *kobj,
 	return size;
 }
 
+#ifdef CONFIG_MEM_OFFLINE_ZONE_BALANCING
+
 static unsigned long get_anon_movable_pages(
 			struct movable_zone_fill_control *fc,
 			unsigned long start_pfn,
@@ -1214,6 +1216,10 @@ out:
 		release_freepages(&fc.freepages);
 	mutex_unlock(&page_migrate_lock);
 }
+
+#else
+static void fill_movable_zone_fn(struct work_struct *work) {}
+#endif
 
 static struct kobj_attribute stats_attr =
 		__ATTR(stats, 0444, show_mem_stats, NULL);
