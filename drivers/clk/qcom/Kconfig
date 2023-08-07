@@ -959,6 +959,15 @@ config SM_VIDEOCC_8250
 	  Say Y if you want to support video devices and functionality such as
 	  video encode and decode.
 
+config SM_VIDEOCC_SUN
+	tristate "SUN Video Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the video clock controller on Qualcomm Technologies, Inc
+	  SUN devices.
+	  Say Y if you want to support video devices and functionality such as
+	  video encode/decode.
+
 config SPMI_PMIC_CLKDIV
 	tristate "SPMI PMIC clkdiv Support"
 	depends on SPMI || COMPILE_TEST
