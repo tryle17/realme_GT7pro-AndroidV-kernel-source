@@ -359,6 +359,15 @@ config QCOM_APR
 	  used by audio driver to configure QDSP6
 	  ASM, ADM and AFE modules.
 
+config QPNP_PBS
+	tristate "PBS trigger support for QPNP PMIC"
+	depends on SPMI
+	help
+	  This driver supports configuring software PBS trigger event through PBS
+	  RAM on Qualcomm Technologies, Inc. QPNP PMICs. This module provides
+	  the APIs to the client drivers that wants to send the PBS trigger
+	  event to the PBS RAM.
+
 config QCOM_RAMDUMP
 	tristate "Qualcomm Technologies, Inc. Ramdump driver"
 	default n
@@ -416,6 +425,16 @@ config QTI_PMIC_GLINK
 	  charging and gauging.
 	  This enables clients to read and write battery charging parameters.
 
+config QTI_PMIC_GLINK_CLIENT_DEBUG
+	depends on QTI_PMIC_GLINK && DEBUG_FS
+	bool "Enable debugfs features in PMIC GLINK client drivers"
+	help
+	  This option enables the generation of debugfs files in PMIC GLINK
+	  client drivers that are strictly meant for internal debugging only.
+	  Writing to these debug files changes key physical parameters of a
+	  system, which may lead to instability. Therefore, this option should
+	  never be enabled on production devices.
+
 config QTI_ALTMODE_GLINK
 	tristate "Type-C alternate mode over GLINK"
 	depends on QTI_PMIC_GLINK
@@ -424,5 +443,42 @@ config QTI_ALTMODE_GLINK
 	  an interface for Type-C alternate mode clients to receive data such
 	  as Pin Assignment Notifications from the Type-C stack running on a
 	  remote subsystem (e.g. DSP) via the PMIC GLINK interface.
+
+config QTI_BATTERY_GLINK_DEBUG
+	tristate "Enable support for QTI battery glink debug driver"
+	depends on QTI_PMIC_GLINK
+	help
+	  Qualcomm Technologies, Inc. battery glink debug driver helps to
+	  obtain debug information for battery charging and gauging over PMIC
+	  Glink from charger and gauging firmware running on a remote subsystem
+	  (e.g. DSP).
+
+config QTI_CHARGER_ULOG_GLINK
+	tristate "Enable support for QTI charger ulog glink driver"
+	depends on QTI_PMIC_GLINK && DEBUG_FS
+	help
+	  Qualcomm Technologies, Inc. charger ulog glink driver helps to
+	  obtain ulogs from battery charging and gauging stack over PMIC
+	  Glink from the charger firmware running on a remote subsystem
+	  (e.g. DSP).
+
+config QTI_PMIC_GLINK_DEBUG
+	tristate "QTI PMIC Glink Debug Device"
+	depends on QTI_PMIC_GLINK
+	help
+	  The Qualcomm Technologies, Inc. PMIC Glink debug device driver
+	  provides an interface to read and write PMIC registers over PMIC
+	  Glink using a remote subsytem (e.g. DSP).  This allows for debugging
+	  PMIC peripherals that would typically only be accessible to the
+	  charger and fuel gauging firmware running on the remote subsystem.
+	  The PMIC peripherals' bus access can be either SPMI or I2C.
+
+config QTI_PMIC_PON_LOG
+	tristate "PMIC PON log parser driver"
+	help
+	  The PMIC PON log driver parses PMIC power-on, power-off, and fault
+	  information out of a binary log stored in the SDAM memory found on
+	  some Qualcomm Technologies, Inc. PMIC devices.  This driver is useful
+	  when debugging unexpected power-off scenarios.
 
 endmenu
