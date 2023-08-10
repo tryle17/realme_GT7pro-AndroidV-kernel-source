@@ -5,6 +5,7 @@
  */
 
 #include <linux/atomic.h>
+#include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/fs.h>
@@ -614,6 +615,7 @@ struct haptics_chip {
 	struct haptics_effect		*custom_effect;
 	struct haptics_play_info	play;
 	struct haptics_mmap		mmap;
+	struct dentry			*debugfs_dir;
 	struct delayed_work		stop_work;
 	struct regulator_dev		*swr_slave_rdev;
 	struct nvmem_cell		*cl_brake_nvmem;
@@ -5050,6 +5052,8 @@ static int haptics_boost_notifier(struct notifier_block *nb, unsigned long event
 	return 0;
 }
 
+#include "qcom-hv-haptics-debugfs.c"
+
 static int haptics_probe(struct platform_device *pdev)
 {
 	struct haptics_chip *chip;
@@ -5167,6 +5171,9 @@ static int haptics_probe(struct platform_device *pdev)
 
 	chip->hboost_nb.notifier_call = haptics_boost_notifier;
 	register_hboost_event_notifier(&chip->hboost_nb);
+	rc = haptics_create_debugfs(chip);
+	if (rc < 0)
+		dev_err(chip->dev, "Creating debugfs failed, rc=%d\n", rc);
 	return 0;
 destroy_ff:
 	input_ff_destroy(chip->input_dev);
@@ -5182,6 +5189,7 @@ static int haptics_remove(struct platform_device *pdev)
 
 	unregister_hboost_event_notifier(&chip->hboost_nb);
 	class_unregister(&chip->hap_class);
+	haptics_remove_debugfs(chip);
 	input_unregister_device(chip->input_dev);
 	dev_set_drvdata(chip->dev, NULL);
 
