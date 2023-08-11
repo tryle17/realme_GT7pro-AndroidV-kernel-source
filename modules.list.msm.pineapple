@@ -40,3 +40,5 @@ ufs_qcom.ko
 regmap-spmi.ko
 spmi-pmic-arb.ko
 qcom-spmi-pmic.ko
+smem.ko
+socinfo.ko

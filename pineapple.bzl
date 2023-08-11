@@ -54,6 +54,7 @@ def define_pineapple():
         "drivers/soc/qcom/secure_buffer.ko",
         "drivers/soc/qcom/smem.ko",
         "drivers/soc/qcom/smp2p.ko",
+        "drivers/soc/qcom/socinfo.ko",
         "drivers/spmi/spmi-pmic-arb.ko",
         "drivers/ufs/host/ufs_qcom.ko",
         "drivers/usb/dwc3/dwc3-msm.ko",
