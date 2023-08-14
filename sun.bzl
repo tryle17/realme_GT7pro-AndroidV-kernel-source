@@ -30,6 +30,7 @@ def define_sun():
         "drivers/iommu/msm_dma_iommu_mapping.ko",
         "drivers/iommu/qcom_iommu_debug.ko",
         "drivers/iommu/qcom_iommu_util.ko",
+        "drivers/mailbox/msm_qmp.ko",
         "drivers/mailbox/qcom-ipcc.ko",
         "drivers/mmc/host/cqhci.ko",
         "drivers/mmc/host/sdhci-msm.ko",
@@ -59,6 +60,7 @@ def define_sun():
         "drivers/soc/qcom/qcom_rpmh.ko",
         "drivers/soc/qcom/secure_buffer.ko",
         "drivers/soc/qcom/smem.ko",
+        "drivers/soc/qcom/smp2p.ko",
         "drivers/soc/qcom/socinfo.ko",
         "drivers/ufs/host/ufs_qcom.ko",
         "drivers/usb/dwc3/dwc3-msm.ko",
@@ -68,6 +70,8 @@ def define_sun():
         "drivers/usb/gadget/function/usb_f_qdss.ko",
         "drivers/usb/phy/phy-generic.ko",
         "drivers/usb/phy/phy-qcom-emu.ko",
+        "net/qrtr/qrtr.ko",
+        "net/qrtr/qrtr-smd.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
