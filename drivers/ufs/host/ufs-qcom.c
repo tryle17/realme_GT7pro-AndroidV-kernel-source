@@ -3646,7 +3646,7 @@ static int ufs_qcom_clk_scale_notify(struct ufs_hba *hba,
 			err = ufs_qcom_clk_scale_down_post_change(hba);
 
 
-		if (err || !dev_req_params) {
+		if (err) {
 			ufshcd_uic_hibern8_exit(hba);
 			goto out;
 		}
@@ -4784,7 +4784,7 @@ static void ufs_qcom_shutdown(struct platform_device *pdev)
 	ufs_qcom_device_reset_ctrl(hba, false);
 }
 
-static const struct of_device_id ufs_qcom_of_match[] = {
+static const struct of_device_id ufs_qcom_of_match[] __maybe_unused = {
 	{ .compatible = "qcom,ufshc"},
 	{},
 };
