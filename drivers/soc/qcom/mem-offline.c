@@ -17,7 +17,9 @@
 #include <linux/of.h>
 #include <linux/mailbox_client.h>
 #include <linux/mailbox/qmp.h>
+#ifdef CONFIG_MSM_RPM_SMD
 #include <soc/qcom/rpm-smd.h>
+#endif
 #include <linux/migrate.h>
 #include <linux/swap.h>
 #include <linux/mm_inline.h>
@@ -56,9 +58,9 @@ static unsigned int sections_per_block;
 static atomic_t target_migrate_pages = ATOMIC_INIT(0);
 static u32 offline_granule;
 static bool is_rpm_controller;
+static DECLARE_BITMAP(movable_bitmap, 1024);
 static bool has_pend_offline_req;
 static struct workqueue_struct *migrate_wq;
-static DECLARE_BITMAP(movable_bitmap, 1024);
 #define MODULE_CLASS_NAME	"mem-offline"
 #define MEMBLOCK_NAME		"memory%lu"
 #define SEGMENT_NAME		"segment%lu"
@@ -151,6 +153,9 @@ struct memory_refresh_request {
 
 static struct section_stat *mem_info;
 
+static int nopasr;
+module_param_named(nopasr, nopasr, uint, 0644);
+
 static void record_stat(unsigned long sec, ktime_t delay, int mode)
 {
 	unsigned int total_sec = end_section_nr - start_section_nr + 1;
@@ -195,6 +200,7 @@ static int mem_region_refresh_control(unsigned long pfn,
 				      unsigned long nr_pages,
 				      bool enable)
 {
+#ifdef CONFIG_MSM_RPM_SMD
 	struct memory_refresh_request mem_req;
 	struct msm_rpm_kvp rpm_kvp;
 
@@ -208,6 +214,9 @@ static int mem_region_refresh_control(unsigned long pfn,
 
 	return msm_rpm_send_message(MSM_RPM_CTX_ACTIVE_SET, RPM_DDR_REQ, 0,
 				    &rpm_kvp, 1);
+#else
+	return -EINVAL;
+#endif
 }
 
 static int aop_send_msg(unsigned long addr, bool online)
@@ -225,20 +234,20 @@ static int aop_send_msg(unsigned long addr, bool online)
 
 	pkt.size = MAX_LEN;
 	pkt.data = mbox_msg;
-	return (mbox_send_message(mailbox.mbox, &pkt) < 0);
+	return mbox_send_message(mailbox.mbox, &pkt);
 }
 
-static long get_memblk_bits(unsigned int seg_idx, unsigned long memblk_addr)
+static long get_memblk_bits(int seg_idx, unsigned long memblk_addr)
 {
-	if (memblk_addr > segment_infos[seg_idx].start_addr +
-			segment_infos[seg_idx].seg_size)
+	if (seg_idx < 0 || (memblk_addr > segment_infos[seg_idx].start_addr +
+			segment_infos[seg_idx].seg_size))
 		return -EINVAL;
 
 	return (1 << ((memblk_addr - segment_infos[seg_idx].start_addr) /
 				memory_block_size_bytes()));
 }
 
-static long get_segment_addr_to_idx(unsigned long addr)
+static int get_segment_addr_to_idx(unsigned long addr)
 {
 	int i;
 
@@ -277,11 +286,11 @@ static int send_msg(struct memory_notify *mn, bool online, int count)
 		else
 			ret = aop_send_msg(__pfn_to_phys(start), online);
 
-		if (ret) {
-			pr_err("PASR: %s %s request addr:0x%llx failed\n",
+		if (ret < 0) {
+			pr_err("PASR: %s %s request addr:0x%llx failed and return value from AOP is %d\n",
 			       is_rpm_controller ? "RPM" : "AOP",
 			       online ? "online" : "offline",
-			       __pfn_to_phys(start));
+			       __pfn_to_phys(start), ret);
 			goto undo;
 		}
 
@@ -306,8 +315,9 @@ undo:
 		else
 			ret = aop_send_msg(__pfn_to_phys(start), !online);
 
-		if (ret)
-			panic("Failed to completely online/offline a hotpluggable segment. A quasi state of memblock can cause randomn system failures.");
+		if (ret < 0)
+			panic("Failed to completely online/offline a hotpluggable segment. A quasi state of memblock can cause random system failures. Return value from AOP is %d",
+				ret);
 		segment_size = segment_infos[seg_idx].seg_size;
 		addr += segment_size;
 		seg_idx = get_segment_addr_to_idx(addr);
@@ -319,7 +329,7 @@ undo:
 
 static void set_memblk_bitmap_online(unsigned long addr)
 {
-	unsigned long seg_idx;
+	int seg_idx;
 	long cur_blk_bit;
 
 	seg_idx = get_segment_addr_to_idx(addr);
@@ -340,7 +350,7 @@ static void set_memblk_bitmap_online(unsigned long addr)
 
 static void set_memblk_bitmap_offline(unsigned long addr)
 {
-	unsigned long seg_idx;
+	int seg_idx;
 	long cur_blk_bit;
 
 	seg_idx = get_segment_addr_to_idx(addr);
@@ -506,7 +516,7 @@ static int mem_event_callback(struct notifier_block *self,
 	ktime_t delay = 0;
 	phys_addr_t start_addr, end_addr;
 	unsigned int idx = end_section_nr - start_section_nr + 1;
-	unsigned long seg_idx;
+	int seg_idx;
 
 	start = SECTION_ALIGN_DOWN(mn->start_pfn);
 	end = SECTION_ALIGN_UP(mn->start_pfn + mn->nr_pages);
@@ -543,7 +553,7 @@ static int mem_event_callback(struct notifier_block *self,
 
 		break;
 	case MEM_ONLINE:
-		delay = ktime_ms_delta(ktime_get(), cur);
+		delay = ktime_us_delta(ktime_get(), cur);
 		record_stat(sec_nr, delay, MEMORY_ONLINE);
 		cur = 0;
 		set_memblk_bitmap_online(start_addr);
@@ -570,7 +580,7 @@ static int mem_event_callback(struct notifier_block *self,
 		 * help since this is the last stage of memory hotplug.
 		 */
 
-		delay = ktime_ms_delta(ktime_get(), cur);
+		delay = ktime_us_delta(ktime_get(), cur);
 		record_stat(sec_nr, delay, MEMORY_OFFLINE);
 		cur = 0;
 		has_pend_offline_req = false;
@@ -813,7 +823,7 @@ static unsigned int print_blk_residency_times(char *buf, size_t sz,
 		delta = ktime_add(delta,
 			mem_info[i + mode * idx].resident_time);
 		c += scnprintf(buf + c, sz - c, "%lus\t\t",
-				ktime_to_ms(delta) / MSEC_PER_SEC);
+				ktime_to_us(delta) / USEC_PER_SEC);
 		total_time[i + mode * idx] = delta;
 	}
 	return c;
@@ -849,26 +859,26 @@ static ssize_t show_mem_stats(struct kobject *kobj,
 		c += scnprintf(buf + c, sz - c,
 							"\tLast recd time:\t");
 		for (i = 0; i <= tot_blks; i++)
-			c += scnprintf(buf + c, sz - c, "%lums\t\t",
+			c += scnprintf(buf + c, sz - c, "%luus\t\t",
 				mem_info[i + j * idx].last_recorded_time);
 		c += scnprintf(buf + c, sz - c, "\n");
 		c += scnprintf(buf + c, sz - c,
 							"\tAvg time:\t");
 		for (i = 0; i <= tot_blks; i++)
 			c += scnprintf(buf + c, sz - c,
-				"%lums\t\t", mem_info[i + j * idx].avg_time);
+				"%luus\t\t", mem_info[i + j * idx].avg_time);
 		c += scnprintf(buf + c, sz - c, "\n");
 		c += scnprintf(buf + c, sz - c,
 							"\tBest time:\t");
 		for (i = 0; i <= tot_blks; i++)
 			c += scnprintf(buf + c, sz - c,
-				"%lums\t\t", mem_info[i + j * idx].best_time);
+				"%luus\t\t", mem_info[i + j * idx].best_time);
 		c += scnprintf(buf + c, sz - c, "\n");
 		c += scnprintf(buf + c, sz - c,
 							"\tWorst time:\t");
 		for (i = 0; i <= tot_blks; i++)
 			c += scnprintf(buf + c, sz - c,
-				"%lums\t\t", mem_info[i + j * idx].worst_time);
+				"%luus\t\t", mem_info[i + j * idx].worst_time);
 		c += scnprintf(buf + c, sz - c, "\n");
 		c += scnprintf(buf + c, sz - c,
 							"\tSuccess count:\t");
@@ -1083,6 +1093,15 @@ static void isolate_free_pages(struct movable_zone_fill_control *fc)
 			start_pfn += pageblock_nr_pages - 1;
 			continue;
 		}
+		/*
+		 * Make sure that the zone->lock is not held for long by
+		 * returning once we have SWAP_CLUSTER_MAX pages in the
+		 * free list for migration.
+		 */
+		if (!(start_pfn % pageblock_nr_pages) &&
+			(fc->nr_free_pages >= SWAP_CLUSTER_MAX ||
+			 has_pend_offline_req))
+			break;
 
 		if (!PageBuddy(page))
 			continue;
@@ -1097,18 +1116,8 @@ static void isolate_free_pages(struct movable_zone_fill_control *fc)
 		list_splice(&tmp, &fc->freepages);
 		fc->nr_free_pages += isolated;
 		start_pfn += isolated - 1;
-
-		/*
-		 * Make sure that the zone->lock is not held for long by
-		 * returning once we have SWAP_CLUSTER_MAX pages in the
-		 * free list for migration.
-		 */
-		if (!((start_pfn + 1) % pageblock_nr_pages) &&
-			(fc->nr_free_pages >= SWAP_CLUSTER_MAX ||
-			 has_pend_offline_req))
-			break;
 	}
-	fc->start_pfn = start_pfn + 1;
+	fc->start_pfn = start_pfn;
 out:
 	spin_unlock_irqrestore(&fc->zone->lock, flags);
 }
@@ -1185,7 +1194,7 @@ repeat:
 		goto repeat;
 
 	ret = migrate_pages(&source, movable_page_alloc, movable_page_free,
-		(unsigned long) &fc, MIGRATE_ASYNC, MR_MEMORY_HOTPLUG);
+		(unsigned long) &fc, MIGRATE_ASYNC, MR_MEMORY_HOTPLUG, NULL);
 	if (ret)
 		putback_movable_pages(&source);
 
@@ -1442,8 +1451,8 @@ static int get_segment_region_info(void)
 {
 	uint8_t r = 0; // region index
 	unsigned long region_end, segment_start, segment_size, r0_segment_size;
-	unsigned long num_kernel_blks, seg_idx = 0, addr;
-	int i;
+	unsigned long num_kernel_blks, addr;
+	int i, seg_idx = 0;
 
 	num_segments = get_num_offlinable_segments();
 
@@ -1706,6 +1715,11 @@ static int mem_offline_driver_probe(struct platform_device *pdev)
 	unsigned int total_blks;
 	int ret, i;
 	ktime_t now;
+
+	if (nopasr) {
+		pr_info("mem-offline: nopasr mode enabled. Skipping probe\n");
+		return 0;
+	}
 
 	ret = mem_parse_dt(pdev);
 	if (ret)
