@@ -318,7 +318,7 @@ static int walt_lb_pull_tasks(int dst_cpu, int src_cpu, struct task_struct *pull
 		if (!cpumask_test_cpu(dst_cpu, p->cpus_ptr))
 			continue;
 
-		if (task_running(src_rq, p))
+		if (task_on_cpu(src_rq, p))
 			continue;
 
 		if (!_walt_can_migrate_task(p, dst_cpu, to_lower, to_higher,
@@ -352,7 +352,7 @@ static int walt_lb_pull_tasks(int dst_cpu, int src_cpu, struct task_struct *pull
 		if (!cpumask_test_cpu(dst_cpu, p->cpus_ptr))
 			continue;
 
-		if (task_running(src_rq, p))
+		if (task_on_cpu(src_rq, p))
 			continue;
 
 		if (!_walt_can_migrate_task(p, dst_cpu, to_lower, to_higher,
@@ -382,7 +382,7 @@ static int walt_lb_pull_tasks(int dst_cpu, int src_cpu, struct task_struct *pull
 
 	list_for_each_entry_reverse(p, &src_rq->cfs_tasks, se.group_node) {
 
-		if (task_running(src_rq, p)) {
+		if (task_on_cpu(src_rq, p)) {
 			if (cpumask_test_cpu(dst_cpu, p->cpus_ptr)
 				&& need_active_lb(p, dst_cpu, src_cpu)) {
 				bool success;
