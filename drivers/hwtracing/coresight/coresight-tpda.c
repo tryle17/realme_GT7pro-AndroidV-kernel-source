@@ -18,6 +18,7 @@
 
 #include "coresight-priv.h"
 #include "coresight-common.h"
+#include "coresight-trace-id.h"
 
 #define tpda_writel(drvdata, val, off)	__raw_writel((val), drvdata->base + off)
 #define tpda_readl(drvdata, off)	__raw_readl(drvdata->base + off)
@@ -181,13 +182,59 @@ static void __tpda_enable(struct tpda_drvdata *drvdata, int port)
 	TPDA_LOCK(drvdata);
 }
 
+static int tpda_alloc_trace_id(struct coresight_device *csdev)
+{
+	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+	int trace_id;
+	int i, nr_conns;
+
+	nr_conns = csdev->pdata->nr_inport;
+
+	for (i = 0; i < nr_conns; i++)
+		if (atomic_read(&csdev->refcnt[i]) != 0)
+			return 0;
+
+	trace_id = coresight_trace_id_get_system_id();
+	if (trace_id < 0)
+		return trace_id;
+
+	drvdata->atid = trace_id;
+
+	return 0;
+}
+
+static void tpda_release_trace_id(struct coresight_device *csdev)
+{
+	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);/*  */
+	int i, nr_conns;
+
+	nr_conns = csdev->pdata->nr_inport;
+
+	for (i = 0; i < nr_conns; i++)
+		if (atomic_read(&csdev->refcnt[i]) != 0)
+			return;
+
+	coresight_trace_id_put_system_id(drvdata->atid);
+
+	drvdata->atid = 0;
+}
+
 static int tpda_enable(struct coresight_device *csdev, int inport, int outport)
 {
+	int ret;
 	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 
 	mutex_lock(&drvdata->lock);
+
+	ret = tpda_alloc_trace_id(csdev);
+	if (ret < 0) {
+		mutex_unlock(&drvdata->lock);
+		return ret;
+	}
+
 	__tpda_enable(drvdata, inport);
 	drvdata->enable = true;
+	atomic_inc(&csdev->refcnt[inport]);
 	mutex_unlock(&drvdata->lock);
 
 	dev_info(drvdata->dev, "TPDA inport %d enabled\n", inport);
@@ -215,6 +262,8 @@ static void tpda_disable(struct coresight_device *csdev, int inport,
 	mutex_lock(&drvdata->lock);
 	__tpda_disable(drvdata, inport);
 	drvdata->enable = false;
+	atomic_dec(&csdev->refcnt[inport]);
+	tpda_release_trace_id(csdev);
 	mutex_unlock(&drvdata->lock);
 
 	dev_info(drvdata->dev, "TPDA inport %d disabled\n", inport);
