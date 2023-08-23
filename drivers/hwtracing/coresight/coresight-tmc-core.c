@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2012, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Description: CoreSight Trace Memory Controller driver
  */
@@ -549,12 +550,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 		mutex_init(&drvdata->idr_mutex);
 		dev_list = &etr_devs;
 
-		if (!of_property_read_u32(dev->of_node, "csr-atid-offset",
-					&drvdata->atid_offset))
-			coresight_set_csr_ops(&csr_atid_ops);
-
 		drvdata->byte_cntr = byte_cntr_init(adev, drvdata);
-
 		break;
 	case TMC_CONFIG_TYPE_ETF:
 		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
@@ -637,7 +633,6 @@ static void tmc_remove(struct amba_device *adev)
 			&& drvdata->byte_cntr)
 		byte_cntr_remove(drvdata->byte_cntr);
 
-	coresight_remove_csr_ops();
 	misc_deregister(&drvdata->miscdev);
 	coresight_unregister(drvdata->csdev);
 }

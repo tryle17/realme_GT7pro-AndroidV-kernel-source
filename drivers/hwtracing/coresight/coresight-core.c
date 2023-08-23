@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -91,8 +92,6 @@ ssize_t coresight_simple_show32(struct device *_dev,
 }
 EXPORT_SYMBOL_GPL(coresight_simple_show32);
 
-static const struct csr_set_atid_op *csr_set_atid_ops;
-
 void coresight_set_cti_ops(const struct cti_assoc_op *cti_op)
 {
 	cti_assoc_ops = cti_op;
@@ -116,18 +115,6 @@ struct coresight_device *coresight_get_percpu_sink(int cpu)
 	return per_cpu(csdev_sink, cpu);
 }
 EXPORT_SYMBOL_GPL(coresight_get_percpu_sink);
-
-void coresight_set_csr_ops(const struct csr_set_atid_op *csr_op)
-{
-	csr_set_atid_ops = csr_op;
-}
-EXPORT_SYMBOL(coresight_set_csr_ops);
-
-void coresight_remove_csr_ops(void)
-{
-	csr_set_atid_ops = NULL;
-}
-EXPORT_SYMBOL(coresight_remove_csr_ops);
 
 static int coresight_find_link_inport(struct coresight_device *csdev,
 				      struct coresight_device *parent)
@@ -497,27 +484,7 @@ static struct coresight_device *coresight_get_source(struct list_head *path)
 	return csdev;
 }
 
-static int coresight_set_csr_atid(struct list_head *path,
-			struct coresight_device *sink_csdev, bool enable)
-{
-	int atid, ret = 0;
-	struct coresight_device *src_csdev;
 
-	src_csdev = coresight_get_source(path);
-	if (!src_csdev)
-		ret = -EINVAL;
-
-	atid = of_coresight_get_atid(src_csdev);
-	if (atid < 0)
-		ret = -EINVAL;
-
-	if (csr_set_atid_ops)
-		ret = csr_set_atid_ops->set_atid(sink_csdev, atid, enable);
-	else
-		ret = -EINVAL;
-
-	return ret;
-}
 
 /*
  * coresight_disable_path_from : Disable components in the given path beyond
@@ -550,9 +517,6 @@ static void coresight_disable_path_from(struct list_head *path,
 
 		switch (type) {
 		case CORESIGHT_DEV_TYPE_SINK:
-			if (csdev->type == CORESIGHT_DEV_TYPE_SINK)
-				coresight_set_csr_atid(path, csdev, false);
-
 			coresight_disable_sink(csdev);
 			break;
 		case CORESIGHT_DEV_TYPE_SOURCE:
@@ -615,12 +579,6 @@ int coresight_enable_path(struct list_head *path, u32 mode, void *sink_data)
 			if (ret)
 				goto out;
 
-			if (csdev->type == CORESIGHT_DEV_TYPE_SINK) {
-				ret = coresight_set_csr_atid(path, csdev, true);
-				if (ret)
-					dev_dbg(&csdev->dev, "Set csr atid register fail\n");
-			}
-
 			break;
 		case CORESIGHT_DEV_TYPE_SOURCE:
 			/* sources are enabled from either sysFS or Perf */
@@ -658,6 +616,8 @@ struct coresight_device *coresight_get_sink(struct list_head *path)
 
 	return csdev;
 }
+EXPORT_SYMBOL_GPL(coresight_get_sink);
+
 
 static struct coresight_device *
 coresight_find_enabled_sink(struct coresight_device *csdev)
@@ -1187,13 +1147,113 @@ static int coresight_validate_source(struct coresight_device *csdev,
 	return 0;
 }
 
+static int coresight_store_path(struct coresight_device *csdev,
+		struct list_head *path)
+{
+	int cpu, ret;
+	enum coresight_dev_subtype_source subtype;
+	u32 hash;
+
+	subtype = csdev->subtype.source_subtype;
+
+	switch (subtype) {
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
+		/*
+		 * When working from sysFS it is important to keep track
+		 * of the paths that were created so that they can be
+		 * undone in 'coresight_disable()'.  Since there can only
+		 * be a single session per tracer (when working from sysFS)
+		 * a per-cpu variable will do just fine.
+		 */
+		cpu = source_ops(csdev)->cpu_id(csdev);
+		per_cpu(tracer_path, cpu) = path;
+		break;
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE:
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_OTHERS:
+		/*
+		 * Use the hash of source's device name as ID
+		 * and map the ID to the pointer of the path.
+		 */
+		hash = hashlen_hash(hashlen_string(NULL, dev_name(&csdev->dev)));
+		ret = idr_alloc_u32(&path_idr, path, &hash, hash, GFP_KERNEL);
+		if (ret)
+			return ret;
+		break;
+	default:
+		/* We can't be here */
+		break;
+	}
+
+	return 0;
+}
+
+static struct list_head *coresight_remove_path(struct coresight_device *csdev)
+{
+	int cpu;
+	struct list_head *path;
+	u32 hash;
+
+	switch (csdev->subtype.source_subtype) {
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
+		cpu = source_ops(csdev)->cpu_id(csdev);
+		path = per_cpu(tracer_path, cpu);
+		per_cpu(tracer_path, cpu) = NULL;
+		break;
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE:
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_OTHERS:
+		hash = hashlen_hash(hashlen_string(NULL, dev_name(&csdev->dev)));
+		/* Find the path by the hash. */
+		path = idr_find(&path_idr, hash);
+		if (path == NULL) {
+			pr_err("Path is not found for %s\n", dev_name(&csdev->dev));
+			return NULL;
+		}
+		idr_remove(&path_idr, hash);
+		break;
+	default:
+		path = NULL;
+		break;
+	}
+
+	return path;
+}
+
+struct list_head *coresight_get_path(struct coresight_device *csdev)
+{
+	int cpu;
+	struct list_head *path;
+	u32 hash;
+
+	switch (csdev->subtype.source_subtype) {
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
+		cpu = source_ops(csdev)->cpu_id(csdev);
+		path = per_cpu(tracer_path, cpu);
+		break;
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE:
+	case CORESIGHT_DEV_SUBTYPE_SOURCE_OTHERS:
+		hash = hashlen_hash(hashlen_string(NULL, dev_name(&csdev->dev)));
+		/* Find the path by the hash. */
+		path = idr_find(&path_idr, hash);
+		if (path == NULL) {
+			pr_err("Path is not found for %s\n", dev_name(&csdev->dev));
+			return NULL;
+		}
+		break;
+	default:
+		path = NULL;
+		break;
+	}
+
+	return path;
+}
+EXPORT_SYMBOL_GPL(coresight_get_path);
+
 int coresight_enable(struct coresight_device *csdev)
 {
-	int cpu, ret = 0;
+	int ret = 0;
 	struct coresight_device *sink;
 	struct list_head *path;
 	enum coresight_dev_subtype_source subtype;
-	u32 hash;
 
 	subtype = csdev->subtype.source_subtype;
 
@@ -1232,41 +1292,18 @@ int coresight_enable(struct coresight_device *csdev)
 		goto out;
 	}
 
-	ret = coresight_enable_path(path, CS_MODE_SYSFS, NULL);
+
+	ret = coresight_store_path(csdev, path);
 	if (ret)
 		goto err_path;
+
+	ret = coresight_enable_path(path, CS_MODE_SYSFS, NULL);
+	if (ret)
+		goto err_enable_path;
 
 	ret = coresight_enable_source(csdev, CS_MODE_SYSFS);
 	if (ret)
 		goto err_source;
-
-	switch (subtype) {
-	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
-		/*
-		 * When working from sysFS it is important to keep track
-		 * of the paths that were created so that they can be
-		 * undone in 'coresight_disable()'.  Since there can only
-		 * be a single session per tracer (when working from sysFS)
-		 * a per-cpu variable will do just fine.
-		 */
-		cpu = source_ops(csdev)->cpu_id(csdev);
-		per_cpu(tracer_path, cpu) = path;
-		break;
-	case CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE:
-	case CORESIGHT_DEV_SUBTYPE_SOURCE_OTHERS:
-		/*
-		 * Use the hash of source's device name as ID
-		 * and map the ID to the pointer of the path.
-		 */
-		hash = hashlen_hash(hashlen_string(NULL, dev_name(&csdev->dev)));
-		ret = idr_alloc_u32(&path_idr, path, &hash, hash, GFP_KERNEL);
-		if (ret)
-			goto err_source;
-		break;
-	default:
-		/* We can't be here */
-		break;
-	}
 
 out:
 	mutex_unlock(&coresight_mutex);
@@ -1274,6 +1311,9 @@ out:
 
 err_source:
 	coresight_disable_path(path);
+
+err_enable_path:
+	coresight_remove_path(csdev);
 
 err_path:
 	coresight_release_path(path);
@@ -1283,9 +1323,8 @@ EXPORT_SYMBOL_GPL(coresight_enable);
 
 static void _coresight_disable(struct coresight_device *csdev)
 {
-	int cpu, ret;
+	int ret;
 	struct list_head *path = NULL;
-	u32 hash;
 
 	ret = coresight_validate_source(csdev, __func__);
 	if (ret)
@@ -1294,28 +1333,9 @@ static void _coresight_disable(struct coresight_device *csdev)
 	if (!csdev->enable || !coresight_disable_source(csdev))
 		return;
 
-	switch (csdev->subtype.source_subtype) {
-	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
-		cpu = source_ops(csdev)->cpu_id(csdev);
-		path = per_cpu(tracer_path, cpu);
-		per_cpu(tracer_path, cpu) = NULL;
-		break;
-	case CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE:
-	case CORESIGHT_DEV_SUBTYPE_SOURCE_OTHERS:
-		hash = hashlen_hash(hashlen_string(NULL, dev_name(&csdev->dev)));
-		/* Find the path by the hash. */
-		path = idr_find(&path_idr, hash);
-		if (path == NULL) {
-			pr_err("Path is not found for %s\n", dev_name(&csdev->dev));
-			return;
-		}
-		idr_remove(&path_idr, hash);
-		break;
-	default:
-		/* We can't be here */
-		break;
-	}
-
+	path = coresight_remove_path(csdev);
+	if (!path)
+		return;
 	coresight_disable_path(path);
 	coresight_release_path(path);
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2013, 2015-2017, 2019-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -114,6 +115,7 @@ struct csr_drvdata {
 	bool			timestamp_support;
 	bool			enable_flush;
 	bool			msr_support;
+	uint32_t		atid_offset;
 };
 
 DEFINE_CORESIGHT_DEVLIST(csr_devs, "csr");
@@ -350,7 +352,7 @@ void coresight_csr_set_byte_cntr(struct coresight_csr *csr, int irqctrl_offset, 
 }
 EXPORT_SYMBOL(coresight_csr_set_byte_cntr);
 
-int coresight_csr_set_etr_atid(struct coresight_csr *csr,
+static int __coresight_csr_set_etr_atid(struct coresight_csr *csr,
 			uint32_t atid_offset, uint32_t atid,
 			bool enable)
 {
@@ -391,8 +393,50 @@ int coresight_csr_set_etr_atid(struct coresight_csr *csr,
 
 	CSR_LOCK(drvdata);
 	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
-
 	return 0;
+}
+
+/*
+ * of_coresight_get_csr_atid_offset: Get the csr atid register offset of a sink device.
+ *
+ * Returns the csr atid offset. If the result is less than zero, it means
+ * failure.
+ */
+static int of_coresight_get_csr_atid_offset(struct coresight_device *csdev,
+				u32 *atid_offset)
+{
+	return of_property_read_u32(csdev->dev.parent->of_node,
+					"csr-atid-offset", atid_offset);
+}
+
+int coresight_csr_set_etr_atid(struct coresight_device *csdev, int atid, bool enable)
+{
+	struct list_head *path = NULL;
+	struct coresight_device *sink_csdev;
+	int atid_offset;
+	struct coresight_csr *csr;
+	const char *csr_name;
+
+
+	path = coresight_get_path(csdev);
+
+	if (!path)
+		return -EINVAL;
+
+	sink_csdev = coresight_get_sink(path);
+
+	if (!sink_csdev)
+		return -EINVAL;
+	/* if no csr for this sink, indicates this sink is not etr.*/
+	if (of_get_coresight_csr_name(sink_csdev->dev.parent->of_node, &csr_name))
+		return 0;
+
+	csr = coresight_csr_get(csr_name);
+
+	if (of_coresight_get_csr_atid_offset(sink_csdev, &atid_offset))
+		return -EINVAL;
+
+	return __coresight_csr_set_etr_atid(csr, atid_offset, atid, enable);
 }
 EXPORT_SYMBOL(coresight_csr_set_etr_atid);
 
