@@ -7,6 +7,7 @@ phy-qcom-ufs-qrbtc-sdm845.ko
 llcc-qcom.ko
 mem_buf.ko
 mem_buf_dev.ko
+mem_buf_msgq.ko
 msm_dma_iommu_mapping.ko
 qcom-pdc.ko
 qcom-dload-mode.ko
