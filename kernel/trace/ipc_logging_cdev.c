@@ -184,7 +184,7 @@ void ipc_log_cdev_init(void)
 		return;
 	}
 
-	cdev_class = class_create(THIS_MODULE, "ipc_logging");
+	cdev_class = class_create("ipc_logging");
 	if (IS_ERR(cdev_class)) {
 		pr_err("%s: unable to create ipl cdev class %ld\n", __func__, PTR_ERR(cdev_class));
 		cdev_class = NULL;

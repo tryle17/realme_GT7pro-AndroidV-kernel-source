@@ -130,7 +130,7 @@ struct apid_data {
 };
 
 /**
- * spmi_pmic_arb - SPMI PMIC Arbiter object
+ * struct spmi_pmic_arb - SPMI PMIC Arbiter object
  *
  * @rd_base:		on v1 "core", on v2 "observer" register base off DT.
  * @wr_base:		on v1 "core", on v2 "chnls"    register base off DT.
@@ -191,7 +191,7 @@ struct spmi_pmic_arb {
 };
 
 /**
- * pmic_arb_ver: version dependent functionality.
+ * struct pmic_arb_ver_ops - version dependent functionality.
  *
  * @ver_str:		version string.
  * @ppid_to_apid:	finds the apid for a given ppid.
@@ -1967,7 +1967,7 @@ err_put_ctrl:
 	return err;
 }
 
-static int spmi_pmic_arb_remove(struct platform_device *pdev)
+static void spmi_pmic_arb_remove(struct platform_device *pdev)
 {
 	struct spmi_controller *ctrl = platform_get_drvdata(pdev);
 	struct spmi_pmic_arb *pmic_arb = spmi_controller_get_drvdata(ctrl);
@@ -1978,7 +1978,6 @@ static int spmi_pmic_arb_remove(struct platform_device *pdev)
 		irq_domain_remove(pmic_arb->domain);
 	}
 	spmi_controller_put(ctrl);
-	return 0;
 }
 
 static const struct of_device_id spmi_pmic_arb_match_table[] = {
@@ -1989,7 +1988,7 @@ MODULE_DEVICE_TABLE(of, spmi_pmic_arb_match_table);
 
 static struct platform_driver spmi_pmic_arb_driver = {
 	.probe		= spmi_pmic_arb_probe,
-	.remove		= spmi_pmic_arb_remove,
+	.remove_new	= spmi_pmic_arb_remove,
 	.driver		= {
 		.name	= "spmi_pmic_arb",
 		.of_match_table = spmi_pmic_arb_match_table,

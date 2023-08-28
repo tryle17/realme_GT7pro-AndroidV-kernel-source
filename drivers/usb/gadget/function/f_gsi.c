@@ -3687,7 +3687,7 @@ static int fgsi_init(void)
 	for (i = 0; i < IPA_USB_MAX_TETH_PROT_SIZE; i++)
 		mutex_init(&inst_status[i].gsi_lock);
 
-	gsi_class = class_create(THIS_MODULE, "gsi_usb");
+	gsi_class = class_create("gsi_usb");
 	if (IS_ERR(gsi_class)) {
 		ret = PTR_ERR(gsi_class);
 		gsi_class = NULL;
