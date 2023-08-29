@@ -51,6 +51,8 @@ def define_sun():
         "drivers/remoteproc/qcom_pil_info.ko",
         "drivers/remoteproc/qcom_q6v5.ko",
         "drivers/remoteproc/qcom_q6v5_pas.ko",
+        "drivers/rpmsg/qcom_glink.ko",
+        "drivers/rpmsg/qcom_glink_smem.ko",
         "drivers/scsi/sg.ko",
         "drivers/soc/qcom/cmd-db.ko",
         "drivers/soc/qcom/llcc-qcom.ko",
