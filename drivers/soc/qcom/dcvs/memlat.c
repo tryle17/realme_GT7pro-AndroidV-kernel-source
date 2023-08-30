@@ -42,7 +42,7 @@
 #define SCMI_VENDOR_MSG_MODULE_START   (16)
 #define INVALID_IDX		0xFF
 #define MAX_NAME_LEN		20
-#define MAX_MAP_ENTRIES 12
+#define MAX_MAP_ENTRIES 14
 
 enum scmi_memlat_protocol_cmd {
 	MEMLAT_SET_LOG_LEVEL = SCMI_VENDOR_MSG_START,
