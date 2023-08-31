@@ -20,6 +20,7 @@ def define_pineapple():
         "drivers/clk/qcom/videocc-pineapple.ko",
         "drivers/dma-buf/heaps/qcom_dma_heaps.ko",
         "drivers/firmware/qcom-scm.ko",
+        "drivers/hwspinlock/qcom_hwspinlock.ko",
         "drivers/interconnect/qcom/icc-bcm-voter.ko",
         "drivers/interconnect/qcom/icc-debug.ko",
         "drivers/interconnect/qcom/icc-rpmh.ko",
