@@ -92,21 +92,6 @@ enum {
 	TSTBUS_MAX,
 };
 
-struct ufs_qcom_dev_params {
-	u32 pwm_rx_gear;	/* pwm rx gear to work in */
-	u32 pwm_tx_gear;	/* pwm tx gear to work in */
-	u32 hs_rx_gear;		/* hs rx gear to work in */
-	u32 hs_tx_gear;		/* hs tx gear to work in */
-	u32 rx_lanes;		/* number of rx lanes */
-	u32 tx_lanes;		/* number of tx lanes */
-	u32 rx_pwr_pwm;		/* rx pwm working pwr */
-	u32 tx_pwr_pwm;		/* tx pwm working pwr */
-	u32 rx_pwr_hs;		/* rx hs working pwr */
-	u32 tx_pwr_hs;		/* tx hs working pwr */
-	u32 hs_rate;		/* rate A/B to work in HS */
-	u32 desired_working_mode;
-};
-
 static struct ufs_qcom_host *ufs_qcom_hosts[MAX_UFS_QCOM_HOSTS];
 
 static void ufs_qcom_get_default_testbus_cfg(struct ufs_qcom_host *host);
@@ -821,12 +806,13 @@ static int ufs_qcom_phy_power_off(struct ufs_hba *hba)
 static int ufs_qcom_power_up_sequence(struct ufs_hba *hba)
 {
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+	struct ufs_qcom_dev_params *host_pwr_cap = &host->host_pwr_cap;
 	struct phy *phy = host->generic_phy;
 	int ret = 0;
 
-	enum phy_mode mode = (host->limit_rate == PA_HS_MODE_B) ?
+	enum phy_mode mode = host_pwr_cap->hs_rate == PA_HS_MODE_B ?
 					PHY_MODE_UFS_HS_B : PHY_MODE_UFS_HS_A;
-	int submode = host->limit_phy_submode;
+	int submode = host_pwr_cap->phy_submode;
 
 	if (host->hw_ver.major < 0x4)
 		submode = UFS_QCOM_PHY_SUBMODE_NON_G4;
@@ -2063,7 +2049,6 @@ static int ufs_qcom_pwr_change_notify(struct ufs_hba *hba,
 	u32 val;
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	struct phy *phy = host->generic_phy;
-	struct ufs_qcom_dev_params ufs_qcom_cap;
 	int ret = 0;
 
 	if (!dev_req_params) {
@@ -2074,27 +2059,8 @@ static int ufs_qcom_pwr_change_notify(struct ufs_hba *hba,
 
 	switch (status) {
 	case PRE_CHANGE:
-		ufs_qcom_cap.hs_rx_gear = host->limit_rx_hs_gear;
-		ufs_qcom_cap.hs_tx_gear = host->limit_tx_hs_gear;
-		ufs_qcom_cap.pwm_tx_gear = host->limit_tx_pwm_gear;
-		ufs_qcom_cap.pwm_rx_gear = host->limit_rx_pwm_gear;
-
-		ufs_qcom_cap.tx_lanes = UFS_QCOM_LIMIT_NUM_LANES_TX;
-		ufs_qcom_cap.rx_lanes = UFS_QCOM_LIMIT_NUM_LANES_RX;
-
-		ufs_qcom_cap.rx_pwr_pwm = UFS_QCOM_LIMIT_RX_PWR_PWM;
-		ufs_qcom_cap.tx_pwr_pwm = UFS_QCOM_LIMIT_TX_PWR_PWM;
-		ufs_qcom_cap.rx_pwr_hs = UFS_QCOM_LIMIT_RX_PWR_HS;
-		ufs_qcom_cap.tx_pwr_hs = UFS_QCOM_LIMIT_TX_PWR_HS;
-
-		ufs_qcom_cap.hs_rate = host->limit_rate;
-
-		ufs_qcom_cap.desired_working_mode =
-					UFS_QCOM_LIMIT_DESIRED_MODE;
-
-		ret = ufs_qcom_get_pwr_dev_param(&ufs_qcom_cap,
-						 dev_max_params,
-						 dev_req_params);
+		ret = ufs_qcom_get_pwr_dev_param(&host->host_pwr_cap,
+						 dev_max_params, dev_req_params);
 		if (ret) {
 			pr_err("%s: failed to determine capabilities\n",
 					__func__);
@@ -3194,6 +3160,7 @@ static int ufs_qcom_populate_ref_clk_ctrl(struct ufs_hba *hba)
 
 static void ufs_qcom_setup_max_hs_gear(struct ufs_qcom_host *host)
 {
+	struct ufs_qcom_dev_params *host_pwr_cap = &host->host_pwr_cap;
 	u32 param0;
 
 	if (host->hw_ver.major == 0x1) {
@@ -3204,13 +3171,15 @@ static void ufs_qcom_setup_max_hs_gear(struct ufs_qcom_host *host)
 		 * supported gear as G3. Hence, downgrade the maximum supported
 		 * gear to HS-G2.
 		 */
-		host->max_hs_gear = UFS_HS_G2;
+		host_pwr_cap->hs_tx_gear = UFS_HS_G2;
 	} else if (host->hw_ver.major < 0x4) {
-		host->max_hs_gear = UFS_HS_G3;
+		host_pwr_cap->hs_tx_gear = UFS_HS_G3;
 	} else {
 		param0 = ufshcd_readl(host->hba, REG_UFS_PARAM0);
-		host->max_hs_gear = UFS_QCOM_MAX_HS_GEAR(param0);
+		host_pwr_cap->hs_tx_gear = UFS_QCOM_MAX_HS_GEAR(param0);
 	}
+
+	host_pwr_cap->hs_rx_gear = host_pwr_cap->hs_tx_gear;
 }
 
 /**
@@ -3291,8 +3260,6 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 		&host->hw_ver.minor, &host->hw_ver.step);
 
 	ufs_qcom_populate_ref_clk_ctrl(hba);
-
-	ufs_qcom_setup_max_hs_gear(host);
 
 	/* Register vdd_hba vreg callback */
 	host->vdd_hba_reg_nb.notifier_call = ufs_qcom_vdd_hba_reg_notifier;
@@ -4136,19 +4103,24 @@ static void ufs_qcom_dump_dbg_regs(struct ufs_hba *hba)
  */
 static void ufs_qcom_parse_limits(struct ufs_qcom_host *host)
 {
+	struct ufs_qcom_dev_params *host_pwr_cap = &host->host_pwr_cap;
 	struct device_node *np = host->hba->dev->of_node;
 	u32 dev_major = 0, dev_minor = 0;
 	u32 val;
 
-	if (!np)
-		return;
+	ufs_qcom_setup_max_hs_gear(host);
 
-	host->limit_tx_hs_gear = host->max_hs_gear;
-	host->limit_rx_hs_gear = host->max_hs_gear;
-	host->limit_tx_pwm_gear = UFS_QCOM_LIMIT_PWMGEAR_TX;
-	host->limit_rx_pwm_gear = UFS_QCOM_LIMIT_PWMGEAR_RX;
-	host->limit_rate = UFS_QCOM_LIMIT_HS_RATE;
-	host->limit_phy_submode = UFS_QCOM_LIMIT_PHY_SUBMODE;
+	host_pwr_cap->pwm_tx_gear	= UFS_QCOM_LIMIT_PWMGEAR_TX;
+	host_pwr_cap->pwm_rx_gear	= UFS_QCOM_LIMIT_PWMGEAR_RX;
+	host_pwr_cap->tx_lanes	= UFS_QCOM_LIMIT_NUM_LANES_TX;
+	host_pwr_cap->rx_lanes	= UFS_QCOM_LIMIT_NUM_LANES_RX;
+	host_pwr_cap->rx_pwr_pwm	= UFS_QCOM_LIMIT_RX_PWR_PWM;
+	host_pwr_cap->tx_pwr_pwm	= UFS_QCOM_LIMIT_TX_PWR_PWM;
+	host_pwr_cap->rx_pwr_hs	= UFS_QCOM_LIMIT_RX_PWR_HS;
+	host_pwr_cap->tx_pwr_hs	= UFS_QCOM_LIMIT_TX_PWR_HS;
+	host_pwr_cap->hs_rate	= UFS_QCOM_LIMIT_HS_RATE;
+	host_pwr_cap->phy_submode	= UFS_QCOM_LIMIT_PHY_SUBMODE;
+	host_pwr_cap->desired_working_mode = UFS_QCOM_LIMIT_DESIRED_MODE;
 
 	/*
 	 * The bootloader passes the on board device
@@ -4168,19 +4140,25 @@ static void ufs_qcom_parse_limits(struct ufs_qcom_host *host)
 	}
 
 	if (host->hw_ver.major == 0x5 && dev_major >= 0x4 && dev_minor >= 0) {
-		host->limit_rate = PA_HS_MODE_A;
-		host->limit_phy_submode = UFS_QCOM_PHY_SUBMODE_G5;
+		host_pwr_cap->hs_rate = PA_HS_MODE_A;
+		host_pwr_cap->phy_submode = UFS_QCOM_PHY_SUBMODE_G5;
 	} else if (host->hw_ver.major >= 0x6 && dev_major >= 0x4 && dev_minor >= 0) {
-		host->limit_rate = PA_HS_MODE_B;
-		host->limit_phy_submode = UFS_QCOM_PHY_SUBMODE_G5;
+		host_pwr_cap->hs_rate = PA_HS_MODE_B;
+		host_pwr_cap->phy_submode = UFS_QCOM_PHY_SUBMODE_G5;
 	}
 
-	of_property_read_u32(np, "limit-tx-hs-gear", &host->limit_tx_hs_gear);
-	of_property_read_u32(np, "limit-rx-hs-gear", &host->limit_rx_hs_gear);
-	of_property_read_u32(np, "limit-tx-pwm-gear", &host->limit_tx_pwm_gear);
-	of_property_read_u32(np, "limit-rx-pwm-gear", &host->limit_rx_pwm_gear);
-	of_property_read_u32(np, "limit-rate", &host->limit_rate);
-	of_property_read_u32(np, "limit-phy-submode", &host->limit_phy_submode);
+	if (!np) {
+		dev_info(host->hba->dev, "%s: device_node NULL\n", __func__);
+		return;
+	}
+
+	/* DT settings will over ride any other settings */
+	of_property_read_u32(np, "limit-tx-hs-gear", &host_pwr_cap->hs_tx_gear);
+	of_property_read_u32(np, "limit-rx-hs-gear", &host_pwr_cap->hs_rx_gear);
+	of_property_read_u32(np, "limit-tx-pwm-gear", &host_pwr_cap->pwm_tx_gear);
+	of_property_read_u32(np, "limit-rx-pwm-gear", &host_pwr_cap->pwm_rx_gear);
+	of_property_read_u32(np, "limit-rate", &host_pwr_cap->hs_rate);
+	of_property_read_u32(np, "limit-phy-submode", &host_pwr_cap->phy_submode);
 }
 
 /*

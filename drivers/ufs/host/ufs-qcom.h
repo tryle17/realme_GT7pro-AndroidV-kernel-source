@@ -476,6 +476,22 @@ struct ufs_qcom_regs {
 	size_t len;
 };
 
+struct ufs_qcom_dev_params {
+	u32 pwm_rx_gear;	/* pwm rx gear to work in */
+	u32 pwm_tx_gear;	/* pwm tx gear to work in */
+	u32 hs_rx_gear;		/* hs rx gear to work in */
+	u32 hs_tx_gear;		/* hs tx gear to work in */
+	u32 rx_lanes;		/* number of rx lanes */
+	u32 tx_lanes;		/* number of tx lanes */
+	u32 rx_pwr_pwm;		/* rx pwm working pwr */
+	u32 tx_pwr_pwm;		/* tx pwm working pwr */
+	u32 rx_pwr_hs;		/* rx hs working pwr */
+	u32 tx_pwr_hs;		/* tx hs working pwr */
+	u32 hs_rate;		/* rate A/B to work in HS */
+	int phy_submode;	/* gear number */
+	u32 desired_working_mode;
+};
+
 struct ufs_qcom_host {
 	/*
 	 * Set this capability if host controller supports the QUniPro mode
@@ -541,13 +557,7 @@ struct ufs_qcom_host {
 
 	struct gpio_desc *device_reset;
 
-	int max_hs_gear;
-	int limit_tx_hs_gear;
-	int limit_rx_hs_gear;
-	int limit_tx_pwm_gear;
-	int limit_rx_pwm_gear;
-	int limit_rate;
-	int limit_phy_submode;
+	struct ufs_qcom_dev_params host_pwr_cap;
 
 	bool disable_lpm;
 	struct qcom_bus_scale_data *qbsd;
