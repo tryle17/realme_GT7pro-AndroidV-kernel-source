@@ -174,9 +174,14 @@ struct walt_sched_cluster {
 	unsigned int		smart_fmax_cap;
 };
 
+extern struct completion walt_get_cycle_counts_cb_completion;
+extern bool use_cycle_counter;
 extern struct walt_sched_cluster *sched_cluster[WALT_NR_CPUS];
 extern cpumask_t part_haltable_cpus;
 /*END SCHED.H PORT*/
+
+extern u64 (*walt_get_cycle_counts_cb)(int cpu);
+extern int walt_cpufreq_cycle_cntr_driver_register(void);
 
 extern int num_sched_clusters;
 extern int nr_big_cpus;
