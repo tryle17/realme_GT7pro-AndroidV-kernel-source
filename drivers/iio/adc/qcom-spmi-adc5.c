@@ -984,6 +984,8 @@ static int adc5_probe(struct platform_device *pdev)
 			return ret;
 	}
 
+	platform_set_drvdata(pdev, adc);
+
 	indio_dev->name = pdev->name;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->info = adc->data->info;
