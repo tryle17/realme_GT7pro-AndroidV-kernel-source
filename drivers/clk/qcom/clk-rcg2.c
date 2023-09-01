@@ -1988,23 +1988,9 @@ unsigned long clk_rcg2_crmc_hw_set_rate(struct clk_hw *hw,
 	return ret;
 }
 
-static long clk_rcg2_crmc_list_rate(struct clk_hw *hw, unsigned int n,
-				    unsigned long fmax)
-{
-	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
-	struct clk_crm *crm = rcg->clkr.crm;
-	struct clk_rate_request req = {0};
-	int ret;
-
-	if (crm->name && !crm->initialized)
-		ret = clk_rcg2_crmc_determine_rate(hw, &req);
-
-	return clk_rcg2_list_rate(hw, n, fmax);
-}
-
 static struct clk_regmap_ops clk_rcg2_crmc_regmap_ops = {
 	.set_crm_rate = clk_rcg2_crmc_hw_set_rate,
-	.list_rate = clk_rcg2_crmc_list_rate,
+	.list_rate = clk_rcg2_list_rate,
 };
 
 static int clk_rcg2_crmc_init(struct clk_hw *hw)
