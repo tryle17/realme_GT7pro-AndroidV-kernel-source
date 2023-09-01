@@ -911,6 +911,15 @@ config SM_CAMBISTMCLKCC_SUN
 	  Say Y if you want to support camera devices for a better low-latency
 	  clock.
 
+config SM_TCSRCC_SUN
+	tristate "SUN Top-Level CSR Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the TCSR clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support miscellaneous top-level clocks
+	  such as for the PHY references.
+
 config SM_GPUCC_6350
 	tristate "SM6350 Graphics Clock Controller"
 	select SM_GCC_6350
