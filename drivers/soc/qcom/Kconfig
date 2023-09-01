@@ -460,6 +460,21 @@ config QCOM_MEM_OFFLINE
 	  helps reduce power consumption during idle mode of the system.
 	  If unsure, say N
 
+config QCOM_MEM_OFFLINE_ZONE_BALANCING
+	bool "Migrate from Zone Normal to Zone Movable upon online"
+	depends on QCOM_MEM_OFFLINE
+	help
+	  When a memory block in a movable zone is onlined, only newly
+	  allocated or swap in anon pages will fill it. This means that
+	  the migrated pages from these memory blocks during offlining
+	  will sit in the lower zones despite enough free space in the
+	  movable zone thus leaving pressure in the lower zones. This
+	  pressure can effect the performance for the allocations which can
+	  only be satisfied from lower zones. This is avoided by filling in
+	  eligible pages from normal zone to movable zone thus results in
+	  effective utilization of movable zone and also free up memory in
+	  the lower zones.
+
 config QCOM_PANEL_EVENT_NOTIFIER
 	tristate "panel event notifier"
 	depends on DRM
