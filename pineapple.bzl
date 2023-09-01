@@ -32,6 +32,7 @@ def define_pineapple():
         "drivers/iommu/qcom_iommu_util.ko",
         "drivers/irqchip/qcom-pdc.ko",
         "drivers/mfd/qcom-spmi-pmic.ko",
+        "drivers/nvmem/nvmem_qfprom.ko",
         "drivers/phy/qualcomm/phy-qcom-ufs.ko",
         "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-pineapple.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
