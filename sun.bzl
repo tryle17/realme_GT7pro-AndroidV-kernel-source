@@ -18,6 +18,7 @@ def define_sun():
         "drivers/clk/qcom/evacc-sun.ko",
         "drivers/clk/qcom/gcc-sun.ko",
         "drivers/clk/qcom/gdsc-regulator.ko",
+        "drivers/clk/qcom/gpucc-sun.ko",
         "drivers/dma-buf/heaps/qcom_dma_heaps.ko",
         "drivers/firmware/qcom-scm.ko",
         "drivers/hwspinlock/qcom_hwspinlock.ko",
