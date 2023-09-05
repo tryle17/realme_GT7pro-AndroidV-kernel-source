@@ -37,6 +37,7 @@ def define_sun():
         "drivers/iommu/qcom_iommu_util.ko",
         "drivers/mailbox/msm_qmp.ko",
         "drivers/mailbox/qcom-ipcc.ko",
+        "drivers/misc/qseecom_proxy.ko",
         "drivers/mmc/host/cqhci.ko",
         "drivers/mmc/host/sdhci-msm.ko",
         "drivers/nvmem/nvmem_qfprom.ko",
