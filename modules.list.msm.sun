@@ -28,6 +28,7 @@ dispcc-sun.ko
 camcc-sun.ko
 evacc-sun.ko
 stub-regulator.ko
+tcsrcc-sun.ko
 sg.ko
 gdsc-regulator.ko
 cqhci.ko
@@ -51,3 +52,4 @@ usb_f_cdev.ko
 usb_f_gsi.ko
 usb_f_qdss.ko
 cambistmclkcc-sun.ko
+videocc-sun.ko
