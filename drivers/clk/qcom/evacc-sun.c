@@ -366,10 +366,12 @@ static struct clk_regmap *eva_cc_sun_clocks[] = {
 };
 
 static const struct qcom_reset_map eva_cc_sun_resets[] = {
-	[EVA_CVP_EVA_CC_INTERFACE_BCR] = { 0x80a0 },
-	[EVA_CVP_EVA_CC_MVS0_BCR] = { 0x8064 },
+	[EVA_CC_INTERFACE_BCR] = { 0x80a0 },
+	[EVA_CC_MVS0_BCR] = { 0x8064 },
+	[EVA_CC_MVS0_FREERUN_CLK_ARES] = { 0x808c, 2 },
 	[EVA_CC_MVS0C_CLK_ARES] = { 0x804c, 2 },
-	[EVA_CVP_EVA_CC_MVS0C_BCR] = { 0x8030 },
+	[EVA_CC_MVS0C_BCR] = { 0x8030 },
+	[EVA_CC_MVS0C_FREERUN_CLK_ARES] = { 0x805c, 2 },
 };
 
 static const struct regmap_config eva_cc_sun_regmap_config = {
