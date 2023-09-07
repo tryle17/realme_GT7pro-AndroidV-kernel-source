@@ -67,17 +67,21 @@
 #define MAX_PERF_OL_PER_VCD	4
 #define MAX_CRM_SW_DRV_STATE	3
 
-#define CLK_RCG_CRMC_CFG_RCGR_OFFSET 0x110
-#define CLK_RCG_CRMC_PERF_LEVEL_PLL_L_VAL_LUT_OFFSET 0x138
-#define CLK_RCG_CRMC_CURR_PERF_OL_OFFSET 0x0c
-#define CLK_RCG_CRMC_CURR_PERF_OL(rcg_index) \
-	(CLK_RCG_CRMC_CURR_PERF_OL_OFFSET + ((rcg_index) * 0x200))
-#define CLK_RCG_CRMC_CFG_RCGR(rcg_index, level) \
-	(CLK_RCG_CRMC_CFG_RCGR_OFFSET + ((rcg_index) * 0x200) + (0x4 * (level)))
-#define CLK_RCG_CRMC_PERF_LEVEL_PLL_L_VAL_LUT(rcg_index, level) \
-	(CLK_RCG_CRMC_PERF_LEVEL_PLL_L_VAL_LUT_OFFSET + ((rcg_index) * 0x200) + (0x4 * (level)))
+#define CRMC_OFFS_VCD(crm, _vcd) \
+	((crm)->offsets.vcd * (_vcd))
 
-#define CLK_RCG_CURR_PERF_OL_MASK 0x07
+#define CRMC_OFFS_LUT(crm, vcd, _level) \
+	(CRMC_OFFS_VCD(crm, vcd) + ((crm)->offsets.level * (_level)))
+
+#define CRMC_OFFS_CURR_PERF(crm, vcd) \
+	(CRMC_OFFS_VCD(crm, vcd) + (crm)->regs.curr_perf)
+
+#define CRMC_OFFS_CFG_RCGR(crm, vcd, level) \
+	(CRMC_OFFS_LUT(crm, vcd, level) + (crm)->regs.cfg_rcgr)
+
+#define CRMC_OFFS_L_VAL(crm, vcd, level) \
+	(CRMC_OFFS_LUT(crm, vcd, level) + (crm)->regs.l_val)
+
 #define PLL_L_VAL_MASK	GENMASK(7, 0)
 #define PLL_ALPHA_VAL_MASK	GENMASK(31, 16)
 #define PLL_ALPHA_VAL_SHIFT	16
@@ -1743,16 +1747,15 @@ static int clk_rcg2_crmc_populate_freq(struct clk_hw *hw, unsigned int l,
 	struct clk_hw *p;
 	unsigned long prate = 0;
 	u32 mask, rcgr_cfg, src, pll_lval, lval, alpha_val, num_parents, i;
+	u32 vcd = rcg->clkr.crm_vcd;
 
 	if (!crm->regmap_crmc) {
 		pr_err("%s crmc regmap error\n", __func__);
 		return -ENODEV;
 	}
 
-	regmap_read(crm->regmap_crmc,
-		    CLK_RCG_CRMC_CFG_RCGR(rcg->clkr.crm_vcd, l), &rcgr_cfg);
-	regmap_read(crm->regmap_crmc,
-		    CLK_RCG_CRMC_PERF_LEVEL_PLL_L_VAL_LUT(rcg->clkr.crm_vcd, l), &pll_lval);
+	regmap_read(crm->regmap_crmc, CRMC_OFFS_CFG_RCGR(crm, vcd, l), &rcgr_cfg);
+	regmap_read(crm->regmap_crmc, CRMC_OFFS_L_VAL(crm, vcd, l), &pll_lval);
 
 	mask = BIT(rcg->hid_width) - 1;
 	f->pre_div = 1;
@@ -2008,6 +2011,7 @@ clk_rcg2_crmc_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	struct clk_crm *crm = rcg->clkr.crm;
+	u32 vcd = rcg->clkr.crm_vcd;
 	u32 curr_perf_ol;
 
 	if (!clk_hw_is_prepared(hw))
@@ -2015,7 +2019,7 @@ clk_rcg2_crmc_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 
 	if (crm->initialized) {
 		regmap_read(crm->regmap_crmc,
-			    CLK_RCG_CRMC_CURR_PERF_OL(rcg->clkr.crm_vcd), &curr_perf_ol);
+			    CRMC_OFFS_CURR_PERF(crm, vcd), &curr_perf_ol);
 
 		if (curr_perf_ol)
 			curr_perf_ol--;

@@ -43,6 +43,15 @@ static struct clk_vdd_class *cam_cc_pineapple_regulators_1[] = {
 
 static struct clk_crm cam_crm = {
 	.name = "cam_crm",
+	.regs = {
+		.cfg_rcgr = 0x110,
+		.l_val = 0x138,
+		.curr_perf = 0xc,
+	},
+	.offsets = {
+		.vcd = 0x200,
+		.level = 0x4,
+	},
 };
 
 enum {
