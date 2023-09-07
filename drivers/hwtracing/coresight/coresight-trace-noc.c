@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -15,6 +15,7 @@
 #include "coresight-priv.h"
 #include "coresight-common.h"
 #include "coresight-trace-noc.h"
+#include "coresight-trace-id.h"
 
 static ssize_t flush_req_store(struct device *dev,
 					    struct device_attribute *attr,
@@ -204,6 +205,43 @@ static const struct attribute_group *trace_noc_attr_grps[] = {
 	NULL,
 };
 
+static int trace_noc_alloc_trace_id(struct coresight_device *csdev)
+{
+	struct trace_noc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+	int trace_id;
+	int i, nr_conns;
+
+	nr_conns = csdev->pdata->nr_inport;
+
+	for (i = 0; i < nr_conns; i++)
+		if (atomic_read(&csdev->refcnt[i]) != 0)
+			return 0;
+
+	trace_id = coresight_trace_id_get_system_id();
+	if (trace_id < 0)
+		return trace_id;
+
+	drvdata->atid = trace_id;
+
+	return 0;
+}
+
+static void trace_noc_release_trace_id(struct coresight_device *csdev)
+{
+	struct trace_noc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+	int i, nr_conns;
+
+	nr_conns = csdev->pdata->nr_inport;
+
+	for (i = 0; i < nr_conns; i++)
+		if (atomic_read(&csdev->refcnt[i]) != 0)
+			return;
+
+	coresight_trace_id_put_system_id(drvdata->atid);
+
+	drvdata->atid = 0;
+}
+
 static int trace_noc_enable(struct coresight_device *csdev, int inport, int outport)
 {
 	struct trace_noc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
@@ -217,6 +255,12 @@ static int trace_noc_enable(struct coresight_device *csdev, int inport, int outp
 	}
 
 	spin_lock(&drvdata->spinlock);
+
+	ret = trace_noc_alloc_trace_id(csdev);
+	if (ret < 0) {
+		spin_unlock(&drvdata->spinlock);
+		return ret;
+	}
 	/* Set ATID */
 	writel_relaxed(drvdata->atid, drvdata->base + TRACE_NOC_XLD);
 
@@ -242,6 +286,7 @@ static int trace_noc_enable(struct coresight_device *csdev, int inport, int outp
 	writel_relaxed(val, drvdata->base + TRACE_NOC_CTRL);
 
 	drvdata->enable = true;
+	atomic_inc(&csdev->refcnt[inport]);
 	spin_unlock(&drvdata->spinlock);
 
 	dev_info(drvdata->dev, "Trace NOC is enabled\n");
@@ -255,6 +300,8 @@ static void trace_noc_disable(struct coresight_device *csdev, int inport, int ou
 	spin_lock(&drvdata->spinlock);
 	writel_relaxed(0x0, drvdata->base + TRACE_NOC_CTRL);
 	drvdata->enable = false;
+	atomic_dec(&csdev->refcnt[inport]);
+	trace_noc_release_trace_id(csdev);
 	spin_unlock(&drvdata->spinlock);
 
 	pm_runtime_put(drvdata->dev);
