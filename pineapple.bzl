@@ -33,6 +33,8 @@ def define_pineapple():
         "drivers/iommu/qcom_iommu_debug.ko",
         "drivers/iommu/qcom_iommu_util.ko",
         "drivers/irqchip/qcom-pdc.ko",
+        "drivers/mailbox/msm_qmp.ko",
+        "drivers/mailbox/qcom-ipcc.ko",
         "drivers/mfd/qcom-spmi-pmic.ko",
         "drivers/nvmem/nvmem_qfprom.ko",
         "drivers/perf/qcom_llcc_pmu.ko",
@@ -47,6 +49,9 @@ def define_pineapple():
         "drivers/remoteproc/qcom_pil_info.ko",
         "drivers/remoteproc/qcom_q6v5.ko",
         "drivers/remoteproc/qcom_q6v5_pas.ko",
+        "drivers/rpmsg/qcom_glink.ko",
+        "drivers/rpmsg/qcom_glink_smem.ko",
+        "drivers/rpmsg/qcom_glink_spss.ko",
         "drivers/soc/qcom/cmd-db.ko",
         "drivers/soc/qcom/cpucp_log.ko",
         "drivers/soc/qcom/crm.ko",
@@ -62,6 +67,7 @@ def define_pineapple():
         "drivers/soc/qcom/mdt_loader.ko",
         "drivers/soc/qcom/mem_buf/mem_buf.ko",
         "drivers/soc/qcom/mem_buf/mem_buf_dev.ko",
+        "drivers/soc/qcom/qcom_aoss.ko",
         "drivers/soc/qcom/qcom_cpucp.ko",
         "drivers/soc/qcom/qcom_rpmh.ko",
         "drivers/soc/qcom/secure_buffer.ko",
@@ -80,6 +86,9 @@ def define_pineapple():
         "drivers/usb/phy/phy-qcom-emu.ko",
         "drivers/usb/repeater/repeater.ko",
         "drivers/usb/repeater/repeater-qti-pmic-eusb2.ko",
+        "net/qrtr/qrtr.ko",
+        "net/qrtr/qrtr-smd.ko",
+        "net/qrtr/qrtr-tun.ko",
     ]
 
     _pineapple_consolidate_in_tree_modules = _pineapple_in_tree_modules + [
