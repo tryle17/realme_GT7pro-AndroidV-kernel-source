@@ -58,3 +58,4 @@ usb_f_gsi.ko
 usb_f_qdss.ko
 cambistmclkcc-sun.ko
 videocc-sun.ko
+clk-rpmh.ko
