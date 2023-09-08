@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright(C) 2016 Linaro Limited. All rights reserved.
  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
  */
@@ -679,18 +680,6 @@ static ssize_t tmc_etr_get_data_flat_buf(struct etr_buf *etr_buf,
 	 */
 	return len;
 }
-
-static int tmc_etr_set_atid(struct coresight_device *csdev, u32 atid, bool enable)
-{
-	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-
-	return coresight_csr_set_etr_atid(drvdata->csr, drvdata->atid_offset,
-				atid, enable);
-}
-
-const struct csr_set_atid_op csr_atid_ops = {
-	.set_atid = tmc_etr_set_atid,
-};
 
 static const struct etr_buf_operations etr_flat_buf_ops = {
 	.alloc = tmc_etr_alloc_flat_buf,

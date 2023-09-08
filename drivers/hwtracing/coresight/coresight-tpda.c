@@ -19,6 +19,7 @@
 #include "coresight-priv.h"
 #include "coresight-common.h"
 #include "coresight-trace-id.h"
+#include "coresight-tpda.h"
 
 #define tpda_writel(drvdata, val, off)	__raw_writel((val), drvdata->base + off)
 #define tpda_readl(drvdata, off)	__raw_readl(drvdata->base + off)
@@ -34,38 +35,7 @@ do {									\
 	mb(); /* ensure unlock take effect before we configure */	\
 } while (0)
 
-#define TPDA_CR			(0x000)
-#define TPDA_Pn_CR(n)		(0x004 + (n * 4))
-#define TPDA_FPID_CR		(0x084)
-#define TPDA_FREQREQ_VAL	(0x088)
-#define TPDA_SYNCR		(0x08C)
-#define TPDA_FLUSH_CR		(0x090)
-#define TPDA_FLUSH_SR		(0x094)
-#define TPDA_FLUSH_ERR		(0x098)
-
-#define TPDA_MAX_INPORTS	32
-
 DEFINE_CORESIGHT_DEVLIST(tpda_devs, "tpda");
-
-struct tpda_drvdata {
-	void __iomem		*base;
-	struct device		*dev;
-	struct coresight_device	*csdev;
-	struct mutex		lock;
-	bool			enable;
-	uint32_t		atid;
-	uint32_t		bc_esize[TPDA_MAX_INPORTS];
-	uint32_t		tc_esize[TPDA_MAX_INPORTS];
-	uint32_t		dsb_esize[TPDA_MAX_INPORTS];
-	uint32_t		cmb_esize[TPDA_MAX_INPORTS];
-	bool			trig_async;
-	bool			trig_flag_ts;
-	bool			trig_freq;
-	bool			freq_ts;
-	uint32_t		freq_req_val;
-	bool			freq_req;
-	bool			cmbchan_mode;
-};
 
 static void __tpda_enable_pre_port(struct tpda_drvdata *drvdata)
 {
