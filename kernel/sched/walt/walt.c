@@ -11,7 +11,6 @@
 #include <linux/sched/stat.h>
 #include <linux/module.h>
 #include <linux/kmemleak.h>
-#include <linux/qcom-cpufreq-hw.h>
 #include <linux/cpumask.h>
 #include <linux/arch_topology.h>
 #include <linux/cpu.h>
@@ -443,6 +442,11 @@ update_window_start(struct rq *rq, u64 wallclock, int event)
 	rollover_top_tasks(rq, full_window);
 
 	return old_window_start;
+}
+
+u64 qcom_cpufreq_get_cpu_cycle_counter(int cpu)
+{
+	return U64_MAX;
 }
 
 /*
