@@ -299,6 +299,7 @@ static const struct kobj_type c1dcvs_settings_ktype = {
 static int scmi_c1dcvs_probe(struct platform_device *pdev)
 {
 	int ret;
+	struct device *dev_root;
 
 	sdev = get_qcom_scmi_device();
 	if (IS_ERR(sdev)) {
@@ -314,8 +315,15 @@ static int scmi_c1dcvs_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = kobject_init_and_add(&c1dcvs_kobj, &c1dcvs_settings_ktype,
-				   &cpu_subsys.dev_root->kobj, "c1dcvs");
+	dev_root = bus_get_dev_root(&cpu_subsys);
+	if (dev_root) {
+		ret = kobject_init_and_add(&c1dcvs_kobj, &c1dcvs_settings_ktype,
+					   &dev_root->kobj, "c1dcvs");
+		put_device(dev_root);
+	} else {
+		dev_err(&pdev->dev, "failed to get cpu_subsys dev_root\n");
+		return -ENODEV;
+	}
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed to init c1 dcvs kobj: %d\n", ret);
 		kobject_put(&c1dcvs_kobj);

@@ -247,6 +247,7 @@ static const struct kobj_type c1dcvs_settings_ktype = {
 static int scmi_c1dcvs_probe(struct scmi_device *sdev)
 {
 	int ret;
+	struct device *dev_root;
 
 	if (!sdev)
 		return -ENODEV;
@@ -258,8 +259,15 @@ static int scmi_c1dcvs_probe(struct scmi_device *sdev)
 		return ret;
 	}
 
-	ret = kobject_init_and_add(&c1dcvs_kobj, &c1dcvs_settings_ktype,
-				   &cpu_subsys.dev_root->kobj, "c1dcvs");
+	dev_root = bus_get_dev_root(&cpu_subsys);
+	if (dev_root) {
+		ret = kobject_init_and_add(&c1dcvs_kobj, &c1dcvs_settings_ktype,
+					   &dev_root->kobj, "c1dcvs");
+		put_device(dev_root);
+	} else {
+		dev_err(&sdev->dev, "failed to get cpu_subsys dev_root\n");
+		return -ENODEV;
+	}
 	if (ret < 0) {
 		pr_err("failed to init c1 dcvs kobj: %d\n", ret);
 		kobject_put(&c1dcvs_kobj);

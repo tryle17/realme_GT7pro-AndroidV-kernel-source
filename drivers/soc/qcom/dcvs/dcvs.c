@@ -659,7 +659,7 @@ out:
 
 static int qcom_dcvs_dev_probe(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
+	struct device *dev = &pdev->dev, *dev_root;
 	int ret;
 
 	dcvs_data = devm_kzalloc(dev, sizeof(*dcvs_data), GFP_KERNEL);
@@ -672,8 +672,15 @@ static int qcom_dcvs_dev_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	ret = kobject_init_and_add(&dcvs_data->kobj, &qcom_dcvs_ktype,
-			&cpu_subsys.dev_root->kobj, "bus_dcvs");
+	dev_root = bus_get_dev_root(&cpu_subsys);
+	if (dev_root) {
+		ret = kobject_init_and_add(&dcvs_data->kobj, &qcom_dcvs_ktype,
+						&dev_root->kobj, "bus_dcvs");
+		put_device(dev_root);
+	} else {
+		dev_err(dev, "failed to get cpu_subsys dev_root\n");
+		return -ENODEV;
+	}
 	if (ret < 0) {
 		dev_err(dev, "failed to init qcom-dcvs kobj: %d\n", ret);
 		kobject_put(&dcvs_data->kobj);
