@@ -15,7 +15,7 @@
 #include <linux/of.h>
 #include <linux/coresight.h>
 #include <linux/regulator/consumer.h>
-#include <linux/qcom_scm.h>
+#include <linux/firmware/qcom/qcom_scm.h>
 
 #include "coresight-priv.h"
 #include "coresight-common.h"

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/interrupt.h>
@@ -246,8 +246,7 @@ static int byte_cntr_register_chardev(struct byte_cntr *byte_cntr_data)
 	if (ret)
 		goto exit_unreg_chrdev_region;
 
-	byte_cntr_data->driver_class = class_create(THIS_MODULE,
-						   byte_cntr_data->class_name);
+	byte_cntr_data->driver_class = class_create(byte_cntr_data->class_name);
 	if (IS_ERR(byte_cntr_data->driver_class)) {
 		ret = -ENOMEM;
 		pr_err("class_create failed %d\n", ret);

@@ -1988,7 +1988,7 @@ static void coresight_reset_all_sink(void)
 	bus_for_each_dev(&coresight_bustype, NULL, NULL, coresight_reset_sink);
 }
 
-static ssize_t reset_source_sink_store(struct bus_type *bus,
+static ssize_t reset_source_sink_store(const struct bus_type *bus,
 				       const char *buf, size_t size)
 {
 	int id, cpu, ret = 0;
