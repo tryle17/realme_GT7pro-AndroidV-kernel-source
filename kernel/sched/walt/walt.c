@@ -5466,6 +5466,7 @@ static int walt_module_init(void)
 		schedule_work(&walt_init_work);
 
 	walt_cpufreq_cycle_cntr_driver_register();
+	walt_gclk_cycle_counter_driver_register();
 
 	return 0;
 }

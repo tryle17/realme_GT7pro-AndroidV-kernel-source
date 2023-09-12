@@ -182,6 +182,7 @@ extern cpumask_t part_haltable_cpus;
 
 extern u64 (*walt_get_cycle_counts_cb)(int cpu);
 extern int walt_cpufreq_cycle_cntr_driver_register(void);
+extern int walt_gclk_cycle_counter_driver_register(void);
 
 extern int num_sched_clusters;
 extern int nr_big_cpus;
