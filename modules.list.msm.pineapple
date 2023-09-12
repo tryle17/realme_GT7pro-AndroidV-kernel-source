@@ -40,5 +40,11 @@ ufs_qcom.ko
 regmap-spmi.ko
 spmi-pmic-arb.ko
 qcom-spmi-pmic.ko
+qcom_ipc_logging.ko
+qcom_hwspinlock.ko
+qcom-ipcc.ko
 smem.ko
 socinfo.ko
+qrtr.ko
+qcom_aoss.ko
+msm_qmp.ko
