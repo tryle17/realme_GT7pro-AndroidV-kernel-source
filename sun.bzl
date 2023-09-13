@@ -57,6 +57,7 @@ def define_sun():
         "drivers/rpmsg/qcom_glink_smem.ko",
         "drivers/scsi/sg.ko",
         "drivers/soc/qcom/cmd-db.ko",
+        "drivers/soc/qcom/eud.ko",
         "drivers/soc/qcom/llcc-qcom.ko",
         "drivers/soc/qcom/mdt_loader.ko",
         "drivers/soc/qcom/mem-offline.ko",
