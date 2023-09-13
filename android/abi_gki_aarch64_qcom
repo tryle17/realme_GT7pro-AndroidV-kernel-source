@@ -2435,6 +2435,7 @@
   perf_get_aux
   perf_pmu_register
   perf_pmu_unregister
+  perf_report_aux_output_id
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   phy_attached_info
