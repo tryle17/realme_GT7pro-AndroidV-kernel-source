@@ -42,7 +42,11 @@ icc-rpmh.ko
 qcom-ipcc.ko
 qnoc-qos.ko
 qnoc-sun.ko
+qcom_ipc_logging.ko
 qcom_hwspinlock.ko
+qrtr.ko
+qcom_aoss.ko
+msm_qmp.ko
 ufs_qcom.ko
 dwc3-msm.ko
 phy-generic.ko
