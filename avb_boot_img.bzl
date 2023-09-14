@@ -27,6 +27,7 @@ def sign_boot_img(ctx):
         key = ctx.file.key.path,
         boot_dir = outputs.dirname,
         boot_name = outputs.basename,
+        boot_partition_size = ctx.attr.boot_partition_size,
         proplist = proplist,
     )
 
@@ -59,6 +60,11 @@ avb_sign_boot_image = rule(
         "key": attr.label(
             mandatory = True,
             allow_single_file = True,
+        ),
+        "boot_partition_size": attr.int(
+            mandatory = False,
+            default = 0x6000000,  # bytes, = 98304 kb
+            doc = "Final size of boot.img desired",
         ),
         "props": attr.string_list(
             mandatory = True,
