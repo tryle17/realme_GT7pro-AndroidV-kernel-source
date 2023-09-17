@@ -59,7 +59,6 @@ DECLARE_COMPLETION(walt_get_cycle_counts_cb_completion);
 bool use_cycle_counter;
 u64 (*walt_get_cycle_counts_cb)(int cpu, u64 wc);
 
-static DEFINE_MUTEX(cluster_lock);
 static u64 walt_load_reported_window;
 
 static struct irq_work walt_cpufreq_irq_work;
