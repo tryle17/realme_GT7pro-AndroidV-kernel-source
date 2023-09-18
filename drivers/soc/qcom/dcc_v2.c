@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1815,7 +1815,7 @@ static int dcc_sram_dev_register(struct dcc_drvdata *drvdata)
 	if (ret)
 		goto err_cdev_add;
 
-	drvdata->sram_class = class_create(THIS_MODULE,
+	drvdata->sram_class = class_create(
 					   drvdata->sram_node);
 	if (IS_ERR(drvdata->sram_class)) {
 		ret = PTR_ERR(drvdata->sram_class);
