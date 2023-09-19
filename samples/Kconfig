@@ -283,6 +283,13 @@ config SAMPLE_GUNYAH
           This demonstrates how to create a virtual machine under the Gunyah
           hypervisor.
 
+config SAMPLE_KMEMLEAK
+        tristate "Simple test for the kernel memory leak detector"
+        depends on DEBUG_KMEMLEAK && m
+        help
+          Build a sample program which have explicitly leaks memory to test
+          kmemleak
+
 source "samples/rust/Kconfig"
 
 endif # SAMPLES

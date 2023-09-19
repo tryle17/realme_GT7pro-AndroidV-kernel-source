@@ -756,22 +756,19 @@ static int qpnp_tm_probe(struct platform_device *pdev)
 	chip->base = res;
 
 	ret = qpnp_tm_read(chip, QPNP_TM_REG_TYPE, &type);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "could not read type\n");
-		return ret;
-	}
+	if (ret < 0)
+		return dev_err_probe(&pdev->dev, ret,
+				     "could not read type\n");
 
 	ret = qpnp_tm_read(chip, QPNP_TM_REG_SUBTYPE, &subtype);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "could not read subtype\n");
-		return ret;
-	}
+	if (ret < 0)
+		return dev_err_probe(&pdev->dev, ret,
+				     "could not read subtype\n");
 
 	ret = qpnp_tm_read(chip, QPNP_TM_REG_DIG_MAJOR, &dig_major);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "could not read dig_major\n");
-		return ret;
-	}
+	if (ret < 0)
+		return dev_err_probe(&pdev->dev, ret,
+				     "could not read dig_major\n");
 
 	ret = qpnp_tm_read(chip, QPNP_TM_REG_DIG_MINOR, &dig_minor);
 	if (ret < 0) {
@@ -818,20 +815,15 @@ static int qpnp_tm_probe(struct platform_device *pdev)
 	 * before the hardware initialization is completed.
 	 */
 	chip->tz_dev = devm_thermal_of_zone_register(&pdev->dev, 0, chip, ops);
-	if (IS_ERR(chip->tz_dev)) {
-		dev_err(&pdev->dev, "failed to register sensor\n");
-		return PTR_ERR(chip->tz_dev);
-	}
+	if (IS_ERR(chip->tz_dev))
+		return dev_err_probe(&pdev->dev, PTR_ERR(chip->tz_dev),
+				     "failed to register sensor\n");
 
 	ret = qpnp_tm_init(chip);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "init failed\n");
-		return ret;
-	}
+	if (ret < 0)
+		return dev_err_probe(&pdev->dev, ret, "init failed\n");
 
-	if (devm_thermal_add_hwmon_sysfs(&pdev->dev, chip->tz_dev))
-		dev_warn(&pdev->dev,
-			 "Failed to add hwmon sysfs attributes\n");
+	devm_thermal_add_hwmon_sysfs(&pdev->dev, chip->tz_dev);
 
 	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL, qpnp_tm_isr,
 					IRQF_ONESHOT, node->name, chip);
