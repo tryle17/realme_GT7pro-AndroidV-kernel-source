@@ -41,6 +41,7 @@
 #define HAP_CFG_V2				0x2
 #define HAP_CFG_V3				0x3
 #define HAP_CFG_V4				0x4
+#define HAP_CFG_V5				0x5
 
 #define HAP_CFG_STATUS_DATA_MSB_REG		0x09
 /* STATUS_DATA_MSB definitions while MOD_STATUS_SEL is 0 */
@@ -54,6 +55,7 @@
 #define FIFO_REAL_TIME_FILL_STATUS_MSB_MASK_V2	GENMASK(1, 0)
 #define FIFO_REAL_TIME_FILL_STATUS_MSB_MASK_V3	GENMASK(2, 0)
 #define FIFO_REAL_TIME_FILL_STATUS_MSB_MASK_V4	GENMASK(3, 0)
+#define FIFO_REAL_TIME_FILL_STATUS_MSB_MASK_V5	GENMASK(4, 0)
 #define FIFO_EMPTY_FLAG_BIT			BIT(6)
 #define FIFO_FULL_FLAG_BIT			BIT(5)
 
@@ -242,6 +244,7 @@
 #define HAP_PTN_V2				0x2
 #define HAP_PTN_V3				0x3
 #define HAP_PTN_V4				0x4
+#define HAP_PTN_V5				0x5
 
 /* status register definition for HAPTICS_PATTERN module */
 #define HAP_PTN_FIFO_READY_STS_REG		0x08
@@ -258,7 +261,10 @@
 #define FIFO_PLAY_RATE_MASK			GENMASK(3, 0)
 
 #define HAP_PTN_FIFO_EMPTY_CFG_REG		0x2A
-#define EMPTY_THRESH_MASK			GENMASK(3, 0)
+#define HAP520_EMPTY_THRESH_MASK		GENMASK(3, 0)
+#define HAP520_MV_EMPTY_THRESH_MASK		GENMASK(4, 0)
+#define HAP525_EMPTY_THRESH_MASK		GENMASK(5, 0)
+#define HAP530_EMPTY_THRESH_MASK		GENMASK(6, 0)
 #define HAP_PTN_FIFO_THRESH_LSB			40
 
 #define HAP_PTN_FIFO_DEPTH_CFG_REG		0x2B
@@ -294,13 +300,24 @@
 #define HAP_PTN_MMAP_FIFO_REG			0xA0
 #define MMAP_FIFO_EXIST_BIT			BIT(7)
 #define MMAP_FIFO_LEN_MASK			GENMASK(3, 0)
+#define HAP530_MMAP_FIFO_LEN_MASK		GENMASK(6, 0)
 #define MMAP_FIFO_LEN_PER_LSB			128
+#define HAP530_MMAP_FIFO_LEN_PER_LSB		64
 
 #define HAP_PTN_MMAP_PAT1_REG			0xA1
 #define MMAP_PAT_LEN_PER_LSB			32
+#define HAP530_MMAP_PAT_LEN_PER_LSB		4
 #define MMAP_PAT1_LEN_MASK			GENMASK(6, 0)
 #define MMAP_PAT2_LEN_MASK			GENMASK(5, 0)
 #define MMAP_PAT3_PAT4_LEN_MASK			GENMASK(4, 0)
+
+/* HAPTICS_PATTERN registers only present in HAP530_HV */
+#define HAP_PTN_PATX_MEM_WR_START_ADDR_REG	0x50
+#define HAP_PTN_SPMI_PATX_MEM_START_ADDR_REG	0xA4
+#define HAP_PTN_SPMI_PATX_MEM_LEN_LSB_REG	0xA6
+#define HAP_PTN_PATX_MEM_LEN_HI_MASK		GENMASK(2, 0)
+#define HAP_PTN_PATX_MEM_LEN_LO_MASK		GENMASK(7, 0)
+#define HAP_PTN_PATX_MEM_LEN_HI_SHIFT		8
 
 /* register in HBOOST module */
 #define HAP_BOOST_REVISION1			0x00
@@ -358,10 +375,15 @@
 #define HW_BRAKE_MAX_CYCLES			16
 #define F_LRA_VARIATION_HZ			5
 #define NON_HBOOST_MAX_VMAX_MV			4000
+#define FIFO_EMPTY_THRESH_RATIO_NUM		45
+#define FIFO_EMPTY_THRESH_RATIO_DEN		100
 /* below definitions are only for HAP525_HV */
 #define MMAP_NUM_BYTES				2048
 #define MMAP_FIFO_MIN_SIZE			640
 #define FIFO_PRGM_INIT_SIZE			320
+
+/* below definitions are only for HAP530_HV */
+#define HAP530_MMAP_NUM_BYTES			8192
 
 #define is_between(val, min, max)	\
 	(((min) <= (max)) && ((min) <= (val)) && ((val) <= (max)))
@@ -452,6 +474,7 @@ enum haptics_hw_type {
 	HAP520 = 0x2,  /* PM8350B */
 	HAP520_MV = 0x3,  /* PM5100 */
 	HAP525_HV = 0x4,  /* PM8550B */
+	HAP530_HV = 0x5,  /* PMIH010X */
 };
 
 enum wa_flags {
@@ -468,6 +491,7 @@ static const char * const src_str[] = {
 	"PATTERN1",
 	"PATTERN2",
 	"SWR",
+	"PATTERN_MEM",
 	"reserved",
 };
 
@@ -530,23 +554,33 @@ struct haptics_effect {
 	struct pattern_cfg	*pattern;
 	struct fifo_cfg		*fifo;
 	struct brake_cfg	*brake;
+	struct list_head	node;
 	u32			id;
 	u32			vmax_mv;
 	u32			t_lra_us;
 	enum pattern_src	src;
-	enum pat_mem_sel	pat_sel;
+	u32			pat_sel;
 	bool			auto_res_disable;
 };
 
 struct mmap_partition {
 	u32	max_size;
 	u32	length;
+	u32	start_addr;
 	bool	in_use;
+};
+
+struct mmap_hw_info {
+	u32	memory_size;
+	u32	pat_mem_step;
+	u32	fifo_mem_step;
+	u8	fifo_mem_mask;
 };
 
 struct haptics_mmap {
 	struct mmap_partition	fifo_mmap;
-	struct mmap_partition	pat_sel_mmap[PAT_MEM_MAX];
+	struct mmap_partition	*pat_sel_mmap;
+	struct mmap_hw_info	hw_info;
 	enum s_period		pat_play_rate;
 };
 
@@ -605,6 +639,13 @@ struct custom_fifo_data {
 	u8	*data;
 };
 
+struct fifo_hw_info {
+	u32	max_fifo_samples;
+	u32	fifo_empty_threshold;
+	u32	fifo_threshold_per_bit;
+	u8	fifo_empty_threshold_mask;
+};
+
 struct haptics_chip {
 	struct device			*dev;
 	struct regmap			*regmap;
@@ -615,6 +656,7 @@ struct haptics_chip {
 	struct haptics_effect		*custom_effect;
 	struct haptics_play_info	play;
 	struct haptics_mmap		mmap;
+	const struct fifo_hw_info	*fifo_info;
 	struct dentry			*debugfs_dir;
 	struct delayed_work		stop_work;
 	struct regulator_dev		*swr_slave_rdev;
@@ -627,10 +669,12 @@ struct haptics_chip {
 	struct notifier_block		hboost_nb;
 	struct mutex			vmax_lock;
 	struct work_struct		set_gain_work;
+	struct list_head		mmap_effect_list;
 	int				fifo_empty_irq;
 	u32				hpwr_voltage_mv;
 	u32				effects_count;
 	u32				primitives_count;
+	u32				mmap_effect_count;
 	u32				cfg_addr_base;
 	u32				ptn_addr_base;
 	u32				hbst_addr_base;
@@ -656,67 +700,38 @@ struct haptics_reg_info {
 	u8 val;
 };
 
+static const struct fifo_hw_info hap520_fifo = {
+	.max_fifo_samples	= 640,
+	.fifo_empty_threshold	= 280,
+	.fifo_threshold_per_bit = 40,
+	.fifo_empty_threshold_mask = HAP520_EMPTY_THRESH_MASK,
+};
+
+static const struct fifo_hw_info hap520_mv_fifo = {
+	.max_fifo_samples	= 1024,
+	.fifo_empty_threshold	= 288,
+	.fifo_threshold_per_bit = 32,
+	.fifo_empty_threshold_mask = HAP520_MV_EMPTY_THRESH_MASK,
+};
+
+static const struct fifo_hw_info hap525_fifo = {
+	.max_fifo_samples	= 2048,
+	.fifo_empty_threshold	= 288,
+	.fifo_threshold_per_bit	= 32,
+	.fifo_empty_threshold_mask = HAP525_EMPTY_THRESH_MASK,
+};
+
+static const struct fifo_hw_info hap530_fifo = {
+	.max_fifo_samples	= 8912,
+	.fifo_empty_threshold	= 320,
+	.fifo_threshold_per_bit	= 64,
+	.fifo_empty_threshold_mask = HAP530_EMPTY_THRESH_MASK,
+};
+
 static inline int get_max_fifo_samples(struct haptics_chip *chip)
 {
-	int val = 0;
-
-	switch (chip->hw_type) {
-	case HAP520:
-		val = 640;
-		break;
-	case HAP520_MV:
-		val = 1024;
-		break;
-	case HAP525_HV:
-		val = chip->mmap.fifo_mmap.length ?
-			chip->mmap.fifo_mmap.length : MMAP_FIFO_MIN_SIZE;
-		break;
-	default:
-		pr_err("Invalid HW type\n");
-		break;
-	}
-
-	return val;
-}
-
-static int get_fifo_empty_threshold(struct haptics_chip *chip)
-{
-	int val = 0;
-
-	switch (chip->hw_type) {
-	case HAP520:
-		val = 280;
-		break;
-	case HAP520_MV:
-	case HAP525_HV:
-		val = 288;
-		break;
-	default:
-		pr_err("Invalid HW type\n");
-		break;
-	}
-
-	return val;
-}
-
-static int get_fifo_threshold_per_bit(struct haptics_chip *chip)
-{
-	int val = -EINVAL;
-
-	switch (chip->hw_type) {
-	case HAP520:
-		val = 40;
-		break;
-	case HAP520_MV:
-	case HAP525_HV:
-		val = 32;
-		break;
-	default:
-		pr_err("Invalid HW type\n");
-		break;
-	}
-
-	return val;
+	return chip->mmap.fifo_mmap.length ?
+		chip->mmap.fifo_mmap.length : chip->fifo_info->max_fifo_samples;
 }
 
 static bool is_haptics_external_powered(struct haptics_chip *chip)
@@ -1968,7 +1983,7 @@ static int haptics_update_fifo_samples(struct haptics_chip *chip,
 		return -EINVAL;
 	}
 
-	if (chip->hw_type == HAP525_HV && !refill) {
+	if ((chip->hw_type == HAP525_HV || chip->hw_type == HAP530_HV) && !refill) {
 		val = MEM_FLUSH_RELOAD_BIT;
 		rc = haptics_write(chip, chip->ptn_addr_base,
 				HAP_PTN_MEM_OP_ACCESS_REG, &val, 1);
@@ -1986,35 +2001,56 @@ static int haptics_update_fifo_samples(struct haptics_chip *chip,
 }
 
 static int haptics_update_pat_mem_samples(struct haptics_chip *chip,
-		enum pat_mem_sel pat_sel, u8 *samples, u32 length)
+		u32 pat_sel, u8 *samples, u32 length)
 {
+	u8 val[4] = {0};
+	u32 addr, size;
 	int rc;
-	u8 val;
 
 	if (!samples) {
 		dev_err(chip->dev, "no data available to update PAT_MEM\n");
 		return -EINVAL;
 	}
 
-	/* only HAP525_HV supports PATx_MEM pattern source */
-	if (chip->hw_type != HAP525_HV) {
+	/* only HAP525_HV/HAP530_HV supports PATx_MEM pattern source */
+	if (chip->hw_type != HAP525_HV && chip->hw_type != HAP530_HV) {
 		dev_dbg(chip->dev, "HW type %d doesn't support PATx_MEM pattern source\n",
 				chip->hw_type);
 		return 0;
 	}
 
-	val = FIELD_PREP(MEM_PAT_RW_SEL_MASK, pat_sel);
-	val |= MEM_PAT_ACCESS_BIT | MEM_FLUSH_RELOAD_BIT;
+	if (chip->hw_type == HAP525_HV)
+		val[0] = FIELD_PREP(MEM_PAT_RW_SEL_MASK, pat_sel);
+
+	val[0] |= MEM_PAT_ACCESS_BIT | MEM_FLUSH_RELOAD_BIT;
 	rc = haptics_write(chip, chip->ptn_addr_base,
-			HAP_PTN_MEM_OP_ACCESS_REG, &val, 1);
+			HAP_PTN_MEM_OP_ACCESS_REG, val, 1);
 	if (rc < 0)
 		return rc;
 
-	val &= ~MEM_FLUSH_RELOAD_BIT;
+	val[0] &= ~MEM_FLUSH_RELOAD_BIT;
 	rc = haptics_write(chip, chip->ptn_addr_base,
-			HAP_PTN_MEM_OP_ACCESS_REG, &val, 1);
+			HAP_PTN_MEM_OP_ACCESS_REG, val, 1);
 	if (rc < 0)
 		return rc;
+
+	/*
+	 * For HAP530_HV module, start address and length for each partition
+	 * need to be set before programming pattern memory
+	 */
+	if (chip->hw_type == HAP530_HV) {
+		size = chip->mmap.pat_sel_mmap[pat_sel].length / HAP530_MMAP_PAT_LEN_PER_LSB;
+		addr = chip->mmap.pat_sel_mmap[pat_sel].start_addr / HAP530_MMAP_PAT_LEN_PER_LSB;
+		val[0] = addr & HAP_PTN_PATX_MEM_LEN_LO_MASK;
+		val[1] = (addr >> HAP_PTN_PATX_MEM_LEN_HI_SHIFT) & HAP_PTN_PATX_MEM_LEN_HI_MASK;
+		val[2] = size & HAP_PTN_PATX_MEM_LEN_LO_MASK;
+		val[3] = (size >> HAP_PTN_PATX_MEM_LEN_HI_SHIFT) & HAP_PTN_PATX_MEM_LEN_HI_MASK;
+
+		rc = haptics_write(chip, chip->ptn_addr_base,
+				HAP_PTN_PATX_MEM_WR_START_ADDR_REG, val, 4);
+		if (rc < 0)
+			return rc;
+	}
 
 	rc = haptics_update_memory_data(chip, samples, length);
 	rc |= haptics_masked_write(chip, chip->ptn_addr_base,
@@ -2042,6 +2078,9 @@ static int haptics_get_fifo_fill_status(struct haptics_chip *chip, u32 *fill)
 		break;
 	case HAP525_HV:
 		fill_status_mask = FIFO_REAL_TIME_FILL_STATUS_MSB_MASK_V4;
+		break;
+	case HAP530_HV:
+		fill_status_mask = FIFO_REAL_TIME_FILL_STATUS_MSB_MASK_V5;
 		break;
 	default:
 		dev_err(chip->dev, "HW type %d is not supported\n",
@@ -2124,17 +2163,14 @@ static int haptics_set_fifo_playrate(struct haptics_chip *chip,
 static int haptics_set_fifo_empty_threshold(struct haptics_chip *chip,
 							u32 thresh)
 {
-	u8 thresh_per_bit;
+	u8 thresh_per_bit, thresh_mask;
 	int rc;
 
-	rc = get_fifo_threshold_per_bit(chip);
-	if (rc < 0)
-		return rc;
-
-	thresh_per_bit = rc;
+	thresh_per_bit = chip->fifo_info->fifo_threshold_per_bit;
+	thresh_mask = chip->fifo_info->fifo_empty_threshold_mask;
 	rc = haptics_masked_write(chip, chip->ptn_addr_base,
 			HAP_PTN_FIFO_EMPTY_CFG_REG,
-			EMPTY_THRESH_MASK, (thresh / thresh_per_bit));
+			thresh_mask, (thresh / thresh_per_bit));
 	if (rc < 0)
 		dev_err(chip->dev, "Set FIFO empty threshold failed, rc=%d\n",
 				rc);
@@ -2285,6 +2321,9 @@ static int haptics_load_predefined_effect(struct haptics_chip *chip,
 					struct haptics_effect *effect)
 {
 	struct haptics_play_info *play = &chip->play;
+	struct mmap_partition *pat_sel_mmap;
+	u32 addr, length;
+	u8 val[4] = {0};
 	int rc;
 
 	if (effect == NULL)
@@ -2295,21 +2334,6 @@ static int haptics_load_predefined_effect(struct haptics_chip *chip,
 	rc = haptics_set_vmax_mv(chip, play->vmax_mv);
 	if (rc < 0)
 		return rc;
-
-	play->pattern_src = play->effect->src;
-	if (play->pattern_src == DIRECT_PLAY ||
-			play->pattern_src == SWR) {
-		dev_err(chip->dev, "pattern src %d can't be used for predefined effect\n",
-				play->pattern_src);
-		return -EINVAL;
-	}
-
-	if ((play->pattern_src == FIFO) && (chip->wa_flags & TOGGLE_EN_TO_FLUSH_FIFO)) {
-		/* Toggle HAPTICS_EN for a clear start point of FIFO playing */
-		rc = haptics_toggle_module_enable(chip);
-		if (rc < 0)
-			return rc;
-	}
 
 	rc = haptics_enable_autores(chip, !play->effect->auto_res_disable);
 	if (rc < 0)
@@ -2323,38 +2347,70 @@ static int haptics_load_predefined_effect(struct haptics_chip *chip,
 			return rc;
 	}
 
-	if (play->pattern_src == PATTERN1 || play->pattern_src == PATTERN2) {
+	play->pattern_src = play->effect->src;
+	switch (play->pattern_src) {
+	case PATTERN1:
+	case PATTERN2:
 		if (play->effect->pattern->preload) {
-			dev_dbg(chip->dev, "Ignore preloaded effect: %d\n",
+			dev_dbg(chip->dev, "Ignore preloaded PATTERNx effect: %d\n",
 					play->effect->id);
-			return 0;
+			break;
 		}
 
 		rc = haptics_set_pattern(chip, play->effect->pattern,
 						play->pattern_src);
 		if (rc < 0)
 			return rc;
-	}
+		break;
+	case FIFO:
+		if (chip->wa_flags & TOGGLE_EN_TO_FLUSH_FIFO) {
+			/* Toggle HAPTICS_EN for a clear start point of FIFO playing */
+			rc = haptics_toggle_module_enable(chip);
+			if (rc < 0)
+				return rc;
 
-	if (play->pattern_src == FIFO) {
+			usleep_range(100, 101);
+		}
+
 		rc = haptics_set_fifo(chip, play->effect->fifo);
 		if (rc < 0)
 			return rc;
-	}
+		break;
+	case PATTERN_MEM:
+		if (!chip->mmap.pat_sel_mmap)
+			return 0;
 
-	/*
-	 * PATTERN_MEM sources (PATx_MEM) introduced in HAP525_HV haptics
-	 * module are used for preload effects. The pattern for the preload
-	 * effect should have been programmed during boot up and it will be
-	 * retained until device is powered off, so it doesn't need to be
-	 * programmed at runtime.
-	 */
-	if (chip->hw_type == HAP525_HV &&
-			play->pattern_src == PATTERN_MEM) {
 		if (!play->effect->fifo->preload) {
-			dev_err(chip->dev, "effect %d has PAT_MEM src but not preloaded\n",
+			dev_err(chip->dev, "effect %d has PATTERN_MEM src but not preloaded\n",
 					play->effect->id);
 			return -EINVAL;
+		}
+
+		if (chip->hw_type == HAP530_HV) {
+			/*
+			 * Update length to 0 to avoid the end address
+			 * calculation getting messed up if the previous
+			 * pattern is still under playing.
+			 */
+			rc = haptics_write(chip, chip->ptn_addr_base,
+					HAP_PTN_SPMI_PATX_MEM_LEN_LSB_REG, val, 2);
+			if (rc < 0)
+				return rc;
+
+			pat_sel_mmap = &chip->mmap.pat_sel_mmap[effect->pat_sel];
+			length = pat_sel_mmap->length / HAP530_MMAP_PAT_LEN_PER_LSB;
+			addr = pat_sel_mmap->start_addr / HAP530_MMAP_PAT_LEN_PER_LSB;
+			val[0] = addr & HAP_PTN_PATX_MEM_LEN_LO_MASK;
+			val[1] = (addr >> HAP_PTN_PATX_MEM_LEN_HI_SHIFT)
+					& HAP_PTN_PATX_MEM_LEN_HI_MASK;
+			val[2] = length & HAP_PTN_PATX_MEM_LEN_LO_MASK;
+			val[3] = (length >> HAP_PTN_PATX_MEM_LEN_HI_SHIFT)
+					& HAP_PTN_PATX_MEM_LEN_HI_MASK;
+
+			rc = haptics_write(chip, chip->ptn_addr_base,
+					HAP_PTN_SPMI_PATX_MEM_START_ADDR_REG, val, 4);
+			if (rc < 0)
+				return rc;
 		}
 
 		/* disable auto resonance for PATx_MEM mode */
@@ -2364,6 +2420,13 @@ static int haptics_load_predefined_effect(struct haptics_chip *chip,
 
 		dev_dbg(chip->dev, "Ignore loading data for preload FIFO effect: %d\n",
 				play->effect->id);
+		break;
+	case DIRECT_PLAY:
+	case SWR:
+	default:
+		dev_err(chip->dev, "pattern src %d can't be used for predefined effect\n",
+				play->pattern_src);
+		return -EINVAL;
 	}
 
 	return 0;
@@ -2962,43 +3025,8 @@ static int haptics_config_preload_fifo_effect(struct haptics_chip *chip,
 static int haptics_mmap_config(struct haptics_chip *chip)
 {
 	int rc, i, left;
+	u32 empty_thresh_allowed;
 	u8 val[4];
-
-	/*
-	 * Make the FIFO memory size 128-byte aligned, and append
-	 * the leftover memory bytes to PAT1_MEM.
-	 */
-	left = chip->mmap.fifo_mmap.length % MMAP_FIFO_LEN_PER_LSB;
-	if (left) {
-		chip->mmap.fifo_mmap.length -= left;
-		chip->mmap.pat_sel_mmap[PAT1_MEM].length += left;
-	}
-
-	/* config MMAP_FIFO */
-	val[0] = chip->mmap.fifo_mmap.length / MMAP_FIFO_LEN_PER_LSB;
-	if (val[0]-- == 0) {
-		dev_err(chip->dev, "fifo length %d is less than %d\n",
-				chip->mmap.fifo_mmap.length,
-				MMAP_FIFO_LEN_PER_LSB);
-		return -EINVAL;
-	}
-
-	val[0] &= MMAP_FIFO_LEN_MASK;
-	val[0] |= MMAP_FIFO_EXIST_BIT;
-	rc = haptics_write(chip, chip->ptn_addr_base,
-			HAP_PTN_MMAP_FIFO_REG, val, 1);
-	if (rc < 0)
-		return rc;
-
-	/* config MMAP_PAT1/2/3/4 */
-	for (i = PAT1_MEM; i <= PAT4_MEM; i++)
-		val[i] = min(chip->mmap.pat_sel_mmap[i].length, chip->mmap.pat_sel_mmap[i].max_size)
-			/ MMAP_PAT_LEN_PER_LSB;
-
-	rc = haptics_write(chip, chip->ptn_addr_base,
-			HAP_PTN_MMAP_PAT1_REG, val, 4);
-	if (rc < 0)
-		return rc;
 
 	/* config PATx_PLAY_RATE */
 	rc = haptics_masked_write(chip, chip->ptn_addr_base,
@@ -3009,26 +3037,85 @@ static int haptics_mmap_config(struct haptics_chip *chip)
 		return rc;
 	}
 
-	dev_dbg(chip->dev, "haptics memory map configured with FIFO: %d, PAT1:%d, PAT2: %d, PAT3: %d, PAT4: %d\n",
-			chip->mmap.fifo_mmap.length,
-			chip->mmap.pat_sel_mmap[PAT1_MEM].length,
-			chip->mmap.pat_sel_mmap[PAT2_MEM].length,
-			chip->mmap.pat_sel_mmap[PAT3_MEM].length,
-			chip->mmap.pat_sel_mmap[PAT4_MEM].length);
+	/*
+	 * Make the FIFO memory with step size aligned, and append
+	 * the leftover memory bytes to PAT1_MEM.
+	 */
+	left = chip->mmap.fifo_mmap.length % chip->mmap.hw_info.fifo_mem_step;
+	if (left) {
+		chip->mmap.fifo_mmap.length -= left;
+		chip->mmap.pat_sel_mmap[0].length += left;
+		chip->mmap.pat_sel_mmap[0].start_addr = chip->mmap.fifo_mmap.length;
+		dev_dbg(chip->dev, "PAT_MEM partition 0 is updated: start_addr %#x, length %#x\n",
+				chip->mmap.pat_sel_mmap[0].start_addr,
+				chip->mmap.pat_sel_mmap[0].length);
+	}
+
+	empty_thresh_allowed = chip->mmap.fifo_mmap.length *
+		FIFO_EMPTY_THRESH_RATIO_NUM / FIFO_EMPTY_THRESH_RATIO_DEN;
+	if (chip->config.fifo_empty_thresh > empty_thresh_allowed) {
+		chip->config.fifo_empty_thresh = empty_thresh_allowed;
+		dev_dbg(chip->dev, "Update FIFO empty threshold after MMAP allocation\n");
+	}
+
+	dev_dbg(chip->dev, "FIFO memory length: %d, empty threshold: %d\n",
+			chip->mmap.fifo_mmap.length, chip->config.fifo_empty_thresh);
+	/* config MMAP_FIFO */
+	val[0] = chip->mmap.fifo_mmap.length / chip->mmap.hw_info.fifo_mem_step;
+	if (!val[0]--) {
+		dev_err(chip->dev, "fifo length %d is less than %d\n",
+				chip->mmap.fifo_mmap.length, MMAP_FIFO_LEN_PER_LSB);
+		return -EINVAL;
+	}
+
+	val[0] &= chip->mmap.hw_info.fifo_mem_mask;
+	val[0] |= MMAP_FIFO_EXIST_BIT;
+	rc = haptics_write(chip, chip->ptn_addr_base,
+			HAP_PTN_MMAP_FIFO_REG, val, 1);
+	if (rc < 0)
+		return rc;
+
+	/*
+	 * Explicit HW indexed PATx_MEM partition is only supported in HAP525_HV
+	 * and it's deprecated in HAP530_HV.
+	 */
+	if (chip->hw_type == HAP525_HV) {
+		/* config MMAP_PAT1/2/3/4 */
+		for (i = PAT1_MEM; i <= PAT4_MEM; i++)
+			val[i] = min(chip->mmap.pat_sel_mmap[i].length,
+				   chip->mmap.pat_sel_mmap[i].max_size) / MMAP_PAT_LEN_PER_LSB;
+
+		rc = haptics_write(chip, chip->ptn_addr_base,
+				HAP_PTN_MMAP_PAT1_REG, val, 4);
+		if (rc < 0)
+			return rc;
+
+		dev_dbg(chip->dev, "haptics memory map configured with FIFO: %d, PAT1:%d, PAT2: %d, PAT3: %d, PAT4: %d\n",
+				chip->mmap.fifo_mmap.length,
+				chip->mmap.pat_sel_mmap[PAT1_MEM].length,
+				chip->mmap.pat_sel_mmap[PAT2_MEM].length,
+				chip->mmap.pat_sel_mmap[PAT3_MEM].length,
+				chip->mmap.pat_sel_mmap[PAT4_MEM].length);
+	}
+
 	return 0;
 }
 
 static int haptics_mmap_preload_fifo_effect(struct haptics_chip *chip,
 				struct haptics_effect *effect)
 {
-	int i;
 	u32 length, fifo_length;
+	u32 end_addr, max_size;
+	int i, num_pat;
 
 	if (!effect->fifo->preload) {
 		dev_err(chip->dev, "effect %d doesn't support preload\n",
 			effect->id);
 		return -EINVAL;
 	}
+
+	if (!chip->mmap.pat_sel_mmap)
+		return 0;
 
 	if (chip->mmap.pat_play_rate == F_RESERVED) {
 		chip->mmap.pat_play_rate = effect->fifo->period_per_s;
@@ -3037,36 +3124,64 @@ static int haptics_mmap_preload_fifo_effect(struct haptics_chip *chip,
 		goto mmap_failed;
 	}
 
-	length = effect->fifo->num_s;
-	if (length % MMAP_PAT_LEN_PER_LSB)
-		length = (length / MMAP_PAT_LEN_PER_LSB + 1) * MMAP_PAT_LEN_PER_LSB;
-
+	length = roundup(effect->fifo->num_s, chip->mmap.hw_info.pat_mem_step);
 	fifo_length = chip->mmap.fifo_mmap.length - length;
 	if (fifo_length < MMAP_FIFO_MIN_SIZE) {
-		dev_warn(chip->dev, "not enough space for preload FIFO effect\n");
+		dev_warn(chip->dev, "not enough space for MMAP effect ID: %d, length: %d\n",
+				effect->id, length);
 		goto mmap_failed;
 	}
 
-	for (i = PAT4_MEM; i >= PAT1_MEM; i--) {
+	if (chip->hw_type == HAP525_HV)
+		num_pat = PAT_MEM_MAX - 1;
+	else
+		num_pat = chip->mmap_effect_count - 1;
+
+	for (i = num_pat; i >= 0; i--) {
 		if (!chip->mmap.pat_sel_mmap[i].in_use &&
 				(length <= chip->mmap.pat_sel_mmap[i].max_size))
 			break;
 	}
 
-	if (i < PAT1_MEM) {
-		dev_warn(chip->dev, "no PAT_MEM source available\n");
+	if (i < 0) {
+		dev_warn(chip->dev, "no PAT_MEM source available for MMAP effect ID: %d, length: %d\n",
+				effect->id, length);
 		effect->fifo->preload = false;
 		goto mmap_failed;
 	}
 
+	/*
+	 * The end address of the last partition is the end address of the memory
+	 * space. For other partitions, the end address is prior to the start
+	 * address of the next partition.
+	 */
+	if (i == num_pat)
+		end_addr = chip->mmap.hw_info.memory_size - 1;
+	else
+		end_addr = chip->mmap.pat_sel_mmap[i + 1].start_addr - 1;
+
 	/* update the mmap configuration */
 	chip->mmap.pat_sel_mmap[i].in_use = true;
 	chip->mmap.pat_sel_mmap[i].length = length;
+	chip->mmap.pat_sel_mmap[i].start_addr = end_addr - length + 1;
 	chip->mmap.fifo_mmap.length = fifo_length;
 
 	/* Update the effect pattern_src and pat_sel for the preload effect */
 	effect->src = PATTERN_MEM;
 	effect->pat_sel = i;
+
+	if (chip->hw_type == HAP525_HV)
+		return 0;
+
+	/* Update max size for the preceding partition */
+	if (i > 0) {
+		max_size = chip->mmap.pat_sel_mmap[i].max_size - length;
+		chip->mmap.pat_sel_mmap[i - 1].max_size = max_size;
+	}
+
+	dev_dbg(chip->dev, "PAT_MEM partition %d: start_addr %#x, length %#x\n", i,
+			chip->mmap.pat_sel_mmap[i].start_addr,
+			chip->mmap.pat_sel_mmap[i].length);
 	return 0;
 
 	/* if mmap is failed then the effect couldn't be preloaded */
@@ -3077,14 +3192,31 @@ mmap_failed:
 
 static void haptics_mmap_init(struct haptics_chip *chip)
 {
-	u32 max_pat_mem_size = MMAP_NUM_BYTES - MMAP_FIFO_MIN_SIZE;
+	u32 max_pat_mem_size;
 
+	if (!chip->mmap.pat_sel_mmap)
+		return;
+
+	max_pat_mem_size = chip->mmap.hw_info.memory_size - MMAP_FIFO_MIN_SIZE;
 	/* Assume that all memory space is used for FIFO mode by default */
 	chip->mmap.fifo_mmap.in_use = true;
-	chip->mmap.fifo_mmap.length = MMAP_NUM_BYTES;
-	chip->mmap.fifo_mmap.max_size = MMAP_NUM_BYTES;
+	chip->mmap.fifo_mmap.length = chip->mmap.hw_info.memory_size;
+	chip->mmap.fifo_mmap.max_size = chip->mmap.hw_info.memory_size;
 
-	/* different PATx_MEM partition has different maximum size */
+	chip->mmap.pat_play_rate = F_RESERVED;
+	if (chip->hw_type != HAP525_HV) {
+		/*
+		 * To keep the mmap allocation logic backward compatible, the
+		 * allocation will be started from the last partition with highest
+		 * address. Thus, update the max_size of the last partition to
+		 * the total size. The max_size of the following partitions
+		 * will be updated according to the bytes in the available space.
+		 */
+		chip->mmap.pat_sel_mmap[chip->mmap_effect_count - 1].max_size = max_pat_mem_size;
+		return;
+	}
+
+	/* In HAP525_HV, different PATx_MEM partition has different maximum size */
 	chip->mmap.pat_sel_mmap[PAT1_MEM].max_size = min(max_pat_mem_size,
 			(u32)MMAP_PAT1_LEN_MASK * MMAP_PAT_LEN_PER_LSB);
 	chip->mmap.pat_sel_mmap[PAT2_MEM].max_size = min(max_pat_mem_size,
@@ -3093,27 +3225,48 @@ static void haptics_mmap_init(struct haptics_chip *chip)
 			(u32)MMAP_PAT3_PAT4_LEN_MASK * MMAP_PAT_LEN_PER_LSB);
 	chip->mmap.pat_sel_mmap[PAT4_MEM].max_size = min(max_pat_mem_size,
 			(u32)MMAP_PAT3_PAT4_LEN_MASK * MMAP_PAT_LEN_PER_LSB);
-	chip->mmap.pat_play_rate = F_RESERVED;
 }
 
 static int haptics_init_fifo_memory(struct haptics_chip *chip)
 {
 	struct haptics_effect *effect;
-	int rc, i;
+	struct mmap_partition *partitions;
+	int counts;
+	int rc;
 
-	if (chip->hw_type != HAP525_HV) {
+	if (chip->hw_type != HAP525_HV && chip->hw_type != HAP530_HV) {
 		dev_dbg(chip->dev, "HW type %d doesn't support mmap\n",
 				chip->hw_type);
 		return 0;
 	}
 
+	if (chip->hw_type == HAP525_HV) {
+		counts = PAT_MEM_MAX;
+		chip->mmap.hw_info.memory_size = MMAP_NUM_BYTES;
+		chip->mmap.hw_info.pat_mem_step = MMAP_PAT_LEN_PER_LSB;
+		chip->mmap.hw_info.fifo_mem_step = MMAP_FIFO_LEN_PER_LSB;
+		chip->mmap.hw_info.fifo_mem_mask = MMAP_FIFO_LEN_MASK;
+	} else {
+		counts = chip->mmap_effect_count;
+		chip->mmap.hw_info.memory_size = HAP530_MMAP_NUM_BYTES;
+		chip->mmap.hw_info.pat_mem_step = HAP530_MMAP_PAT_LEN_PER_LSB;
+		chip->mmap.hw_info.fifo_mem_step = HAP530_MMAP_FIFO_LEN_PER_LSB;
+		chip->mmap.hw_info.fifo_mem_mask = HAP530_MMAP_FIFO_LEN_MASK;
+	}
+
+	if (!counts) {
+		dev_dbg(chip->dev, "no PAT_MEM effect is defined, skip MMAP config\n");
+		return 0;
+	}
+
+	partitions = devm_kcalloc(chip->dev, sizeof(*partitions), counts, GFP_KERNEL);
+	if (!partitions)
+		return -ENOMEM;
+
+	chip->mmap.pat_sel_mmap = partitions;
 	haptics_mmap_init(chip);
 
-	for (i = 0; i < chip->effects_count; i++) {
-		effect = &chip->effects[i];
-		if (!effect->fifo || !effect->fifo->preload)
-			continue;
-
+	list_for_each_entry(effect, &chip->mmap_effect_list, node) {
 		rc = haptics_mmap_preload_fifo_effect(chip, effect);
 		if (rc < 0 && rc != -ENOSPC)
 			return rc;
@@ -3123,11 +3276,7 @@ static int haptics_init_fifo_memory(struct haptics_chip *chip)
 	if (rc < 0)
 		return rc;
 
-	for (i = 0; i < chip->effects_count; i++) {
-		effect = &chip->effects[i];
-		if (!effect->fifo || !effect->fifo->preload)
-			continue;
-
+	list_for_each_entry(effect, &chip->mmap_effect_list, node) {
 		rc = haptics_config_preload_fifo_effect(chip, effect);
 		if (rc < 0)
 			return rc;
@@ -3288,6 +3437,8 @@ static int haptics_config_wa(struct haptics_chip *chip)
 	case HAP525_HV:
 		if (chip->hbst_revision == HAP_BOOST_V0P1)
 			chip->wa_flags |= SW_CTRL_HBST;
+		break;
+	case HAP530_HV:
 		break;
 	default:
 		dev_err(chip->dev, "HW type %d does not match\n",
@@ -3534,6 +3685,7 @@ static int haptics_parse_effect_fifo_data(struct haptics_chip *chip,
 		return 0;
 	}
 
+	INIT_LIST_HEAD(&effect->node);
 	tmp = of_property_count_u8_elems(node, "qcom,wf-fifo-data");
 	if (tmp <= 0) {
 		dev_dbg(chip->dev, "qcom,wf-fifo-data is not defined properly for effect %d\n",
@@ -3582,6 +3734,11 @@ static int haptics_parse_effect_fifo_data(struct haptics_chip *chip,
 	effect->src = FIFO;
 	effect->fifo->preload = of_property_read_bool(node,
 					"qcom,wf-fifo-preload");
+	if (effect->fifo->preload) {
+		list_add_tail(&effect->node, &chip->mmap_effect_list);
+		chip->mmap_effect_count++;
+	}
+
 	return 0;
 }
 
@@ -3887,12 +4044,19 @@ static int haptics_get_revision(struct haptics_chip *chip)
 	if ((chip->cfg_revision == HAP_CFG_V2) &&
 			(chip->ptn_revision == HAP_PTN_V2)) {
 		chip->hw_type = HAP520;
+		chip->fifo_info = &hap520_fifo;
 	} else if ((chip->cfg_revision == HAP_CFG_V3) &&
 			(chip->ptn_revision == HAP_PTN_V3)) {
 		chip->hw_type = HAP520_MV;
+		chip->fifo_info = &hap520_mv_fifo;
 	} else if ((chip->cfg_revision == HAP_CFG_V4) &&
 			(chip->ptn_revision == HAP_PTN_V4)) {
 		chip->hw_type = HAP525_HV;
+		chip->fifo_info = &hap525_fifo;
+	} else if ((chip->cfg_revision == HAP_CFG_V5) &&
+			(chip->ptn_revision == HAP_PTN_V5)) {
+		chip->hw_type = HAP530_HV;
+		chip->fifo_info = &hap530_fifo;
 	} else {
 		dev_err(chip->dev, "haptics revision is not supported\n");
 		return -EOPNOTSUPP;
@@ -4025,7 +4189,7 @@ static int haptics_parse_dt(struct haptics_chip *chip)
 		goto free_pbs;
 	}
 
-	config->fifo_empty_thresh = get_fifo_empty_threshold(chip);
+	config->fifo_empty_thresh = chip->fifo_info->fifo_empty_threshold;
 	of_property_read_u32(node, "qcom,fifo-empty-threshold",
 			&config->fifo_empty_thresh);
 	if (config->fifo_empty_thresh >= get_max_fifo_samples(chip)) {
@@ -5076,6 +5240,7 @@ static int haptics_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
+	INIT_LIST_HEAD(&chip->mmap_effect_list);
 	rc = haptics_parse_dt(chip);
 	if (rc < 0) {
 		dev_err(chip->dev, "Parse device-tree failed, rc = %d\n", rc);
