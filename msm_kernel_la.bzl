@@ -312,6 +312,7 @@ def _define_kernel_dist(target, msm_target, variant, base_kernel, define_abi_tar
         ":{}_super_image".format(target),
         ":{}_merged_kernel_uapi_headers".format(target),
         ":{}_build_config".format(target),
+        "{}_avb_sign_boot_image".format(target),
     ])
 
     if define_abi_targets:
@@ -354,8 +355,6 @@ def _define_kernel_dist(target, msm_target, variant, base_kernel, define_abi_tar
             },
             log = "info",
         )
-
-    msm_dist_targets.append("{}_avb_sign_boot_image".format(target))
 
 def _define_uapi_library(target):
     """Define a cc_library for userspace programs to use
