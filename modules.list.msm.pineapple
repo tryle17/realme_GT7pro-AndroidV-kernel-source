@@ -7,6 +7,7 @@ qcom-scm.ko
 qcom_iommu_util.ko
 iommu-logger.ko
 qcom_dma_heaps.ko
+llcc-qcom.ko
 mem_buf.ko
 mem_buf_dev.ko
 msm_dma_iommu_mapping.ko
