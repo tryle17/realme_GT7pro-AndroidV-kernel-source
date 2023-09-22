@@ -617,4 +617,14 @@ config QTI_PMIC_PON_LOG
 	  some Qualcomm Technologies, Inc. PMIC devices.  This driver is useful
 	  when debugging unexpected power-off scenarios.
 
+config QCOM_WCD_USBSS_I2C
+	tristate "WCD USBSS chip with I2C"
+	select REGMAP
+	depends on I2C
+	help
+	 Support for the WCD939X USBSS IC switch chip controlled
+	 using I2C. This driver provides common support
+	 for accessing the device, switching between USB and Audio
+	 modes, changing orientation.
+
 endmenu
