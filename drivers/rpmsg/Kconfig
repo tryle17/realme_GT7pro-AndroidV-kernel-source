@@ -44,6 +44,15 @@ config RPMSG_QCOM_GLINK
 	tristate
 	select RPMSG
 
+config RPMSG_QCOM_GLINK_DEBUG
+	bool "Qualcomm Technologies, Inc. Glink driver debug support"
+	depends on RPMSG_QCOM_GLINK
+	help
+	  Say y here to enable GLINK debugging features. This currently includes
+	  an assert in the intent timeout case to catch issues with unresponsive
+	  remote processors. Future debug enhancements can be switched on and off
+	  with this config.
+
 config RPMSG_QCOM_GLINK_RPM
 	tristate "Qualcomm RPM Glink driver"
 	select RPMSG_QCOM_GLINK
@@ -75,6 +84,15 @@ config RPMSG_QCOM_GLINK_SPSS
 	  over SMEM. This protocol maps the smem and then shares the mapped
 	  region with the remote proc by writing the smem descriptor location
 	  and size into shared registers.
+
+config QCOM_GLINK_PKT
+	tristate "Enable device interface for GLINK packet channels"
+	depends on RPMSG_QCOM_GLINK_SMEM || RPMSG_QCOM_GLINK_SLATECOM
+	help
+	  G-link packet driver provides the interface for the userspace
+	  clients to communicate over G-Link via device nodes.
+	  This enable the userspace clients to read and write to
+	  some glink packets channel.
 
 config RPMSG_QCOM_SMD
 	tristate "Qualcomm Shared Memory Driver (SMD)"
