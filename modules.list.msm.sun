@@ -9,6 +9,7 @@ mem_buf.ko
 mem_buf_dev.ko
 msm_dma_iommu_mapping.ko
 qcom-pdc.ko
+qcom-dload-mode.ko
 pinctrl-msm.ko
 pinctrl-sun.ko
 qcom_dma_heaps.ko
