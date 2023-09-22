@@ -89,7 +89,10 @@ def define_sun():
         "drivers/usb/phy/phy-generic.ko",
         "drivers/usb/phy/phy-qcom-emu.ko",
         "net/qrtr/qrtr.ko",
+        "net/qrtr/qrtr-gunyah.ko",
+        "net/qrtr/qrtr-mhi.ko",
         "net/qrtr/qrtr-smd.ko",
+        "net/qrtr/qrtr-tun.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
