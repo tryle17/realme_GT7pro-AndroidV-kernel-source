@@ -485,7 +485,6 @@ static struct coresight_device *coresight_get_source(struct list_head *path)
 }
 
 
-
 /*
  * coresight_disable_path_from : Disable components in the given path beyond
  * @nd in the list. If @nd is NULL, all the components, except the SOURCE are
@@ -947,6 +946,7 @@ void coresight_release_path(struct list_head *path)
 	}
 
 	kfree(path);
+	path = NULL;
 }
 
 /* return true if the device is a suitable type for a default sink */
@@ -1287,8 +1287,8 @@ int coresight_enable(struct coresight_device *csdev)
 
 	path = coresight_build_path(csdev, sink);
 	if (IS_ERR(path)) {
-		pr_err("building path(s) failed\n");
 		ret = PTR_ERR(path);
+		pr_err("building path(s) failed %d\n", ret);
 		goto out;
 	}
 
@@ -1329,6 +1329,9 @@ static void _coresight_disable(struct coresight_device *csdev)
 	ret = coresight_validate_source(csdev, __func__);
 	if (ret)
 		return;
+
+	if (csdev->def_sink)
+		csdev->def_sink = NULL;
 
 	if (!csdev->enable || !coresight_disable_source(csdev))
 		return;
@@ -1446,6 +1449,8 @@ static ssize_t sink_name_store(struct device *dev,
 	}
 
 	sink_name = kstrdup(buf, GFP_KERNEL);
+	if (!sink_name)
+		return -ENOMEM;
 	sink_name[size-1] = 0;
 
 	hash = hashlen_hash(hashlen_string(NULL, sink_name));
