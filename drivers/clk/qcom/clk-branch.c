@@ -60,7 +60,7 @@ static bool clk_branch2_check_halt(const struct clk_branch *br, bool enabling)
 		val &= mask;
 
 		if (br->halt_check == BRANCH_HALT_INVERT)
-			return (val & BRANCH_CLK_OFF) == BRANCH_CLK_OFF;
+			return (val & CBCR_CLK_OFF) == CBCR_CLK_OFF;
 
 		return (val & CBCR_CLK_OFF) == 0 ||
 			FIELD_GET(CBCR_NOC_FSM_STATUS, val) == FSM_STATUS_ON;
