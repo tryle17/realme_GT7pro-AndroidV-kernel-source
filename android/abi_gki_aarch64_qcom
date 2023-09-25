@@ -564,6 +564,7 @@
   datagram_poll
   dbs_update
   deactivate_task
+  debug_check_no_locks_freed
   debugfs_attr_read
   debugfs_attr_write
   debugfs_create_atomic_t
@@ -586,6 +587,8 @@
   debugfs_lookup
   debugfs_remove
   debugfs_rename
+  debug_lockdep_rcu_enabled
+  debug_locks
   debug_locks_off
   debug_locks_silent
   dec_node_page_state
@@ -682,7 +685,9 @@
   devm_clk_bulk_get
   devm_clk_bulk_get_all
   devm_clk_get
+  devm_clk_get_enabled
   devm_clk_get_optional
+  devm_clk_get_optional_enabled
   devm_clk_hw_register
   devm_clk_put
   devm_clk_register
@@ -1228,6 +1233,8 @@
   freq_qos_remove_request
   freq_qos_update_request
   freq_reg_info
+  fs_reclaim_acquire
+  fs_reclaim_release
   fsync_bdev
   ftrace_dump
   fwnode_find_reference
@@ -1306,6 +1313,7 @@
   get_state_synchronize_rcu
   get_state_synchronize_srcu
   __get_task_comm
+  get_task_cred
   get_task_mm
   get_task_pid
   get_unmapped_area
@@ -1369,6 +1377,7 @@
   handle_nested_irq
   handle_simple_irq
   handle_sysrq
+  hardirqs_enabled
   hashlen_string
   hci_alloc_dev_priv
   __hci_cmd_send
@@ -1494,6 +1503,7 @@
   icc_set_tag
   icc_sync_state
   ida_alloc_range
+  ida_destroy
   ida_free
   idr_alloc
   idr_alloc_cyclic
@@ -1698,6 +1708,7 @@
   init_pid_ns
   init_pseudo
   __init_rwsem
+  __init_srcu_struct
   init_srcu_struct
   __init_swait_queue_head
   init_task
@@ -1831,6 +1842,7 @@
   irq_set_irqchip_state
   irq_set_irq_type
   irq_set_irq_wake
+  __irq_set_lockdep_class
   irq_set_parent
   irq_to_desc
   irq_work_queue
@@ -1969,6 +1981,7 @@
   ktime_get_real_seconds
   ktime_get_real_ts64
   ktime_get_seconds
+  ktime_get_snapshot
   ktime_get_ts64
   ktime_get_with_offset
   kvasprintf_const
@@ -2021,11 +2034,23 @@
   led_trigger_unregister_simple
   linkwatch_fire_event
   __list_add_valid
+  __list_add_valid_or_report
   __list_del_entry_valid
+  __list_del_entry_valid_or_report
   list_sort
   llist_add_batch
   llist_reverse_order
+  __local_bh_disable_ip
   __local_bh_enable_ip
+  lock_acquire
+  lockdep_init_map_type
+  lockdep_rcu_suspicious
+  lockdep_recursion
+  lockdep_rht_bucket_is_held
+  lockdep_rht_mutex_is_held
+  lockdep_rtnl_is_held
+  lock_is_held_type
+  lock_release
   lock_sock_nested
   log_post_read_mmio
   log_post_write_mmio
@@ -2099,6 +2124,7 @@
   memunmap
   metadata_dst_alloc
   metadata_dst_free
+  __might_fault
   migrate_swap
   __migrate_task
   mipi_dsi_create_packet
@@ -2131,10 +2157,13 @@
   msleep
   msleep_interruptible
   mtree_load
+  mutex_destroy
   __mutex_init
   mutex_is_locked
   mutex_lock
   mutex_lock_interruptible
+  mutex_lock_interruptible_nested
+  mutex_lock_nested
   mutex_trylock
   mutex_unlock
   __napi_alloc_skb
@@ -2597,6 +2626,8 @@
   policy_has_boost_freq
   poll_state_synchronize_rcu
   poll_state_synchronize_srcu
+  posix_clock_register
+  posix_clock_unregister
   power_supply_changed
   power_supply_get_by_name
   power_supply_get_drvdata
@@ -2656,6 +2687,7 @@
   ptp_clock_unregister
   ptp_parse_header
   put_cmsg
+  __put_cred
   put_device
   put_disk
   put_iova_domain
@@ -2686,6 +2718,7 @@
   radix_tree_iter_resume
   radix_tree_lookup
   radix_tree_next_chunk
+  radix_tree_preloads
   radix_tree_tagged
   rate_control_set_rates
   ___ratelimit
@@ -2703,8 +2736,11 @@
   _raw_read_unlock_irqrestore
   _raw_spin_lock
   _raw_spin_lock_bh
+  __raw_spin_lock_init
   _raw_spin_lock_irq
   _raw_spin_lock_irqsave
+  _raw_spin_lock_irqsave_nested
+  _raw_spin_lock_nested
   raw_spin_rq_lock_nested
   raw_spin_rq_unlock
   _raw_spin_trylock
@@ -2717,6 +2753,7 @@
   _raw_write_lock_bh
   _raw_write_lock_irq
   _raw_write_lock_irqsave
+  _raw_write_lock_nested
   _raw_write_unlock
   _raw_write_unlock_bh
   _raw_write_unlock_irq
@@ -2734,6 +2771,7 @@
   rcu_barrier
   rcu_barrier_tasks
   rcu_barrier_tasks_trace
+  rcu_bh_lock_map
   rcu_bind_current_to_nocb
   rcu_check_boost_fail
   rcu_cpu_stall_suppress
@@ -2749,9 +2787,13 @@
   rcu_inkernel_boot_has_ended
   rcu_is_watching
   rcu_jiffies_till_stall_check
+  rcu_lock_map
   rcu_nocb_cpu_deoffload
   rcu_nocb_cpu_offload
   __rcu_read_lock
+  rcu_read_lock_any_held
+  rcu_read_lock_bh_held
+  rcu_read_lock_held
   __rcu_read_unlock
   rcu_read_unlock_trace_special
   rcuref_get_slowpath
@@ -2955,6 +2997,7 @@
   rtnl_unregister
   rtnl_unregister_all
   runqueues
+  __rwlock_init
   safe_candev_priv
   sampling_rate_store
   scatterwalk_ffwd
@@ -3031,6 +3074,8 @@
   seq_hex_dump
   seq_hlist_next
   seq_hlist_start_head
+  seq_list_next
+  seq_list_start
   seq_lseek
   seq_open
   seq_printf
@@ -3146,6 +3191,7 @@
   sk_error_report
   sk_filter_trim_cap
   sk_free
+  sk_ioctl
   skip_spaces
   __sk_receive_skb
   sk_reset_timer
@@ -3283,6 +3329,7 @@
   sprint_symbol
   srcu_barrier
   srcu_batches_completed
+  srcu_check_nmi_safety
   srcu_init_notifier_head
   srcu_notifier_call_chain
   srcu_notifier_chain_register
@@ -3412,6 +3459,9 @@
   thermal_zone_get_zone_by_name
   tick_nohz_get_sleep_length
   time64_to_tm
+  timecounter_cyc2time
+  timecounter_init
+  timecounter_read
   timer_delete
   timer_delete_sync
   timer_shutdown_sync
@@ -3436,6 +3486,8 @@
   trace_event_reg
   trace_get_event_file
   trace_handle_return
+  trace_hardirqs_off
+  trace_hardirqs_on
   __traceiter_android_rvh_account_irq
   __traceiter_android_rvh_after_dequeue_task
   __traceiter_android_rvh_after_enqueue_task
@@ -3528,6 +3580,7 @@
   __traceiter_gpu_mem_total
   __traceiter_ipi_entry
   __traceiter_ipi_raise
+  __traceiter_mark_victim
   __traceiter_mmap_lock_acquire_returned
   __traceiter_mmap_lock_released
   __traceiter_mmap_lock_start_locking
@@ -3629,6 +3682,7 @@
   __tracepoint_gpu_mem_total
   __tracepoint_ipi_entry
   __tracepoint_ipi_raise
+  __tracepoint_mark_victim
   __tracepoint_mmap_lock_acquire_returned
   __tracepoint_mmap_lock_released
   __tracepoint_mmap_lock_start_locking
@@ -3802,6 +3856,7 @@
   usb_autopm_put_interface_async
   usb_bus_idr
   usb_bus_idr_lock
+  usb_check_bulk_endpoints
   usb_clear_halt
   usb_composite_setup_continue
   usb_control_msg
