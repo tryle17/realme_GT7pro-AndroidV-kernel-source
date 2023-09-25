@@ -1,5 +1,6 @@
 [abi_symbol_list]
   access_process_vm
+  account_locked_vm
   activate_task
   add_cpu
   add_device_randomness
@@ -47,6 +48,7 @@
   argv_free
   argv_split
   arm64_use_ng_mappings
+  arm_smccc_1_2_hvc
   __arm_smccc_smc
   __arm_smccc_sve_check
   async_schedule_node
@@ -55,6 +57,10 @@
   atomic_notifier_chain_register
   atomic_notifier_chain_unregister
   autoremove_wake_function
+  __auxiliary_device_add
+  auxiliary_device_init
+  __auxiliary_driver_register
+  auxiliary_driver_unregister
   available_idle_cpu
   backlight_device_get_by_type
   backlight_device_register
@@ -902,6 +908,7 @@
   do_wait_intr_irq
   down
   down_read
+  down_read_interruptible
   down_timeout
   down_write
   d_path
@@ -1777,6 +1784,7 @@
   irq_chip_enable_parent
   irq_chip_eoi_parent
   irq_chip_get_parent_state
+  irq_chip_mask_ack_parent
   irq_chip_mask_parent
   irq_chip_retrigger_hierarchy
   irq_chip_set_affinity_parent
@@ -1789,6 +1797,7 @@
   irq_create_mapping_affinity
   irq_dispose_mapping
   __irq_domain_add
+  __irq_domain_alloc_irqs
   irq_domain_alloc_irqs_parent
   irq_domain_create_hierarchy
   irq_domain_disconnect_hierarchy
@@ -2027,6 +2036,7 @@
   mac_pton
   mas_find
   match_string
+  mbox_bind_client
   mbox_chan_received_data
   mbox_chan_txdone
   mbox_client_txdone
@@ -2098,6 +2108,7 @@
   mmc_regulator_set_ocr
   mmc_regulator_set_vqmmc
   mmc_send_tuning
+  __mmdrop
   mmput
   mod_delayed_work_on
   mod_node_page_state
@@ -2106,6 +2117,7 @@
   module_layout
   module_put
   __module_put_and_kthread_exit
+  module_refcount
   __msecs_to_jiffies
   msleep
   msleep_interruptible
@@ -2511,6 +2523,7 @@
   pinctrl_pm_select_sleep_state
   pinctrl_select_state
   pinctrl_utils_free_map
+  pin_user_pages_fast
   pipe_lock
   pipe_unlock
   platform_bus_type
@@ -3720,6 +3733,7 @@
   __uio_register_device
   uio_unregister_device
   unlock_page
+  unpin_user_pages
   unregister_blkdev
   unregister_candev
   __unregister_chrdev
