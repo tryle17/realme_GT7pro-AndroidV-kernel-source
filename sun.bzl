@@ -52,6 +52,7 @@ def define_sun():
         "drivers/power/reset/qcom-reboot-reason.ko",
         "drivers/regulator/debug-regulator.ko",
         "drivers/regulator/proxy-consumer.ko",
+        "drivers/regulator/qti-fixed-regulator.ko",
         "drivers/regulator/qti-ocp-notifier.ko",
         "drivers/regulator/rpmh-regulator.ko",
         "drivers/regulator/stub-regulator.ko",
