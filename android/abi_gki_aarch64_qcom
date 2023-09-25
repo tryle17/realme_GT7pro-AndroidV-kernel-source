@@ -91,6 +91,7 @@
   __blk_alloc_disk
   blk_execute_rq
   blk_execute_rq_nowait
+  blk_get_queue
   __blk_mq_alloc_disk
   blk_mq_alloc_request
   blk_mq_alloc_tag_set
@@ -108,6 +109,7 @@
   blk_mq_stop_hw_queue
   blk_mq_unquiesce_queue
   blk_mq_virtio_map_queues
+  blk_put_queue
   blk_queue_alignment_offset
   blk_queue_flag_clear
   blk_queue_flag_set
@@ -3346,6 +3348,7 @@
   sysfs_streq
   sysrq_mask
   system_32bit_el0_cpumask
+  system_cpucaps
   system_freezable_power_efficient_wq
   system_freezable_wq
   system_highpri_wq
