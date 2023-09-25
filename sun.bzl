@@ -7,6 +7,7 @@ target_name = "sun"
 def define_sun():
     _sun_in_tree_modules = [
         # keep sorted
+        "drivers/base/regmap/qti-regmap-debugfs.ko",
         "drivers/bus/mhi/devices/mhi_dev_satellite.ko",
         "drivers/bus/mhi/devices/mhi_dev_uci.ko",
         "drivers/bus/mhi/host/mhi.ko",
