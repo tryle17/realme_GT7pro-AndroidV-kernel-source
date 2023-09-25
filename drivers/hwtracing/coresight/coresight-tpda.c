@@ -707,13 +707,6 @@ static int tpda_parse_cmb(struct tpda_drvdata *drvdata)
 static int tpda_parse_of_data(struct tpda_drvdata *drvdata)
 {
 	int ret;
-	struct device_node *node = drvdata->dev->of_node;
-
-	ret = of_property_read_u32(node, "qcom,tpda-atid", &drvdata->atid);
-	if (ret) {
-		dev_err(drvdata->dev, "TPDA ATID is not specified\n");
-		return -EINVAL;
-	}
 
 	ret = tpda_parse_tc(drvdata);
 	if (ret) {
