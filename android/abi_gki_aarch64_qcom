@@ -1274,6 +1274,7 @@
   gen_pool_best_fit
   gen_pool_create
   gen_pool_destroy
+  gen_pool_dma_alloc
   gen_pool_first_fit_order_align
   gen_pool_free_owner
   gen_pool_has_addr
@@ -2121,6 +2122,7 @@
   __msecs_to_jiffies
   msleep
   msleep_interruptible
+  mtree_load
   __mutex_init
   mutex_is_locked
   mutex_lock
@@ -2292,6 +2294,7 @@
   of_genpd_add_provider_onecell
   of_genpd_add_provider_simple
   of_genpd_del_provider
+  of_gen_pool_get
   __of_get_address
   of_get_child_by_name
   of_get_cpu_node
@@ -4095,6 +4098,7 @@
   xsk_tx_peek_desc
   xsk_tx_release
   xsk_uses_need_wakeup
+  zap_vma_ptes
   zlib_deflate
   zlib_deflateEnd
   zlib_deflateInit2
