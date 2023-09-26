@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/mhi.h>
@@ -18,6 +19,7 @@ struct qrtr_mhi_dev {
 	struct qrtr_endpoint ep;
 	struct mhi_device *mhi_dev;
 	struct device *dev;
+	struct completion prepared;
 };
 
 /* From MHI to QRTR */
@@ -56,6 +58,10 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	if (skb->sk)
 		sock_hold(skb->sk);
 
+	rc = wait_for_completion_interruptible(&qdev->prepared);
+	if (rc)
+		goto free_skb;
+
 	rc = skb_linearize(skb);
 	if (rc)
 		goto free_skb;
@@ -76,7 +82,7 @@ free_skb:
 }
 
 static void qrtr_mhi_of_parse(struct mhi_device *mhi_dev,
-			      u32 *net_id)
+			      u32 *net_id, bool *rt)
 {
 	struct mhi_controller *mhi_cntrl = mhi_dev->mhi_cntrl;
 	struct device_node *np = NULL;
@@ -97,6 +103,7 @@ static void qrtr_mhi_of_parse(struct mhi_device *mhi_dev,
 			rc = of_property_read_u32(np, "qcom,net-id", &nid);
 			if (!rc)
 				*net_id = nid;
+			*rt = of_property_read_bool(np, "qcom,low-latency");
 		}
 	}
 	of_node_put(np);
@@ -107,6 +114,7 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 {
 	struct qrtr_mhi_dev *qdev;
 	u32 net_id;
+	bool rt;
 	int rc;
 
 	qdev = devm_kzalloc(&mhi_dev->dev, sizeof(*qdev), GFP_KERNEL);
@@ -116,12 +124,13 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	qdev->mhi_dev = mhi_dev;
 	qdev->dev = &mhi_dev->dev;
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
+	init_completion(&qdev->prepared);
 
 	dev_set_drvdata(&mhi_dev->dev, qdev);
 
-	qrtr_mhi_of_parse(mhi_dev, &net_id);
+	qrtr_mhi_of_parse(mhi_dev, &net_id, &rt);
 
-	rc = qrtr_endpoint_register(&qdev->ep, net_id);
+	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt);
 	if (rc)
 		return rc;
 
@@ -131,6 +140,7 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 		qrtr_endpoint_unregister(&qdev->ep);
 		return rc;
 	}
+	complete_all(&qdev->prepared);
 
 	dev_dbg(qdev->dev, "Qualcomm MHI QRTR driver probed\n");
 
