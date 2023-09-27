@@ -47,6 +47,7 @@ def define_sun():
         "drivers/mmc/host/sdhci-msm.ko",
         "drivers/nvmem/nvmem_qcom-spmi-sdam.ko",
         "drivers/nvmem/nvmem_qfprom.ko",
+        "drivers/pci/controller/pci-msm-drv.ko",
         "drivers/phy/qualcomm/phy-qcom-ufs.ko",
         "drivers/phy/qualcomm/phy-qcom-ufs-qrbtc-sdm845.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
