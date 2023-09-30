@@ -1677,7 +1677,7 @@ static int update_dram_end_address_and_movable_bitmap(phys_addr_t *bootmem_dram_
 	}
 
 	*bootmem_dram_end_addr = addr;
-	pr_debug("mem-offline: bootmem_dram_end_addr 0x%pa\n", &bootmem_dram_end_addr);
+	pr_debug("mem-offline: bootmem_dram_end_addr 0x%pa\n", bootmem_dram_end_addr);
 
 	num_entries = num_cells / (nr_address_cells + nr_size_cells);
 	pos = prop->value;
