@@ -63,6 +63,9 @@ MODULE_PARM_DESC(bbm_block_size,
  * onlined to the same zone - virtio-mem relies on this behavior.
  */
 
+/* For now, only allow one virtio-mem device */
+struct virtio_mem *virtio_mem_dev;
+
 /*
  * We have to share a single online_page callback among all virtio-mem
  * devices. We use RCU to iterate the list in the callback.
@@ -2530,6 +2533,8 @@ static int virtio_mem_probe(struct platform_device *vdev)
 	if (rc)
 		goto out_free_vm;
 
+	virtio_mem_dev = vm;
+
 	/* trigger a config update to start processing the requested_size */
 	if (!vm->in_kdump) {
 		atomic_set(&vm->config_changed, 1);
@@ -2632,7 +2637,7 @@ static int virtio_mem_remove(struct platform_device *vdev)
 	return 0;
 }
 
-static void __maybe_unused virtio_mem_config_changed(struct platform_device *vdev)
+void virtio_mem_config_changed(struct platform_device *vdev)
 {
 	struct virtio_mem *vm = platform_get_drvdata(vdev);
 

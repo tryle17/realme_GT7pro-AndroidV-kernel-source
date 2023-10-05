@@ -214,4 +214,9 @@ struct virtio_mem {
 	struct list_head next;
 };
 
+void virtio_mem_config_changed(struct platform_device *vdev);
+
+/* For now, only allow one virtio-mem device */
+extern struct virtio_mem *virtio_mem_dev;
+
 #endif
