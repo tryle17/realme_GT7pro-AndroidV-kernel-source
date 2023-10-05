@@ -3192,6 +3192,8 @@ static void ufs_qcom_setup_max_hs_gear(struct ufs_qcom_host *host)
  * Returns -EPROBE_DEFER if binding fails, returns negative error
  * on phy power up failure and returns zero on success.
  */
+static u32 defer_probe_cnt = 1;
+
 static int ufs_qcom_init(struct ufs_hba *hba)
 {
 	int err;
@@ -3214,6 +3216,13 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 #if defined(CONFIG_UFS_DBG)
 	host->dbg_en = true;
 #endif
+
+	if (defer_probe_cnt == 1) {
+		defer_probe_cnt++;
+		pr_err("ufs defers first probe\n");
+		err = -EPROBE_DEFER;
+		goto out_variant_clear;
+	}
 
 	/* Setup the optional reset control of HCI */
 	host->core_reset = devm_reset_control_get_optional(hba->dev, "rst");
