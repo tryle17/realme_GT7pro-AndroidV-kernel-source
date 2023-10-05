@@ -36,6 +36,16 @@ config QCOM_CRM
 	  of hardware components aggregate requests for these resources and
 	  help apply the aggregated power state on the resource.
 
+config QCOM_CRM_V2
+	tristate "Qualcomm Technologies, Inc. (QTI) CRM-V2 driver"
+	depends on QCOM_RPMH && (ARCH_QCOM || COMPILE_TEST)
+	help
+	  Support for communication with the hardened-CRM blocks in
+	  Qualcomm Technologies, Inc. (QTI) SoCs. CRM-V2 provides interface
+	  to vote desired power state of resources local to a subsystem. A set
+	  of hardware components aggregate requests for these resources and
+	  help apply the aggregated power state on the resource.
+
 config QCOM_CPR
 	tristate "QCOM Core Power Reduction (CPR) support"
 	depends on ARCH_QCOM && HAS_IOMEM
