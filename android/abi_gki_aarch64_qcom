@@ -97,6 +97,7 @@
   __blk_alloc_disk
   blk_execute_rq
   blk_execute_rq_nowait
+  blk_get_queue
   __blk_mq_alloc_disk
   blk_mq_alloc_request
   blk_mq_alloc_tag_set
@@ -114,6 +115,7 @@
   blk_mq_stop_hw_queue
   blk_mq_unquiesce_queue
   blk_mq_virtio_map_queues
+  blk_put_queue
   blk_queue_alignment_offset
   blk_queue_flag_clear
   blk_queue_flag_set
@@ -638,6 +640,7 @@
   device_del
   device_destroy
   device_find_child
+  device_find_child_by_name
   device_for_each_child
   device_for_each_child_reverse
   device_get_child_node_count
@@ -2091,6 +2094,8 @@
   __memset_io
   memstart_addr
   memunmap
+  metadata_dst_alloc
+  metadata_dst_free
   migrate_swap
   __migrate_task
   mipi_dsi_create_packet
@@ -2175,6 +2180,7 @@
   __netif_napi_del
   netif_receive_skb
   netif_receive_skb_list
+  __netif_rx
   netif_rx
   netif_schedule_queue
   netif_set_real_num_rx_queues
@@ -2933,6 +2939,8 @@
   rt_mutex_lock
   rt_mutex_trylock
   rt_mutex_unlock
+  rtnl_configure_link
+  rtnl_create_link
   rtnl_is_locked
   rtnl_link_register
   rtnl_link_unregister
@@ -3362,6 +3370,7 @@
   sysfs_streq
   sysrq_mask
   system_32bit_el0_cpumask
+  system_cpucaps
   system_freezable_power_efficient_wq
   system_freezable_wq
   system_highpri_wq
