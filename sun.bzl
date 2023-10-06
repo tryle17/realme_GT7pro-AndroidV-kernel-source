@@ -46,6 +46,7 @@ def define_sun():
         "drivers/phy/qualcomm/phy-qcom-ufs-qrbtc-sdm845.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-sun.ko",
+        "drivers/power/reset/qcom-dload-mode.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
         "drivers/regulator/debug-regulator.ko",
         "drivers/regulator/proxy-consumer.ko",

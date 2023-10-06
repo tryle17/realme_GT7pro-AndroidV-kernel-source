@@ -490,6 +490,84 @@ config QCOM_RAMDUMP
 	  userspace. Say 'Y' here to enable this driver. It's safe to say
 	  'N' here if you don't plan on collecting ramdumps.
 
+config QCOM_MINIDUMP
+	tristate "QCOM Minidump Support"
+	depends on (QCOM_SMEM || ARCH_QTI_VM) && KALLSYMS
+	help
+	  This enables minidump feature. It allows various clients to
+	  register to dump their state at system bad state (panic/WDT,etc.,).
+	  Minidump would dump all registered entries, only when DLOAD mode
+	  is enabled.
+
+config QCOM_VA_MINIDUMP
+	tristate "QCOM VA Minidump Support"
+	depends on QCOM_MINIDUMP
+	help
+	  This enables minidump feature for registering dynamic
+	  data structures. It supports VA based registration
+	  with minidump, which is made into an ELF. The region
+	  for ELF is registered with legacy minidump.
+
+config QCOM_DYN_MINIDUMP_STACK
+	bool "QTI Dynamic Minidump Stack Registration Support"
+	depends on QCOM_MINIDUMP
+	help
+	  This enables minidump dynamic current stack registration feature.
+	  It allows current task stack to be available in minidump, for cases
+	  where CPU is unable to register it from IPI_CPU_STOP. The stack data
+	  can be used to unwind stack frames.
+
+config QCOM_MINIDUMP_FTRACE
+	bool "QCOM Minidump Support"
+	depends on QCOM_MINIDUMP
+	help
+	  This enables ftrace buffer registration in minidump table.
+	  On oops, ftrace content will be copied to that buffer.
+	  This way ftrace buffer content becomes a part of minidump dump
+	  collection.
+
+config QCOM_MINIDUMP_PANIC_DUMP
+	bool "QCOM Minidump Panic dumps Support"
+	depends on QCOM_MINIDUMP
+	help
+	  This enables collection of debug information like runqueue
+	  statistics etc. on panic in minidump. It dumps current, CFS,
+	  and RT runqueue tasks running on each cpu. This help in
+	  knowing the tasks running, pending, hogging on cpu during
+	  panic.
+
+config QCOM_MINIDUMP_PANIC_CPU_CONTEXT
+	bool "QCOM Minidump Panic dumps CPU Context"
+	depends on ARM64 && QCOM_MINIDUMP_PANIC_DUMP
+	help
+	  This enables cpu context collection in minidump table,
+	  on panic.
+
+config QCOM_MINIDUMP_PANIC_MEMORY_INFO
+	bool "QCOM Minidump Panic dumps Memory Info"
+	depends on QCOM_MINIDUMP_PANIC_DUMP
+	help
+	  This enables memory info collection in minidump table,
+	  on panic.
+
+config QCOM_MINIDUMP_PSTORE
+	bool "QCOM Minidump Pstore dumps Support"
+	depends on ARM64 && QCOM_MINIDUMP
+	help
+	  This enables pstore registration in minidump table.
+	  Here, pstore framework dump logs like pmsg, dmesg,
+	  console ftrace etc. in the given carve-out memory
+	  (non-volatile memory) and during warm reboot these
+	  dump will be copied outside the system on panic.
+
+config MINIDUMP_MAX_ENTRIES
+	int "Minidump Maximum num of entries"
+	default 200
+	depends on QCOM_MINIDUMP
+	help
+	  This defines maximum number of entries to be allocated for application
+	  subsytem in Minidump table.
+
 config QCOM_ICC_BWMON
 	tristate "QCOM Interconnect Bandwidth Monitor driver"
 	depends on ARCH_QCOM || COMPILE_TEST
@@ -634,5 +712,14 @@ config QCOM_WCD_USBSS_I2C
 	 using I2C. This driver provides common support
 	 for accessing the device, switching between USB and Audio
 	 modes, changing orientation.
+
+config QCOM_DEBUG_SYMBOL
+	tristate "Enable Debug Symbol Support"
+	depends on ANDROID_DEBUG_KINFO
+	help
+	  This enables Debug Symbol Support. This driver is based on
+	  Google Debug Kinfo driver, according to the provided info, this
+	  driver allows other modules to get symbol addresses by traversing
+	  kallsyms table for debug usage.
 
 endmenu
