@@ -189,6 +189,7 @@ extern struct completion walt_get_cycle_counts_cb_completion;
 extern bool use_cycle_counter;
 extern struct walt_sched_cluster *sched_cluster[WALT_NR_CPUS];
 extern cpumask_t part_haltable_cpus;
+extern cpumask_t cpus_paused_by_us;
 /*END SCHED.H PORT*/
 
 extern u64 (*walt_get_cycle_counts_cb)(int cpu, u64 wc);
