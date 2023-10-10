@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/mhi.h>
@@ -20,6 +20,7 @@ struct qrtr_mhi_dev {
 	struct mhi_device *mhi_dev;
 	struct device *dev;
 	struct completion prepared;
+	struct completion ringfull;
 };
 
 /* From MHI to QRTR */
@@ -43,14 +44,17 @@ static void qcom_mhi_qrtr_ul_callback(struct mhi_device *mhi_dev,
 				      struct mhi_result *mhi_res)
 {
 	struct sk_buff *skb = mhi_res->buf_addr;
+	struct qrtr_mhi_dev *qdev = dev_get_drvdata(&mhi_dev->dev);
 
 	if (skb->sk)
 		sock_put(skb->sk);
 	consume_skb(skb);
+
+	complete_all(&qdev->ringfull);
 }
 
 /* Send data over MHI */
-static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
+static int __qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 {
 	struct qrtr_mhi_dev *qdev = container_of(ep, struct qrtr_mhi_dev, ep);
 	int rc;
@@ -68,7 +72,7 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 
 	rc = mhi_queue_skb(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
 			   MHI_EOT);
-	if (rc)
+	if (rc && rc != -EAGAIN)
 		goto free_skb;
 
 	return rc;
@@ -77,6 +81,22 @@ free_skb:
 	if (skb->sk)
 		sock_put(skb->sk);
 	kfree_skb(skb);
+
+	return rc;
+}
+
+static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
+{
+	struct qrtr_mhi_dev *qdev = container_of(ep, struct qrtr_mhi_dev, ep);
+	int rc;
+
+	do {
+		rc = __qcom_mhi_qrtr_send(ep, skb);
+		if (rc == -EAGAIN) {
+			reinit_completion(&qdev->ringfull);
+			wait_for_completion(&qdev->ringfull);
+		}
+	} while (rc == -EAGAIN);
 
 	return rc;
 }
@@ -125,12 +145,13 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	qdev->dev = &mhi_dev->dev;
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
 	init_completion(&qdev->prepared);
+	init_completion(&qdev->ringfull);
 
 	dev_set_drvdata(&mhi_dev->dev, qdev);
 
 	qrtr_mhi_of_parse(mhi_dev, &net_id, &rt);
 
-	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt);
+	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt, NULL);
 	if (rc)
 		return rc;
 
