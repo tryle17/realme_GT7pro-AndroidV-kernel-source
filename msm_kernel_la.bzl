@@ -111,6 +111,26 @@ EOF
         ],
     )
 
+    board_cmdline_extras = " ".join(boot_image_opts.board_kernel_cmdline_extras)
+    if board_cmdline_extras:
+        native.genrule(
+            name = "{}_extra_cmdline".format(target),
+            outs = ["board_extra_cmdline_{}".format(target)],
+            cmd_bash = """
+                echo {} > "$@"
+            """.format(board_cmdline_extras),
+        )
+
+    board_bc_extras = " ".join(boot_image_opts.board_bootconfig_extras)
+    if board_bc_extras:
+        native.genrule(
+            name = "{}_extra_bootconfig".format(target),
+            outs = ["board_extra_bootconfig_{}".format(target)],
+            cmd_bash = """
+                echo {} > "$@"
+            """.format(board_bc_extras),
+        )
+
 def _define_kernel_build(
         target,
         base_kernel,
@@ -191,6 +211,7 @@ def _define_image_build(
         build_vendor_kernel_boot = False,
         build_vendor_dlkm = True,
         build_system_dlkm = False,
+        boot_image_opts = boot_image_opts(),
         boot_image_outs = None,
         dtbo_list = [],
         vendor_ramdisk_binaries = None,
@@ -302,7 +323,13 @@ def _define_image_build(
         out = "super_unsparsed.img",
     )
 
-def _define_kernel_dist(target, msm_target, variant, base_kernel, define_abi_targets):
+def _define_kernel_dist(
+        target,
+        msm_target,
+        variant,
+        base_kernel,
+        define_abi_targets,
+        boot_image_opts = boot_image_opts()):
     """Creates distribution targets for kernel builds
 
     When Bazel builds everything, the outputs end up buried in `bazel-bin`.
@@ -347,6 +374,14 @@ def _define_kernel_dist(target, msm_target, variant, base_kernel, define_abi_tar
         "{}_avb_sign_boot_image".format(target),
         ":{}_system_dlkm_module_blocklist".format(target),
     ])
+
+    board_cmdline_extras = " ".join(boot_image_opts.board_kernel_cmdline_extras)
+    if board_cmdline_extras:
+        msm_dist_targets.append("{}_extra_cmdline".format(target))
+
+    board_bc_extras = " ".join(boot_image_opts.board_bootconfig_extras)
+    if board_bc_extras:
+        msm_dist_targets.append("{}_extra_bootconfig".format(target))
 
     if define_abi_targets:
         kernel_abi_dist(
@@ -473,11 +508,19 @@ def define_msm_la(
         dtbo_list = dtbo_list,
         vendor_ramdisk_binaries = vendor_ramdisk_binaries,
         gki_ramdisk_prebuilt_binary = gki_ramdisk_prebuilt_binary,
+        boot_image_opts = boot_image_opts,
         boot_image_outs = None if dtb_list else ["boot.img", "init_boot.img"],
         in_tree_module_list = in_tree_module_list,
     )
 
-    _define_kernel_dist(target, msm_target, variant, base_kernel, define_abi_targets)
+    _define_kernel_dist(
+        target,
+        msm_target,
+        variant,
+        base_kernel,
+        define_abi_targets,
+        boot_image_opts = boot_image_opts,
+    )
 
     _define_uapi_library(target)
 
