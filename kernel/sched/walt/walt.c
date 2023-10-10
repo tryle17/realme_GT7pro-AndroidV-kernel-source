@@ -597,10 +597,10 @@ static inline u64 freq_policy_load(struct rq *rq, unsigned int *reason)
 	if (sched_freq_aggr_en) {
 		load = wrq->prev_runnable_sum + aggr_grp_load;
 		*reason = CPUFREQ_REASON_FREQ_AGR;
-	}
-	else
+	} else {
 		load = wrq->prev_runnable_sum +
 					wrq->grp_time.prev_runnable_sum;
+	}
 
 	if (cpu_ksoftirqd && READ_ONCE(cpu_ksoftirqd->__state) == TASK_RUNNING) {
 		kload = task_load(cpu_ksoftirqd);
@@ -2933,7 +2933,6 @@ static void walt_init_cycle_counter(void)
 	}
 
 	wait_for_completion_interruptible(&walt_get_cycle_counts_cb_completion);
-	return;
 }
 
 static void transfer_busy_time(struct rq *rq,
@@ -4341,6 +4340,7 @@ static inline void irq_work_restrict_to_mig_clusters(cpumask_t *lock_cpus)
 
 	for_each_sched_cluster(cluster) {
 		bool keep_locked = false;
+
 		for_each_cpu(cpu, &cluster->cpus) {
 			rq = cpu_rq(cpu);
 			wrq = &per_cpu(walt_rq, cpu_of(rq));

@@ -632,7 +632,7 @@ static const struct sysfs_ops sysfs_ops = {
 	.store	= store,
 };
 
-static struct kobj_type ktype_core_ctl = {
+static const struct kobj_type ktype_core_ctl = {
 	.sysfs_ops	= &sysfs_ops,
 	.default_groups = default_groups,
 };
