@@ -317,21 +317,6 @@ static const struct coresight_ops trace_noc_cs_ops = {
 	.link_ops	= &trace_noc_link_ops,
 };
 
-static int trace_noc_parse_of_data(struct trace_noc_drvdata *drvdata)
-{
-	int ret;
-	struct device_node *node = drvdata->dev->of_node;
-
-	ret = of_property_read_u32(node, "atid", &drvdata->atid);
-	if (ret) {
-		dev_err(drvdata->dev, "Trace Noc ATID is not specified\n");
-		return -EINVAL;
-	}
-
-	dev_dbg(drvdata->dev, "Trace Noc ATID is %d\n", drvdata->atid);
-	return 0;
-}
-
 static void trace_noc_init_default_data(struct trace_noc_drvdata *drvdata)
 {
 	drvdata->freqType = FREQ_TS;
@@ -344,7 +329,6 @@ static int trace_noc_probe(struct amba_device *adev, const struct amba_id *id)
 	struct coresight_platform_data *pdata;
 	struct trace_noc_drvdata *drvdata;
 	struct coresight_desc desc = { 0 };
-	int ret;
 
 	desc.name = coresight_alloc_device_name(&trace_noc_devs, dev);
 	if (!desc.name)
@@ -364,10 +348,6 @@ static int trace_noc_probe(struct amba_device *adev, const struct amba_id *id)
 	drvdata->base = devm_ioremap_resource(dev, &adev->res);
 	if (!drvdata->base)
 		return -ENOMEM;
-
-	ret = trace_noc_parse_of_data(drvdata);
-	if (ret)
-		return ret;
 
 	desc.type = CORESIGHT_DEV_TYPE_LINK;
 	desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_MERG;
