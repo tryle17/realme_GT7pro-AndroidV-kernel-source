@@ -12,6 +12,7 @@
 #include <linux/anon_inodes.h>
 #include <linux/kref.h>
 #include <linux/qcom_tui_heap.h>
+#include <linux/memremap.h>
 #include "qcom_dt_parser.h"
 #include "qcom_sg_ops.h"
 
@@ -19,6 +20,7 @@ struct tui_heap;
 struct tui_pool {
 	struct tui_heap *heap;
 	void *membuf;
+	struct dev_pagemap pgmap;
 	struct kref kref;
 	struct gen_pool *pool;
 	struct file *filp;
@@ -41,9 +43,11 @@ static struct tui_pool *tui_pool_create(struct mem_buf_allocation_data *alloc_da
 {
 	struct tui_pool *pool;
 	struct gh_sgl_desc *sgl_desc;
+	struct dev_pagemap *pgmap;
 	phys_addr_t base;
 	size_t size;
 	int ret;
+	void *kva;
 
 	pool = kzalloc(sizeof(*pool), GFP_KERNEL);
 	if (!pool)
@@ -54,11 +58,33 @@ static struct tui_pool *tui_pool_create(struct mem_buf_allocation_data *alloc_da
 		ret = PTR_ERR(pool->membuf);
 		goto err_mem_buf_alloc;
 	}
-	sgl_desc = mem_buf_get_sgl(pool->membuf);
 
-	ret = mem_buf_map_mem_s1(sgl_desc);
-	if (ret)
-		goto err_mem_buf_map_mem_s1;
+	sgl_desc = mem_buf_get_sgl(pool->membuf);
+	if (sgl_desc->n_sgl_entries != 1) {
+		pr_err("Memory not contiguous!\n");
+		ret = EINVAL;
+		goto err_memremap;
+	}
+
+	/*
+	 * memremap_pages() creates the 'struct page array'/vmemmap.
+	 * as well as the linear kernel mapping. Pages are added
+	 * to ZONE_DEVICE.
+	 */
+	pgmap = &pool->pgmap;
+	base = sgl_desc->sgl_entries[0].ipa_base;
+	size = sgl_desc->sgl_entries[0].size;
+	memset(pgmap, 0, sizeof(*pgmap));
+	pgmap->type = MEMORY_DEVICE_GENERIC;
+	pgmap->nr_range = 1;
+	pgmap->range.start = base;
+	pgmap->range.end = base + size - 1;
+	kva = memremap_pages(pgmap, 0);
+	if (IS_ERR(kva)) {
+		pr_err("memremap_pages failed\n");
+		ret = PTR_ERR(kva);
+		goto err_memremap;
+	}
 
 	kref_init(&pool->kref);
 	pool->pool = gen_pool_create(PAGE_SHIFT, -1);
@@ -67,8 +93,6 @@ static struct tui_pool *tui_pool_create(struct mem_buf_allocation_data *alloc_da
 		goto err_gen_pool_create;
 	}
 
-	base = sgl_desc->sgl_entries[0].ipa_base;
-	size = sgl_desc->sgl_entries[0].size;
 	ret = gen_pool_add(pool->pool, base, size, -1);
 	if (ret)
 		goto err_gen_pool_add;
@@ -78,9 +102,8 @@ static struct tui_pool *tui_pool_create(struct mem_buf_allocation_data *alloc_da
 err_gen_pool_add:
 	gen_pool_destroy(pool->pool);
 err_gen_pool_create:
-	if (WARN_ON(mem_buf_unmap_mem_s1(sgl_desc)))
-		return ERR_PTR(ret);
-err_mem_buf_map_mem_s1:
+	memunmap_pages(pgmap);
+err_memremap:
 	mem_buf_free(pool->membuf);
 err_mem_buf_alloc:
 	kfree(pool);
@@ -96,8 +119,7 @@ static void tui_pool_release(struct kref *kref)
 
 	gen_pool_destroy(pool->pool);
 	sgl_desc = mem_buf_get_sgl(pool->membuf);
-	if (WARN_ON(mem_buf_unmap_mem_s1(sgl_desc)))
-		return;
+	memunmap_pages(&pool->pgmap);
 	mem_buf_free(pool->membuf);
 	kfree(pool);
 }
