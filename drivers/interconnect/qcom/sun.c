@@ -388,9 +388,10 @@ static struct qcom_icc_node qsm_cfg = {
 	.channels = 1,
 	.buswidth = 4,
 	.noc_ops = &qcom_qnoc4_ops,
-	.num_links = 31,
+	.num_links = 33,
 	.links = { SLAVE_AHB2PHY_SOUTH, SLAVE_AHB2PHY_NORTH,
-		   SLAVE_CAMERA_CFG, SLAVE_DISPLAY_CFG,
+		   SLAVE_CAMERA_CFG, SLAVE_CLK_CTL,
+		   SLAVE_CRYPTO_0_CFG, SLAVE_DISPLAY_CFG,
 		   SLAVE_EVA_CFG, SLAVE_GFX3D_CFG,
 		   SLAVE_I2C, SLAVE_I3C_IBI0_CFG,
 		   SLAVE_I3C_IBI1_CFG, SLAVE_IMEM_CFG,
@@ -483,7 +484,7 @@ static struct qcom_icc_node chm_apps = {
 	.buswidth = 32,
 	.noc_ops = &qcom_qnoc4_ops,
 	.num_links = 4,
-	.links = { SLAVE_UBWC, SLAVE_GEM_NOC_CNOC,
+	.links = { SLAVE_UBWC_P, SLAVE_GEM_NOC_CNOC,
 		   SLAVE_LLCC, SLAVE_MEM_NOC_PCIE_SNOC },
 };
 
@@ -668,7 +669,7 @@ static struct qcom_icc_qosbox qnm_ubwc_p_qos = {
 
 static struct qcom_icc_node qnm_ubwc_p = {
 	.name = "qnm_ubwc_p",
-	.id = MASTER_UBWC,
+	.id = MASTER_UBWC_P,
 	.channels = 1,
 	.buswidth = 32,
 	.noc_ops = &qcom_qnoc4_ops,
@@ -990,7 +991,7 @@ static struct qcom_icc_qosbox xm_pcie3_qos = {
 
 static struct qcom_icc_node xm_pcie3 = {
 	.name = "xm_pcie3",
-	.id = MASTER_PCIE_3,
+	.id = MASTER_PCIE_0,
 	.channels = 1,
 	.buswidth = 8,
 	.noc_ops = &qcom_qnoc4_ops,
@@ -1331,7 +1332,7 @@ static struct qcom_icc_node llcc_mc_pcie_crm_hw_0 = {
 
 static struct qcom_icc_node xm_pcie3_pcie_crm_hw_0 = {
 	.name = "xm_pcie3_pcie_crm_hw_0",
-	.id = MASTER_PCIE_3_PCIE_CRM_HW_0,
+	.id = MASTER_PCIE_0_PCIE_CRM_HW_0,
 	.channels = 1,
 	.buswidth = 8,
 	.noc_ops = &qcom_qnoc4_ops,
@@ -1407,6 +1408,24 @@ static struct qcom_icc_node qhs_ahb2phy1 = {
 static struct qcom_icc_node qhs_camera_cfg = {
 	.name = "qhs_camera_cfg",
 	.id = SLAVE_CAMERA_CFG,
+	.channels = 1,
+	.buswidth = 4,
+	.noc_ops = &qcom_qnoc4_ops,
+	.num_links = 0,
+};
+
+static struct qcom_icc_node qhs_clk_ctl = {
+	.name = "qhs_clk_ctl",
+	.id = SLAVE_CLK_CTL,
+	.channels = 1,
+	.buswidth = 4,
+	.noc_ops = &qcom_qnoc4_ops,
+	.num_links = 0,
+};
+
+static struct qcom_icc_node qhs_crypto0_cfg = {
+	.name = "qhs_crypto0_cfg",
+	.id = SLAVE_CRYPTO_0_CFG,
 	.channels = 1,
 	.buswidth = 4,
 	.noc_ops = &qcom_qnoc4_ops,
@@ -1787,7 +1806,7 @@ static struct qcom_icc_node xs_pcie = {
 
 static struct qcom_icc_node chs_ubwc_p = {
 	.name = "chs_ubwc_p",
-	.id = SLAVE_UBWC,
+	.id = SLAVE_UBWC_P,
 	.channels = 1,
 	.buswidth = 32,
 	.noc_ops = &qcom_qnoc4_ops,
@@ -2136,9 +2155,10 @@ static struct qcom_icc_bcm bcm_cn0 = {
 	.voter_idx = VOTER_IDX_HLOS,
 	.enable_mask = 0x1,
 	.keepalive = true,
-	.num_nodes = 42,
+	.num_nodes = 44,
 	.nodes = { &qsm_cfg, &qhs_ahb2phy0,
 		   &qhs_ahb2phy1, &qhs_camera_cfg,
+		   &qhs_clk_ctl, &qhs_crypto0_cfg,
 		   &qhs_eva_cfg, &qhs_gpuss_cfg,
 		   &qhs_i3c_ibi0_cfg, &qhs_i3c_ibi1_cfg,
 		   &qhs_imem_cfg, &qhs_mss_cfg,
@@ -2251,15 +2271,14 @@ static struct qcom_icc_bcm bcm_sh1 = {
 	.name = "SH1",
 	.voter_idx = VOTER_IDX_HLOS,
 	.enable_mask = 0x1,
-	.num_nodes = 15,
+	.num_nodes = 14,
 	.nodes = { &alm_gpu_tcu, &alm_sys_tcu,
 		   &chm_apps, &qnm_gpu,
 		   &qnm_mdsp, &qnm_mnoc_hf,
 		   &qnm_mnoc_sf, &qnm_nsp_gemnoc,
 		   &qnm_pcie, &qnm_snoc_sf,
-		   &qnm_ubwc_p, &xm_gic,
-		   &chs_ubwc_p, &qns_gem_noc_cnoc,
-		   &qns_pcie },
+		   &xm_gic, &chs_ubwc_p,
+		   &qns_gem_noc_cnoc, &qns_pcie },
 };
 
 static struct qcom_icc_bcm bcm_sn0 = {
@@ -2277,11 +2296,25 @@ static struct qcom_icc_bcm bcm_sn2 = {
 	.nodes = { &qnm_aggre1_noc },
 };
 
+static struct qcom_icc_bcm bcm_sn3 = {
+	.name = "SN3",
+	.voter_idx = VOTER_IDX_HLOS,
+	.num_nodes = 1,
+	.nodes = { &qnm_aggre2_noc },
+};
+
 static struct qcom_icc_bcm bcm_sn4 = {
 	.name = "SN4",
 	.voter_idx = VOTER_IDX_HLOS,
 	.num_nodes = 1,
 	.nodes = { &qns_pcie_mem_noc },
+};
+
+static struct qcom_icc_bcm bcm_ubw0 = {
+	.name = "UBW0",
+	.voter_idx = VOTER_IDX_HLOS,
+	.num_nodes = 1,
+	.nodes = { &qnm_ubwc_p },
 };
 
 static struct qcom_icc_bcm bcm_acv_disp = {
@@ -2618,6 +2651,8 @@ static struct qcom_icc_node *cnoc_cfg_nodes[] = {
 	[SLAVE_AHB2PHY_SOUTH] = &qhs_ahb2phy0,
 	[SLAVE_AHB2PHY_NORTH] = &qhs_ahb2phy1,
 	[SLAVE_CAMERA_CFG] = &qhs_camera_cfg,
+	[SLAVE_CLK_CTL] = &qhs_clk_ctl,
+	[SLAVE_CRYPTO_0_CFG] = &qhs_crypto0_cfg,
 	[SLAVE_DISPLAY_CFG] = &qhs_display_cfg,
 	[SLAVE_EVA_CFG] = &qhs_eva_cfg,
 	[SLAVE_GFX3D_CFG] = &qhs_gpuss_cfg,
@@ -2701,6 +2736,7 @@ static struct qcom_icc_desc sun_cnoc_main = {
 static struct qcom_icc_bcm *gem_noc_bcms[] = {
 	&bcm_sh0,
 	&bcm_sh1,
+	&bcm_ubw0,
 	&bcm_sh0_disp,
 	&bcm_sh1_disp,
 	&bcm_sh0_cam_ife_0,
@@ -2725,9 +2761,9 @@ static struct qcom_icc_node *gem_noc_nodes[] = {
 	[MASTER_COMPUTE_NOC] = &qnm_nsp_gemnoc,
 	[MASTER_ANOC_PCIE_GEM_NOC] = &qnm_pcie,
 	[MASTER_SNOC_SF_MEM_NOC] = &qnm_snoc_sf,
-	[MASTER_UBWC] = &qnm_ubwc_p,
+	[MASTER_UBWC_P] = &qnm_ubwc_p,
 	[MASTER_GIC] = &xm_gic,
-	[SLAVE_UBWC] = &chs_ubwc_p,
+	[SLAVE_UBWC_P] = &chs_ubwc_p,
 	[SLAVE_GEM_NOC_CNOC] = &qns_gem_noc_cnoc,
 	[SLAVE_LLCC] = &qns_llcc,
 	[SLAVE_MEM_NOC_PCIE_SNOC] = &qns_pcie,
@@ -2982,10 +3018,10 @@ static struct qcom_icc_bcm *pcie_anoc_bcms[] = {
 
 static struct qcom_icc_node *pcie_anoc_nodes[] = {
 	[MASTER_PCIE_ANOC_CFG] = &qsm_pcie_anoc_cfg,
-	[MASTER_PCIE_3] = &xm_pcie3,
+	[MASTER_PCIE_0] = &xm_pcie3,
 	[SLAVE_ANOC_PCIE_GEM_NOC] = &qns_pcie_mem_noc,
 	[SLAVE_SERVICE_PCIE_ANOC] = &srvc_pcie_aggre_noc,
-	[MASTER_PCIE_3_PCIE_CRM_HW_0] = &xm_pcie3_pcie_crm_hw_0,
+	[MASTER_PCIE_0_PCIE_CRM_HW_0] = &xm_pcie3_pcie_crm_hw_0,
 	[SLAVE_ANOC_PCIE_GEM_NOC_PCIE_CRM_HW_0] = &qns_pcie_mem_noc_pcie_crm_hw_0,
 };
 
@@ -3007,6 +3043,7 @@ static struct qcom_icc_desc sun_pcie_anoc = {
 static struct qcom_icc_bcm *system_noc_bcms[] = {
 	&bcm_sn0,
 	&bcm_sn2,
+	&bcm_sn3,
 };
 
 static struct qcom_icc_node *system_noc_nodes[] = {
