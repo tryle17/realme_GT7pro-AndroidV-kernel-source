@@ -23,6 +23,13 @@ clk-qcom.ko
 debug-regulator.ko
 proxy-consumer.ko
 rpmh-regulator.ko
+spmi-pmic-arb.ko
+regmap-spmi.ko
+qti-regmap-debugfs.ko
+qcom-spmi-pmic.ko
+nvmem_qcom-spmi-sdam.ko
+rtc-pm8xxx.ko
+pmic-pon-log.ko
 gcc-sun.ko
 gpucc-sun.ko
 secure_buffer.ko

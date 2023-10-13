@@ -719,6 +719,7 @@
   devm_krealloc
   devm_kstrdup
   devm_kstrdup_const
+  devm_led_classdev_multicolor_register_ext
   devm_led_classdev_register_ext
   devm_mbox_controller_register
   devm_mipi_dsi_attach
@@ -2011,6 +2012,7 @@
   led_classdev_flash_register_ext
   led_classdev_flash_unregister
   led_classdev_unregister
+  led_mc_calc_color_components
   led_trigger_event
   led_trigger_register
   led_trigger_register_simple
