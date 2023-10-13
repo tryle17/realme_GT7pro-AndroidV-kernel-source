@@ -154,6 +154,7 @@ struct adc5_chip {
 	struct completion	complete;
 	struct mutex		lock;
 	const struct adc5_data	*data;
+	int			irq_eoc;
 };
 
 static int adc5_read(struct adc5_chip *adc, u16 offset, u8 *data, int len)
@@ -604,8 +605,8 @@ static const struct adc5_channels adc5_chans_pmic[ADC5_MAX_CHANNEL] = {
 					SCALE_HW_CALIB_THERM_100K_PULLUP)
 	[ADC5_AMUX_THM2]	= ADC5_CHAN_TEMP("amux_thm2", 0,
 					SCALE_HW_CALIB_PM5_SMB_TEMP)
-	[ADC5_PARALLEL_ISENSE]	= ADC5_CHAN_VOLT("parallel_isense", 1,
-					SCALE_HW_CALIB_CUR)
+	[ADC5_PARALLEL_ISENSE]	= ADC5_CHAN_VOLT("parallel_isense", 0,
+					SCALE_HW_CALIB_PM5_CUR)
 	[ADC5_GPIO1_100K_PU]	= ADC5_CHAN_TEMP("gpio1_100k_pu", 0,
 					SCALE_HW_CALIB_THERM_100K_PULLUP)
 	[ADC5_GPIO2_100K_PU]	= ADC5_CHAN_TEMP("gpio2_100k_pu", 0,
@@ -625,17 +626,19 @@ static const struct adc5_channels adc7_chans_pmic[ADC5_MAX_CHANNEL] = {
 					SCALE_HW_CALIB_DEFAULT)
 	[ADC7_VBAT_SNS]		= ADC5_CHAN_VOLT("vbat_sns", 3,
 					SCALE_HW_CALIB_DEFAULT)
-	[ADC7_AMUX_THM3]	= ADC5_CHAN_TEMP("smb_temp", 0,
+	[ADC7_USB_IN_V_16]	= ADC5_CHAN_VOLT("usb_in_v_div_16", 8,
+					SCALE_HW_CALIB_DEFAULT)
+	[ADC7_AMUX_THM3]	= ADC5_CHAN_TEMP("smb_temp", 9,
 					SCALE_HW_CALIB_PM7_SMB_TEMP)
 	[ADC7_CHG_TEMP]		= ADC5_CHAN_TEMP("chg_temp", 0,
 					SCALE_HW_CALIB_PM7_CHG_TEMP)
-	[ADC7_IIN_FB]		= ADC5_CHAN_CUR("iin_fb", 9,
+	[ADC7_IIN_FB]		= ADC5_CHAN_CUR("iin_fb", 10,
 					SCALE_HW_CALIB_CUR)
-	[ADC7_ICHG_SMB]		= ADC5_CHAN_CUR("ichg_smb", 10,
+	[ADC7_IIN_SMB]		= ADC5_CHAN_CUR("iin_smb", 12,
 					SCALE_HW_CALIB_CUR)
-	[ADC7_IIN_SMB]		= ADC5_CHAN_CUR("iin_smb", 11,
+	[ADC7_ICHG_SMB]		= ADC5_CHAN_CUR("ichg_smb", 13,
 					SCALE_HW_CALIB_CUR)
-	[ADC7_ICHG_FB]		= ADC5_CHAN_CUR("ichg_fb", 12,
+	[ADC7_ICHG_FB]		= ADC5_CHAN_CUR("ichg_fb", 14,
 					SCALE_HW_CALIB_CUR_RAW)
 	[ADC7_DIE_TEMP]		= ADC5_CHAN_TEMP("die_temp", 0,
 					SCALE_HW_CALIB_PMIC_THERM_PM7)
@@ -687,6 +690,8 @@ static const struct adc5_channels adc5_chans_rev2[ADC5_MAX_CHANNEL] = {
 	[ADC5_AMUX_THM5_100K_PU] = ADC5_CHAN_TEMP("amux_thm5_100k_pu", 0,
 					SCALE_HW_CALIB_THERM_100K_PULLUP)
 	[ADC5_XO_THERM_100K_PU]	= ADC5_CHAN_TEMP("xo_therm_100k_pu", 0,
+					SCALE_HW_CALIB_THERM_100K_PULLUP)
+	[ADC5_GPIO2_100K_PU]	= ADC5_CHAN_TEMP("gpio2_100k_pu", 0,
 					SCALE_HW_CALIB_THERM_100K_PULLUP)
 };
 
@@ -828,6 +833,7 @@ static int adc5_get_fw_channel_data(struct adc5_chip *adc,
 }
 
 static const struct adc5_data adc5_data_pmic = {
+	.name = "pm-adc5",
 	.full_scale_code_volt = 0x70e4,
 	.full_scale_code_cur = 0x2710,
 	.adc_chans = adc5_chans_pmic,
@@ -843,6 +849,7 @@ static const struct adc5_data adc5_data_pmic = {
 };
 
 static const struct adc5_data adc7_data_pmic = {
+	.name = "pm-adc7",
 	.full_scale_code_volt = 0x70e4,
 	.adc_chans = adc7_chans_pmic,
 	.info = &adc7_info,
@@ -855,17 +862,19 @@ static const struct adc5_data adc7_data_pmic = {
 };
 
 static const struct adc5_data adc5_data_pmic5_lite = {
+	.name = "pm-adc5-lite",
 	.full_scale_code_volt = 0x70e4,
 	/* On PMI632, IBAT LSB = 5A/32767 */
 	.full_scale_code_cur = 5000,
 	.adc_chans = adc5_chans_pmic,
 	.info = &adc5_info,
 	.decimation = (unsigned int []) {250, 420, 840},
-	.hw_settle_2 = (unsigned int []) {15, 100, 200, 300, 400, 500, 600, 700,
+	.hw_settle_1 = (unsigned int []) {15, 100, 200, 300, 400, 500, 600, 700,
 					800, 900, 1, 2, 4, 6, 8, 10},
 };
 
 static const struct adc5_data adc5_data_pmic_rev2 = {
+	.name = "pm-adc4-rev2",
 	.full_scale_code_volt = 0x4000,
 	.full_scale_code_cur = 0x1800,
 	.adc_chans = adc5_chans_rev2,
@@ -962,7 +971,8 @@ static int adc5_probe(struct platform_device *pdev)
 	struct iio_dev *indio_dev;
 	struct adc5_chip *adc;
 	struct regmap *regmap;
-	int ret, irq_eoc;
+	const char *irq_name;
+	int ret;
 	u32 reg;
 
 	regmap = dev_get_regmap(dev->parent, NULL);
@@ -982,6 +992,8 @@ static int adc5_probe(struct platform_device *pdev)
 	adc->dev = dev;
 	adc->base = reg;
 
+	dev_set_drvdata(&pdev->dev, adc);
+
 	init_completion(&adc->complete);
 	mutex_init(&adc->lock);
 
@@ -989,14 +1001,18 @@ static int adc5_probe(struct platform_device *pdev)
 	if (ret)
 		return dev_err_probe(dev, ret, "adc get dt data failed\n");
 
-	irq_eoc = platform_get_irq(pdev, 0);
-	if (irq_eoc < 0) {
-		if (irq_eoc == -EPROBE_DEFER || irq_eoc == -EINVAL)
-			return irq_eoc;
+	adc->irq_eoc = platform_get_irq(pdev, 0);
+	if (adc->irq_eoc < 0) {
+		if (adc->irq_eoc == -EPROBE_DEFER || adc->irq_eoc == -EINVAL)
+			return adc->irq_eoc;
 		adc->poll_eoc = true;
 	} else {
-		ret = devm_request_irq(dev, irq_eoc, adc5_isr, 0,
-				       "pm-adc5", adc);
+		irq_name = "pm-adc5";
+		if (adc->data->name)
+			irq_name = adc->data->name;
+
+		ret = devm_request_irq(dev, adc->irq_eoc, adc5_isr, 0,
+				       irq_name, adc);
 		if (ret)
 			return ret;
 	}
@@ -1012,10 +1028,39 @@ static int adc5_probe(struct platform_device *pdev)
 	return devm_iio_device_register(dev, indio_dev);
 }
 
+static int __maybe_unused adc_restore(struct device *dev)
+{
+	int ret = 0;
+	struct adc5_chip *adc = dev_get_drvdata(dev);
+
+	if (adc->irq_eoc > 0)
+		ret = devm_request_irq(dev, adc->irq_eoc, adc5_isr, 0,
+				       "pm-adc5", adc);
+
+	return ret;
+}
+
+static int __maybe_unused adc_freeze(struct device *dev)
+{
+	struct adc5_chip *adc = dev_get_drvdata(dev);
+
+	if (adc->irq_eoc > 0)
+		devm_free_irq(dev, adc->irq_eoc, adc);
+
+	return 0;
+}
+
+static const struct dev_pm_ops __maybe_unused adc_pm_ops = {
+	.freeze = pm_ptr(adc_freeze),
+	.thaw = pm_ptr(adc_restore),
+	.restore = pm_ptr(adc_restore),
+};
+
 static struct platform_driver adc5_driver = {
 	.driver = {
 		.name = "qcom-spmi-adc5",
 		.of_match_table = adc5_match_table,
+		.pm = pm_ptr(&adc_pm_ops),
 	},
 	.probe = adc5_probe,
 };
