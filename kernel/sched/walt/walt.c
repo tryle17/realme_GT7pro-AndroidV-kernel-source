@@ -4601,6 +4601,11 @@ void fmax_uncap_checkpoint(int nr_big, u64 window_start, u32 wakeup_ctr_sum)
 
 	trace_sched_fmax_uncap(nr_big, window_start, wakeup_ctr_sum,
 			fmax_uncap_load_detected, fmax_uncap_timestamp);
+
+	if (trace_sched_cluster_fmax_uncap_enabled()) {
+		for (i = 0; i < num_sched_clusters; i++)
+			trace_sched_cluster_fmax_uncap(i);
+	}
 }
 
 void walt_fill_ta_data(struct core_ctl_notif_data *data)
