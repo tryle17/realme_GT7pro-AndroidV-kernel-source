@@ -41,3 +41,12 @@ def define_sun_vms(vm_image_opts = vm_image_opts()):
         )
 
         define_combined_vm_image(target_name, variant, vm_image_opts.vm_size_ext4)
+
+        copy_to_dist_dir(
+            name = "{}_{}_dtc_dist".format(target_name, variant),
+            archives = [":{}_dtc_tarball".format(base_tv)],
+            dist_dir = "{}/host".format(get_out_dir(target_name, variant)),
+            flat = True,
+            wipe_dist_dir = True,
+            log = "info",
+        )
