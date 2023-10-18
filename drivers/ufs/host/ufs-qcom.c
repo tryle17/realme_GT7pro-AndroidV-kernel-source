@@ -1679,7 +1679,7 @@ static void ufs_qcom_get_speed_mode(struct ufs_pa_layer_attr *p, char *result)
 
 	if (!p->pwr_rx && !p->pwr_tx) {
 		pwr = SLOWAUTO_MODE;
-		snprintf(result, BUS_VECTOR_NAME_LEN, "MIN");
+		snprintf(result, BUS_VECTOR_NAME_LEN, "MAX");
 	} else if (p->pwr_rx == FAST_MODE || p->pwr_rx == FASTAUTO_MODE ||
 		 p->pwr_tx == FAST_MODE || p->pwr_tx == FASTAUTO_MODE) {
 		pwr = FAST_MODE;
@@ -1809,7 +1809,7 @@ static int ufs_qcom_set_bus_vote(struct ufs_hba *hba, bool on)
 	if (on) {
 		vote = host->bus_vote.saved_vote;
 		if (vote == host->bus_vote.min_bw_vote)
-			ufs_qcom_update_bus_bw_vote(host);
+			return ufs_qcom_update_bus_bw_vote(host);
 	} else {
 		vote = host->bus_vote.min_bw_vote;
 	}
