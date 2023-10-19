@@ -4716,12 +4716,6 @@ static void walt_sched_init_rq(struct rq *rq)
 	wrq->task_exec_scale = 1024;
 	wrq->push_task = NULL;
 
-	/*
-	 * All cpus part of same cluster by default. This avoids the
-	 * need to check for wrq->cluster being non-NULL in hot-paths
-	 * like select_best_cpu()
-	 */
-	wrq->cluster = &init_cluster;
 	wrq->curr_runnable_sum = wrq->prev_runnable_sum = 0;
 	wrq->nt_curr_runnable_sum = wrq->nt_prev_runnable_sum = 0;
 	memset(&wrq->grp_time, 0, sizeof(struct group_cpu_time));
@@ -5348,8 +5342,6 @@ static int walt_init_stop_handler(void *data)
 
 	create_default_coloc_group();
 
-	walt_update_cluster_topology();
-
 	walt_disabled = false;
 
 	for_each_possible_cpu(cpu) {
@@ -5408,6 +5400,8 @@ static void walt_init(struct work_struct *work)
 		schedule_work(&rebuild_sd_work);
 		wait_for_completion_interruptible(&rebuild_domains_completion);
 	}
+
+	walt_update_cluster_topology();
 
 	stop_machine(walt_init_stop_handler, NULL, NULL);
 
