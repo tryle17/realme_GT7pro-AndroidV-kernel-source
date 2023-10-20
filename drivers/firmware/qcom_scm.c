@@ -592,8 +592,9 @@ EXPORT_SYMBOL(qcom_scm_config_cpu_errata);
  * qcom_scm_pas_metadata_release() by the caller.
  */
 int qcom_scm_pas_init_image(u32 peripheral, const void *metadata, size_t size,
-			    struct qcom_scm_pas_metadata *ctx)
+			    struct qcom_scm_pas_metadata *ctx, struct device *dev_32bit)
 {
+	struct device *dev = __scm->dev;
 	dma_addr_t mdata_phys;
 	void *mdata_buf;
 	int ret;
@@ -606,15 +607,18 @@ int qcom_scm_pas_init_image(u32 peripheral, const void *metadata, size_t size,
 	};
 	struct qcom_scm_res res;
 
+	if (dev_32bit)
+		dev = dev_32bit;
+
 	/*
 	 * During the scm call memory protection will be enabled for the meta
 	 * data blob, so make sure it's physically contiguous, 4K aligned and
 	 * non-cachable to avoid XPU violations.
 	 */
-	mdata_buf = dma_alloc_coherent(__scm->dev, size, &mdata_phys,
+	mdata_buf = dma_alloc_coherent(dev, size, &mdata_phys,
 				       GFP_KERNEL);
 	if (!mdata_buf) {
-		dev_err(__scm->dev, "Allocation of metadata buffer failed.\n");
+		dev_err(dev, "Allocation of metadata buffer failed.\n");
 		return -ENOMEM;
 	}
 	memcpy(mdata_buf, metadata, size);
@@ -629,14 +633,14 @@ int qcom_scm_pas_init_image(u32 peripheral, const void *metadata, size_t size,
 
 	desc.args[1] = mdata_phys;
 
-	ret = qcom_scm_call(__scm->dev, &desc, &res);
+	ret = qcom_scm_call(dev, &desc, &res);
 
 	qcom_scm_bw_disable();
 	qcom_scm_clk_disable();
 
 out:
 	if (ret < 0 || !ctx) {
-		dma_free_coherent(__scm->dev, size, mdata_buf, mdata_phys);
+		dma_free_coherent(dev, size, mdata_buf, mdata_phys);
 	} else if (ctx) {
 		ctx->ptr = mdata_buf;
 		ctx->phys = mdata_phys;
@@ -651,12 +655,18 @@ EXPORT_SYMBOL(qcom_scm_pas_init_image);
  * qcom_scm_pas_metadata_release() - release metadata context
  * @ctx:	metadata context
  */
-void qcom_scm_pas_metadata_release(struct qcom_scm_pas_metadata *ctx)
+void qcom_scm_pas_metadata_release(struct qcom_scm_pas_metadata *ctx,
+				   struct device *dev_32bit)
 {
+	struct device *dev = __scm->dev;
+
 	if (!ctx->ptr)
 		return;
 
-	dma_free_coherent(__scm->dev, ctx->size, ctx->ptr, ctx->phys);
+	if (dev_32bit)
+		dev = dev_32bit;
+
+	dma_free_coherent(dev, ctx->size, ctx->ptr, ctx->phys);
 
 	ctx->ptr = NULL;
 	ctx->phys = 0;
