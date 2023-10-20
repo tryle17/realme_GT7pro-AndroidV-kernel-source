@@ -84,6 +84,7 @@ def define_pineapple():
         "drivers/soc/qcom/mdt_loader.ko",
         "drivers/soc/qcom/mem_buf/mem_buf.ko",
         "drivers/soc/qcom/mem_buf/mem_buf_dev.ko",
+        "drivers/soc/qcom/mem_buf/mem_buf_msgq.ko",
         "drivers/soc/qcom/pdr_interface.ko",
         "drivers/soc/qcom/pmic-glink-debug.ko",
         "drivers/soc/qcom/qcom_aoss.ko",

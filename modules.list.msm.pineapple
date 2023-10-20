@@ -19,6 +19,7 @@ qcom_dma_heaps.ko
 llcc-qcom.ko
 mem_buf.ko
 mem_buf_dev.ko
+mem_buf_msgq.ko
 msm_dma_iommu_mapping.ko
 secure_buffer.ko
 arm_smmu.ko
