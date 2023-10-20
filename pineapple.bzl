@@ -23,6 +23,8 @@ def define_pineapple():
         "drivers/clk/qcom/tcsrcc-pineapple.ko",
         "drivers/clk/qcom/videocc-pineapple.ko",
         "drivers/cpufreq/qcom-cpufreq-hw.ko",
+        "drivers/devfreq/governor_gpubw_mon.ko",
+        "drivers/devfreq/governor_msm_adreno_tz.ko",
         "drivers/dma-buf/heaps/qcom_dma_heaps.ko",
         "drivers/dma/qcom/bam_dma.ko",
         "drivers/dma/qcom/msm_gpi.ko",
