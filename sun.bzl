@@ -23,6 +23,7 @@ def define_sun():
         "drivers/clk/qcom/tcsrcc-sun.ko",
         "drivers/clk/qcom/videocc-sun.ko",
         "drivers/dma-buf/heaps/qcom_dma_heaps.ko",
+        "drivers/edac/qcom_edac.ko",
         "drivers/firmware/qcom-scm.ko",
         "drivers/hwspinlock/qcom_hwspinlock.ko",
         "drivers/input/misc/pm8941-pwrkey.ko",
