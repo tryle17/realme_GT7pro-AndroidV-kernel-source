@@ -1143,6 +1143,7 @@
   edac_device_free_ctl_info
   edac_device_handle_ce_count
   edac_device_handle_ue_count
+  edac_op_state
   efi
   enable_irq
   enable_percpu_irq
