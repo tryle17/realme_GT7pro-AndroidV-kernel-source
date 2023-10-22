@@ -6,7 +6,7 @@ targets = [
 
 la_variants = [
     # keep sorted
-    # "consolidate",
+    "consolidate",
     "perf",
 ]
 
