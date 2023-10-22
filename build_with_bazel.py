@@ -286,8 +286,6 @@ class BazelBuilder:
         self.user_opts.extend([
             "--user_kmi_symbol_lists=//msm-kernel:android/abi_gki_aarch64_qcom",
             "--ignore_missing_projects",
-            # TODO: remove after resolution of b/299079771
-            "--btf_debug_info=disable",
         ])
 
         if self.dry_run:
