@@ -12,6 +12,7 @@ la_variants = [
 
 le_targets = [
     # keep sorted
+    "sun-allyes",
 ]
 
 le_variants = [
