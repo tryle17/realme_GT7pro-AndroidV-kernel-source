@@ -53,6 +53,7 @@ qcom_hwspinlock.ko
 qcom-ipcc.ko
 smem.ko
 socinfo.ko
+qcom_ipc_logging.ko
 qrtr.ko
 qcom_aoss.ko
 msm_qmp.ko
