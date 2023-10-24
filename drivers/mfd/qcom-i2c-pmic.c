@@ -588,8 +588,7 @@ static struct regmap_config i2c_pmic_regmap_config = {
 	.max_register	= 0xFFFF,
 };
 
-static int i2c_pmic_probe(struct i2c_client *client,
-			  const struct i2c_device_id *id)
+static int i2c_pmic_probe(struct i2c_client *client)
 {
 	struct i2c_pmic *chip;
 	int rc = 0;
