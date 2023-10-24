@@ -48,12 +48,12 @@ static const struct pll_vco taycan_elu_vco[] = {
 
 static const struct alpha_pll_config gpu_cc_pll0_config = {
 	.l = 0x34,
-	.cal_l = 0x0,
+	.cal_l = 0x44,
 	.alpha = 0x1555,
 	.config_ctl_val = 0x19660387,
-	.config_ctl_hi_val = 0x058060a0,
-	.config_ctl_hi1_val = 0xb516cb20,
-	.user_ctl_val = 0x00000401,
+	.config_ctl_hi_val = 0x098060a0,
+	.config_ctl_hi1_val = 0xb416cb20,
+	.user_ctl_val = 0x00000400,
 	.user_ctl_hi_val = 0x00000002,
 };
 
