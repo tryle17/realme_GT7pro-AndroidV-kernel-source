@@ -2762,7 +2762,6 @@ static int sdhci_msm_ice_init(struct sdhci_msm_host *msm_host,
 #if IS_ENABLED(CONFIG_QTI_HW_KEY_MANAGER)
 	struct resource *ice_hwkm_res;
 #endif
-	int err;
 	struct qcom_ice *ice;
 
 	if (!(cqhci_readl(cq_host, CQHCI_CAP) & CQHCI_CAP_CS))

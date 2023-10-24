@@ -840,13 +840,6 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 				 __func__, ret);
 
 	usleep_range(1000, 1100);
-	/*
-	 * The ice registers are also reset to default values after a ufs
-	 * host controller reset. Reset the ice internal software flags here
-	 * so that the ice hardware will be re-initialized properly in the
-	 * later part of the UFS host controller reset.
-	 */
-	ufs_qcom_ice_disable(host);
 
 	if (reenable_intr) {
 		enable_irq(hba->irq);
@@ -1706,7 +1699,6 @@ static int ufs_qcom_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op,
 	ufs_qcom_log_str(host, "&,%d,%d,%d,%d,%d,%d\n",
 			pm_op, hba->rpm_lvl, hba->spm_lvl, hba->uic_link_state,
 			hba->curr_dev_pwr_mode, err);
-	ufs_qcom_ice_disable(host);
 
 	cancel_dwork_unvote_cpufreq(hba);
 	return err;
@@ -4184,9 +4176,6 @@ static void ufs_qcom_dump_dbg_regs(struct ufs_hba *hba)
 	/* sleep a bit intermittently as we are dumping too much data */
 	ufs_qcom_print_hw_debug_reg_all(hba, NULL, ufs_qcom_dump_regs_wrapper);
 
-	/* Dump ICE registers */
-	ufs_qcom_ice_debug(host);
-
 	if (in_task()) {
 		usleep_range(1000, 1100);
 		ufs_qcom_testbus_read(hba);
@@ -4599,7 +4588,7 @@ static ssize_t hibern8_count_show(struct device *dev,
 	struct ufs_hba *hba = dev_get_drvdata(dev);
 
 	pm_runtime_get_sync(hba->dev);
-	ufshcd_hold(hba, false);
+	ufshcd_hold(hba);
 	hw_h8_enter = ufshcd_readl(hba, REG_UFS_HW_H8_ENTER_CNT);
 	sw_h8_enter = ufshcd_readl(hba, REG_UFS_SW_H8_ENTER_CNT);
 	sw_hw_h8_enter = ufshcd_readl(hba, REG_UFS_SW_AFTER_HW_H8_ENTER_CNT);
@@ -4846,21 +4835,6 @@ static int ufs_qcom_remove(struct platform_device *pdev)
 
 	ufshcd_remove(hba);
 	return 0;
-}
-
-static void ufs_qcom_shutdown(struct platform_device *pdev)
-{
-	struct ufs_hba *hba =  platform_get_drvdata(pdev);
-	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
-
-	ufs_qcom_log_str(host, "0xdead\n");
-	ufshcd_pltfrm_shutdown(pdev);
-
-	/* UFS_RESET TLMM register cannot reset to POR value '1' after warm
-	 * reset, so deassert ufs device reset line after UFS device shutdown
-	 * to ensure the UFS_RESET TLMM register value is POR value
-	 */
-	ufs_qcom_device_reset_ctrl(hba, false);
 }
 
 static const struct of_device_id ufs_qcom_of_match[] __maybe_unused = {

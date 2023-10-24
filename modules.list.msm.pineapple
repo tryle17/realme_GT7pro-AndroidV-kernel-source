@@ -44,7 +44,8 @@ qnoc-qos.ko
 crm.ko
 phy-qcom-ufs.ko
 phy-qcom-ufs-qmp-v4-pineapple.ko
-ufs_qcom.ko
+qcom_ice.ko
+ufs-qcom.ko
 regmap-spmi.ko
 spmi-pmic-arb.ko
 qcom-spmi-pmic.ko
