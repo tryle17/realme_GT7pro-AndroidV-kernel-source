@@ -1171,16 +1171,16 @@ static int qrtr_port_assign(struct qrtr_sock *ipc, int *port)
 	if (!*port) {
 		rc = xa_alloc_cyclic(&qrtr_ports, port, ipc,
 				     QRTR_EPH_PORT_RANGE, &qrtr_ports_next,
-				     GFP_KERNEL);
+				     GFP_ATOMIC);
 	} else if (*port < QRTR_MIN_EPH_SOCKET &&
 		   !(capable(CAP_NET_ADMIN) ||
 		   in_egroup_p(AID_VENDOR_QRTR) ||
 		   in_egroup_p(GLOBAL_ROOT_GID))) {
 		rc = -EACCES;
 	} else if (*port == QRTR_PORT_CTRL) {
-		rc = xa_insert(&qrtr_ports, 0, ipc, GFP_KERNEL);
+		rc = xa_insert(&qrtr_ports, 0, ipc, GFP_ATOMIC);
 	} else {
-		rc = xa_insert(&qrtr_ports, *port, ipc, GFP_KERNEL);
+		rc = xa_insert(&qrtr_ports, *port, ipc, GFP_ATOMIC);
 	}
 
 	if (rc == -EBUSY)
