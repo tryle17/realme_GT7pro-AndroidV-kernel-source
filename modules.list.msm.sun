@@ -44,7 +44,6 @@ cqhci.ko
 sdhci-msm.ko
 smem.ko
 socinfo.ko
-icc-test.ko
 icc-bcm-voter.ko
 icc-debug.ko
 icc-rpmh.ko

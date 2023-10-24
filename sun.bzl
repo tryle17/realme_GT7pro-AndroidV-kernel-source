@@ -45,7 +45,6 @@ def define_sun():
         "drivers/hwtracing/stm/stm_heartbeat.ko",
         "drivers/hwtracing/stm/stm_p_ost.ko",
         "drivers/input/misc/pm8941-pwrkey.ko",
-        "drivers/interconnect/icc-test.ko",
         "drivers/interconnect/qcom/icc-bcm-voter.ko",
         "drivers/interconnect/qcom/icc-debug.ko",
         "drivers/interconnect/qcom/icc-rpmh.ko",
