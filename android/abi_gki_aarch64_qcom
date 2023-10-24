@@ -719,6 +719,7 @@
   devm_krealloc
   devm_kstrdup
   devm_kstrdup_const
+  devm_led_classdev_flash_register_ext
   devm_led_classdev_multicolor_register_ext
   devm_led_classdev_register_ext
   devm_mbox_controller_register
@@ -729,6 +730,7 @@
   devm_nvmem_register
   devm_of_clk_add_hw_provider
   devm_of_icc_get
+  devm_of_led_get
   __devm_of_phy_provider_register
   devm_of_platform_populate
   devm_pci_alloc_host_bridge
@@ -748,6 +750,7 @@
   devm_regmap_add_irq_chip
   devm_regmap_del_irq_chip
   devm_regmap_field_alloc
+  devm_regmap_field_bulk_alloc
   __devm_regmap_init
   __devm_regmap_init_i2c
   __devm_regmap_init_mmio_clk
@@ -2809,6 +2812,7 @@
   regmap_bulk_write
   regmap_check_range_table
   regmap_field_read
+  regmap_fields_update_bits_base
   regmap_field_update_bits_base
   __regmap_init
   regmap_irq_get_virq
