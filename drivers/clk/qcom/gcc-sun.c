@@ -2106,34 +2106,6 @@ static struct clk_branch gcc_pcie_0_slv_q2a_axi_clk = {
 	},
 };
 
-static struct clk_branch gcc_pcie_rscc_cfg_ahb_clk = {
-	.halt_reg = 0x11004,
-	.halt_check = BRANCH_HALT_VOTED,
-	.hwcg_reg = 0x11004,
-	.hwcg_bit = 1,
-	.clkr = {
-		.enable_reg = 0x52010,
-		.enable_mask = BIT(20),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gcc_pcie_rscc_cfg_ahb_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
-static struct clk_branch gcc_pcie_rscc_xo_clk = {
-	.halt_reg = 0x11008,
-	.halt_check = BRANCH_HALT_VOTED,
-	.clkr = {
-		.enable_reg = 0x52010,
-		.enable_mask = BIT(21),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gcc_pcie_rscc_xo_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
 static struct clk_branch gcc_pdm2_clk = {
 	.halt_reg = 0x3300c,
 	.halt_check = BRANCH_HALT,
@@ -3478,8 +3450,6 @@ static struct clk_regmap *gcc_sun_clocks[] = {
 	[GCC_PCIE_0_PIPE_CLK_SRC] = &gcc_pcie_0_pipe_clk_src.clkr,
 	[GCC_PCIE_0_SLV_AXI_CLK] = &gcc_pcie_0_slv_axi_clk.clkr,
 	[GCC_PCIE_0_SLV_Q2A_AXI_CLK] = &gcc_pcie_0_slv_q2a_axi_clk.clkr,
-	[GCC_PCIE_RSCC_CFG_AHB_CLK] = &gcc_pcie_rscc_cfg_ahb_clk.clkr,
-	[GCC_PCIE_RSCC_XO_CLK] = &gcc_pcie_rscc_xo_clk.clkr,
 	[GCC_PDM2_CLK] = &gcc_pdm2_clk.clkr,
 	[GCC_PDM2_CLK_SRC] = &gcc_pdm2_clk_src.clkr,
 	[GCC_PDM_AHB_CLK] = &gcc_pdm_ahb_clk.clkr,
@@ -3706,6 +3676,8 @@ static int gcc_sun_probe(struct platform_device *pdev)
 	 *	gcc_eva_ahb_clk
 	 *	gcc_eva_xo_clk
 	 *	gcc_gpu_cfg_ahb_clk
+	 *	gcc_pcie_rscc_cfg_ahb_clk
+	 *	gcc_pcie_rscc_xo_clk
 	 *	gcc_video_ahb_clk
 	 *	gcc_video_xo_clk
 	 */
@@ -3716,6 +3688,8 @@ static int gcc_sun_probe(struct platform_device *pdev)
 	regmap_update_bits(regmap, 0x9F004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x9F01C, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x71004, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x52010, BIT(20), BIT(20));
+	regmap_update_bits(regmap, 0x52010, BIT(21), BIT(21));
 	regmap_update_bits(regmap, 0x32004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x32038, BIT(0), BIT(0));
 
