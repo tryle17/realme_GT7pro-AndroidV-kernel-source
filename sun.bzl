@@ -113,6 +113,7 @@ def define_sun():
         "drivers/soc/qcom/qcom_aoss.ko",
         "drivers/soc/qcom/qcom_ramdump.ko",
         "drivers/soc/qcom/qcom_rpmh.ko",
+        "drivers/soc/qcom/qcom_stats.ko",
         "drivers/soc/qcom/qmi_helpers.ko",
         "drivers/soc/qcom/secure_buffer.ko",
         "drivers/soc/qcom/smem.ko",
