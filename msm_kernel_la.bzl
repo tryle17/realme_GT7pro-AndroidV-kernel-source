@@ -248,6 +248,7 @@ def _define_image_build(
         vendor_ramdisk_binaries = vendor_ramdisk_binaries,
         gki_ramdisk_prebuilt_binary = gki_ramdisk_prebuilt_binary,
         boot_image_outs = boot_image_outs,
+        system_dlkm_fs_types = ["ext4"],
         deps = [
             "modules.list.msm.{}".format(msm_target),
             "modules.vendor_blocklist.msm.{}".format(msm_target),
@@ -272,10 +273,15 @@ def _define_image_build(
         ],
     )
 
+    if "consolidate" in target:
+        system_dlkm_img_file = "system_dlkm.img"
+    else:
+        system_dlkm_img_file = "system_dlkm.ext4.img"
+
     native.filegroup(
         name = "{}_system_dlkm_image_file".format(target),
         srcs = ["{}_images".format(base_kernel)],
-        output_group = "system_dlkm.img",
+        output_group = system_dlkm_img_file,
     )
 
     native.filegroup(
