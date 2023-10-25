@@ -127,6 +127,7 @@ def define_sun():
         "drivers/soc/qcom/smp2p.ko",
         "drivers/soc/qcom/socinfo.ko",
         "drivers/spmi/spmi-pmic-arb.ko",
+        "drivers/spmi/spmi-pmic-arb-debug.ko",
         "drivers/thermal/qcom/qcom-spmi-temp-alarm.ko",
         "drivers/tty/hvc/hvc_gunyah.ko",
         "drivers/ufs/host/ufs_qcom.ko",
