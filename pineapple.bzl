@@ -9,6 +9,9 @@ def define_pineapple():
         # keep sorted
         "arch/arm64/gunyah/gh_arm_drv.ko",
         "arch/arm64/gunyah/gunyah_hypercall.ko",
+        "drivers/bus/mhi/devices/mhi_dev_satellite.ko",
+        "drivers/bus/mhi/devices/mhi_dev_uci.ko",
+        "drivers/bus/mhi/host/mhi.ko",
         "drivers/clk/qcom/camcc-pineapple.ko",
         "drivers/clk/qcom/clk-dummy.ko",
         "drivers/clk/qcom/clk-qcom.ko",
