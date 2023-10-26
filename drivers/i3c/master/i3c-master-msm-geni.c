@@ -3476,9 +3476,9 @@ static int geni_i3c_remove(struct platform_device *pdev)
 			gi3c->i3c_gpio_disable);
 	if (ret)
 		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
-			" i3c: pinctrl_select_state failed\n");
+			    "%s: pinctrl_select_state failed ret:%d\n", __func__, ret);
 
-	ret = i3c_master_unregister(&gi3c->ctrlr);
+	i3c_master_unregister(&gi3c->ctrlr);
 	/* TBD : If we need debug for previous session, Don't delete logs */
 	if (gi3c->ipcl)
 		ipc_log_context_destroy(gi3c->ipcl);
@@ -3487,7 +3487,7 @@ static int geni_i3c_remove(struct platform_device *pdev)
 		i3c_geni_dev[i] = NULL;
 	i3c_nos = 0;
 
-	return ret;
+	return 0;
 }
 
 static int geni_i3c_resume_early(struct device *dev)
