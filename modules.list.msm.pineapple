@@ -33,7 +33,6 @@ camcc-pineapple.ko
 tcsrcc-pineapple.ko
 dispcc-pineapple.ko
 gpucc-pineapple.ko
-debugcc-pineapple.ko
 gcc-pineapple.ko
 gdsc-regulator.ko
 icc-bcm-voter.ko

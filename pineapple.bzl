@@ -13,7 +13,6 @@ def define_pineapple():
         "drivers/clk/qcom/clk-dummy.ko",
         "drivers/clk/qcom/clk-qcom.ko",
         "drivers/clk/qcom/clk-rpmh.ko",
-        "drivers/clk/qcom/debugcc-pineapple.ko",
         "drivers/clk/qcom/dispcc-pineapple.ko",
         "drivers/clk/qcom/gcc-pineapple.ko",
         "drivers/clk/qcom/gdsc-regulator.ko",
