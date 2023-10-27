@@ -3659,7 +3659,17 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 		}
 	}
 
-	ret = geni_se_resources_off(&gi3c->se);
+	/*
+	 * Currently implemented as SWA.
+	 * Fix is present from qup-core version 4.0.0 onwards[major = 4, minor = 0].
+	 * So below SWA is not applicable from qup-core version 4.0.0 onwards.
+	 */
+	if (gi3c->ver_info.hw_major_ver < 4)
+		geni_se_common_clks_off(gi3c->se.clk, gi3c->i3c_rsc.m_ahb_clk,
+					gi3c->i3c_rsc.s_ahb_clk);
+	else
+		ret = geni_se_resources_off(&gi3c->se);
+
 	if (ret)
 		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
 			"%s geni_se_resources_off failed %d\n", __func__, ret);
