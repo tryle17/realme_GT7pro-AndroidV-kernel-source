@@ -4198,6 +4198,7 @@ include/trace/hooks/iommu.h
 include/trace/hooks/mpam.h
 include/trace/hooks/net.h
 include/trace/hooks/pm_domain.h
+include/trace/hooks/preemptirq.h
 include/trace/hooks/printk.h
 include/trace/hooks/remoteproc.h
 include/trace/hooks/sched.h
