@@ -1283,13 +1283,13 @@ static struct etr_buf *tmc_etr_get_sysfs_buffer(struct coresight_device *csdev)
 	}
 
 	drvdata->mode = CS_MODE_SYSFS;
-	atomic_inc(csdev->refcnt);
+	atomic_inc(&csdev->refcnt);
 
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 	if (drvdata->out_mode == TMC_ETR_OUT_MODE_USB) {
 		ret = tmc_usb_enable(drvdata->usb_data);
 		if (ret) {
-			atomic_dec(csdev->refcnt);
+			atomic_dec(&csdev->refcnt);
 			drvdata->mode = CS_MODE_DISABLED;
 		}
 	}

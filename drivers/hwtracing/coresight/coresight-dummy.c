@@ -159,7 +159,5 @@ static void __exit dummy_exit(void)
 }
 module_exit(dummy_exit);
 
-module_platform_driver(dummy_driver);
-
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("CoreSight dummy driver");

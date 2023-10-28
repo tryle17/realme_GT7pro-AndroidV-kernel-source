@@ -211,10 +211,10 @@ static int trace_noc_alloc_trace_id(struct coresight_device *csdev)
 	int trace_id;
 	int i, nr_conns;
 
-	nr_conns = csdev->pdata->nr_inport;
+	nr_conns = csdev->pdata->nr_inconns;
 
 	for (i = 0; i < nr_conns; i++)
-		if (atomic_read(&csdev->refcnt[i]) != 0)
+		if (atomic_read(&csdev->pdata->in_conns[i]->dest_refcnt) != 0)
 			return 0;
 
 	trace_id = coresight_trace_id_get_system_id();
@@ -231,10 +231,10 @@ static void trace_noc_release_trace_id(struct coresight_device *csdev)
 	struct trace_noc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	int i, nr_conns;
 
-	nr_conns = csdev->pdata->nr_inport;
+	nr_conns = csdev->pdata->nr_inconns;
 
 	for (i = 0; i < nr_conns; i++)
-		if (atomic_read(&csdev->refcnt[i]) != 0)
+		if (atomic_read(&csdev->pdata->in_conns[i]->dest_refcnt) != 0)
 			return;
 
 	coresight_trace_id_put_system_id(drvdata->atid);
@@ -242,7 +242,8 @@ static void trace_noc_release_trace_id(struct coresight_device *csdev)
 	drvdata->atid = 0;
 }
 
-static int trace_noc_enable(struct coresight_device *csdev, int inport, int outport)
+static int trace_noc_enable(struct coresight_device *csdev, struct coresight_connection *inport,
+							struct coresight_connection *outport)
 {
 	struct trace_noc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	int ret;
@@ -286,21 +287,22 @@ static int trace_noc_enable(struct coresight_device *csdev, int inport, int outp
 	writel_relaxed(val, drvdata->base + TRACE_NOC_CTRL);
 
 	drvdata->enable = true;
-	atomic_inc(&csdev->refcnt[inport]);
+	atomic_inc(&inport->dest_refcnt);
 	spin_unlock(&drvdata->spinlock);
 
 	dev_info(drvdata->dev, "Trace NOC is enabled\n");
 	return 0;
 }
 
-static void trace_noc_disable(struct coresight_device *csdev, int inport, int outport)
+static void trace_noc_disable(struct coresight_device *csdev, struct coresight_connection *inport,
+							struct coresight_connection *outport)
 {
 	struct trace_noc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 
 	spin_lock(&drvdata->spinlock);
 	writel_relaxed(0x0, drvdata->base + TRACE_NOC_CTRL);
 	drvdata->enable = false;
-	atomic_dec(&csdev->refcnt[inport]);
+	atomic_dec(&inport->dest_refcnt);
 	trace_noc_release_trace_id(csdev);
 	spin_unlock(&drvdata->spinlock);
 
