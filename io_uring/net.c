@@ -397,6 +397,7 @@ int io_send(struct io_kiocb *req, unsigned int issue_flags)
 	if (flags & MSG_WAITALL)
 		min_ret = iov_iter_count(&msg.msg_iter);
 
+	flags &= ~MSG_INTERNAL_SENDMSG_FLAGS;
 	msg.msg_flags = flags;
 	ret = sock_sendmsg(sock, &msg);
 	if (ret < min_ret) {
@@ -630,7 +631,7 @@ static inline bool io_recv_finish(struct io_kiocb *req, int *ret,
 	unsigned int cflags;
 
 	cflags = io_put_kbuf(req, issue_flags);
-	if (msg->msg_inq && msg->msg_inq != -1U)
+	if (msg->msg_inq && msg->msg_inq != -1)
 		cflags |= IORING_CQE_F_SOCK_NONEMPTY;
 
 	if (!(req->flags & REQ_F_APOLL_MULTISHOT)) {
@@ -645,7 +646,7 @@ static inline bool io_recv_finish(struct io_kiocb *req, int *ret,
 			io_recv_prep_retry(req);
 			/* Known not-empty or unknown state, retry */
 			if (cflags & IORING_CQE_F_SOCK_NONEMPTY ||
-			    msg->msg_inq == -1U)
+			    msg->msg_inq == -1)
 				return false;
 			if (issue_flags & IO_URING_F_MULTISHOT)
 				*ret = IOU_ISSUE_SKIP_COMPLETE;
@@ -804,7 +805,7 @@ retry_multishot:
 		flags |= MSG_DONTWAIT;
 
 	kmsg->msg.msg_get_inq = 1;
-	kmsg->msg.msg_inq = -1U;
+	kmsg->msg.msg_inq = -1;
 	if (req->flags & REQ_F_APOLL_MULTISHOT) {
 		ret = io_recvmsg_multishot(sock, sr, kmsg, flags,
 					   &mshot_finished);
@@ -902,7 +903,7 @@ retry_multishot:
 	if (unlikely(ret))
 		goto out_free;
 
-	msg.msg_inq = -1U;
+	msg.msg_inq = -1;
 	msg.msg_flags = 0;
 
 	flags = sr->msg_flags;
@@ -1154,6 +1155,7 @@ int io_send_zc(struct io_kiocb *req, unsigned int issue_flags)
 		msg_flags |= MSG_DONTWAIT;
 	if (msg_flags & MSG_WAITALL)
 		min_ret = iov_iter_count(&msg.msg_iter);
+	msg_flags &= ~MSG_INTERNAL_SENDMSG_FLAGS;
 
 	msg.msg_flags = msg_flags;
 	msg.msg_ubuf = &io_notif_to_data(zc->notif)->uarg;

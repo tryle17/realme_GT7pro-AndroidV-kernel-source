@@ -247,8 +247,8 @@ int cti_add_connection_entry(struct device *dev, struct cti_drvdata *drvdata,
 			     const char *assoc_dev_name);
 struct cti_trig_con *cti_allocate_trig_con(struct device *dev, int in_sigs,
 					   int out_sigs);
-int cti_enable(struct coresight_device *csdev);
-int cti_disable(struct coresight_device *csdev);
+int cti_enable(struct coresight_device *csdev, enum cs_mode mode, void *data);
+int cti_disable(struct coresight_device *csdev, void *data);
 void cti_trigin_gpio_disable(struct cti_drvdata *drvdata);
 void cti_trigout_gpio_disable(struct cti_drvdata *drvdata);
 void cti_write_all_hw_regs(struct cti_drvdata *drvdata);

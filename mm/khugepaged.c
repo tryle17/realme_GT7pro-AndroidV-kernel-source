@@ -1937,9 +1937,9 @@ static int collapse_file(struct mm_struct *mm, unsigned long addr,
 		}
 	} while (1);
 
-	xas_set(&xas, start);
 	for (index = start; index < end; index++) {
-		page = xas_next(&xas);
+		xas_set(&xas, index);
+		page = xas_load(&xas);
 
 		VM_BUG_ON(index != xas.xa_index);
 		if (is_shmem) {
@@ -1954,11 +1954,6 @@ static int collapse_file(struct mm_struct *mm, unsigned long addr,
 						result = SCAN_TRUNCATED;
 						goto xa_locked;
 					}
-					xas_set(&xas, index + 1);
-				}
-				if (!shmem_charge(mapping->host, 1)) {
-					result = SCAN_FAIL;
-					goto xa_locked;
 				}
 				nr_none++;
 				continue;
@@ -2090,7 +2085,7 @@ static int collapse_file(struct mm_struct *mm, unsigned long addr,
 
 		xas_lock_irq(&xas);
 
-		VM_BUG_ON_PAGE(page != xas_load(&xas), page);
+		VM_BUG_ON_PAGE(page != xa_load(xas.xa, index), page);
 
 		/*
 		 * We control three references to the page:
@@ -2146,8 +2141,13 @@ xa_unlocked:
 	 */
 	try_to_unmap_flush();
 
-	if (result != SCAN_SUCCEED)
+	if (result == SCAN_SUCCEED && nr_none &&
+	    !shmem_charge(mapping->host, nr_none))
+		result = SCAN_FAIL;
+	if (result != SCAN_SUCCEED) {
+		nr_none = 0;
 		goto rollback;
+	}
 
 	/*
 	 * The old pages are locked, so they won't change anymore.
@@ -2284,8 +2284,8 @@ rollback:
 	if (nr_none) {
 		xas_lock_irq(&xas);
 		mapping->nrpages -= nr_none;
-		shmem_uncharge(mapping->host, nr_none);
 		xas_unlock_irq(&xas);
+		shmem_uncharge(mapping->host, nr_none);
 	}
 
 	list_for_each_entry_safe(page, tmp, &pagelist, lru) {

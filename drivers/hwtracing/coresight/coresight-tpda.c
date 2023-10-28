@@ -189,7 +189,9 @@ static void tpda_release_trace_id(struct coresight_device *csdev)
 	drvdata->atid = 0;
 }
 
-static int tpda_enable(struct coresight_device *csdev, int inport, int outport)
+static int tpda_enable(struct coresight_device *csdev,
+		       struct coresight_connection *in,
+		       struct coresight_connection *out)
 {
 	int ret;
 	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
@@ -202,12 +204,12 @@ static int tpda_enable(struct coresight_device *csdev, int inport, int outport)
 		return ret;
 	}
 
-	__tpda_enable(drvdata, inport);
+	__tpda_enable(drvdata, in->dest_port);
 	drvdata->enable = true;
-	atomic_inc(&csdev->refcnt[inport]);
+	atomic_inc(&in->dest_refcnt);
 	mutex_unlock(&drvdata->lock);
 
-	dev_info(drvdata->dev, "TPDA inport %d enabled\n", inport);
+	dev_info(drvdata->dev, "TPDA inport %d enabled\n", in->dest_port);
 	return 0;
 }
 
@@ -224,19 +226,20 @@ static void __tpda_disable(struct tpda_drvdata *drvdata, int port)
 	TPDA_LOCK(drvdata);
 }
 
-static void tpda_disable(struct coresight_device *csdev, int inport,
-			   int outport)
+static void tpda_disable(struct coresight_device *csdev,
+			 struct coresight_connection *in,
+			 struct coresight_connection *out)
 {
 	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 
 	mutex_lock(&drvdata->lock);
-	__tpda_disable(drvdata, inport);
+	__tpda_disable(drvdata, in->dest_port);
 	drvdata->enable = false;
-	atomic_dec(&csdev->refcnt[inport]);
+	atomic_dec(&in->dest_refcnt);
 	tpda_release_trace_id(csdev);
 	mutex_unlock(&drvdata->lock);
 
-	dev_info(drvdata->dev, "TPDA inport %d disabled\n", inport);
+	dev_info(drvdata->dev, "TPDA inport %d disabled\n", in->dest_port);
 }
 
 static const struct coresight_ops_link tpda_link_ops = {
