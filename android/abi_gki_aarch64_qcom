@@ -382,6 +382,7 @@
   __clk_get_name
   clk_get_parent
   clk_get_rate
+  clk_hw_determine_rate_no_reparent
   clk_hw_get_flags
   clk_hw_get_name
   clk_hw_get_num_parents
