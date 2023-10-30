@@ -143,6 +143,7 @@ def define_sun():
         "drivers/virt/gunyah/gunyah_platform_hooks.ko",
         "drivers/virt/gunyah/gunyah_qcom.ko",
         "drivers/virt/gunyah/gunyah_vcpu.ko",
+        "kernel/trace/qcom_ipc_logging.ko",
         "net/qrtr/qrtr.ko",
         "net/qrtr/qrtr-gunyah.ko",
         "net/qrtr/qrtr-mhi.ko",
