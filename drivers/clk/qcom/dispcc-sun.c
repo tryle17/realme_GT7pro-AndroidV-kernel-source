@@ -67,12 +67,12 @@ static const struct pll_vco taycan_elu_vco[] = {
 
 static const struct alpha_pll_config disp_cc_pll0_config = {
 	.l = 0xd,
-	.cal_l = 0x0,
+	.cal_l = 0x44,
 	.alpha = 0x6492,
 	.config_ctl_val = 0x19660387,
-	.config_ctl_hi_val = 0x058060a0,
-	.config_ctl_hi1_val = 0xb516cb20,
-	.user_ctl_val = 0x00000001,
+	.config_ctl_hi_val = 0x098060a0,
+	.config_ctl_hi1_val = 0xb416cb20,
+	.user_ctl_val = 0x00000000,
 	.user_ctl_hi_val = 0x00000002,
 };
 
@@ -106,12 +106,12 @@ static struct clk_alpha_pll disp_cc_pll0 = {
 
 static const struct alpha_pll_config disp_cc_pll1_config = {
 	.l = 0x1f,
-	.cal_l = 0x0,
+	.cal_l = 0x44,
 	.alpha = 0x4000,
 	.config_ctl_val = 0x19660387,
-	.config_ctl_hi_val = 0x058060a0,
-	.config_ctl_hi1_val = 0xb516cb20,
-	.user_ctl_val = 0x00000001,
+	.config_ctl_hi_val = 0x098060a0,
+	.config_ctl_hi1_val = 0xb416cb20,
+	.user_ctl_val = 0x00000000,
 	.user_ctl_hi_val = 0x00000002,
 };
 
@@ -147,17 +147,17 @@ static const struct alpha_pll_config disp_cc_pll2_config = {
 	.l = 0x2,
 	.cal_l = 0x2,
 	.alpha = 0x0,
-	.config_ctl_val = 0x60000f64,
+	.config_ctl_val = 0x60000f6a,
 	.config_ctl_hi_val = 0x0001c808,
 	.config_ctl_hi1_val = 0x00000000,
-	.config_ctl_hi2_val = 0x040001ac,
+	.config_ctl_hi2_val = 0x040082f4,
 	.test_ctl_val = 0x00000000,
-	.test_ctl_hi_val = 0x0088c496,
+	.test_ctl_hi_val = 0x0080c496,
 	.test_ctl_hi1_val = 0x40100180,
-	.test_ctl_hi2_val = 0x440005bc,
-	.test_ctl_hi3_val = 0x000003d8,
-	.user_ctl_val = 0x00000441,
-	.user_ctl_hi_val = 0x00250202,
+	.test_ctl_hi2_val = 0x441001bc,
+	.test_ctl_hi3_val = 0x002003d8,
+	.user_ctl_val = 0x00000400,
+	.user_ctl_hi_val = 0x00250302,
 };
 
 static struct clk_alpha_pll disp_cc_pll2 = {
@@ -443,7 +443,8 @@ static struct clk_rcg2 disp_cc_mdss_byte0_clk_src = {
 		.ops = &clk_byte2_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 140630000,
@@ -467,7 +468,8 @@ static struct clk_rcg2 disp_cc_mdss_byte1_clk_src = {
 		.ops = &clk_byte2_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 140630000,
@@ -512,7 +514,8 @@ static struct clk_rcg2 disp_cc_mdss_dptx0_link_clk_src = {
 		.ops = &clk_byte2_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 19200000,
@@ -536,7 +539,8 @@ static struct clk_rcg2 disp_cc_mdss_dptx0_pixel0_clk_src = {
 		.ops = &clk_dp_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 19200000,
@@ -560,7 +564,8 @@ static struct clk_rcg2 disp_cc_mdss_dptx0_pixel1_clk_src = {
 		.ops = &clk_dp_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 19200000,
@@ -839,7 +844,8 @@ static struct clk_rcg2 disp_cc_mdss_esc0_clk_src = {
 		.ops = &clk_rcg2_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 19200000},
@@ -860,7 +866,8 @@ static struct clk_rcg2 disp_cc_mdss_esc1_clk_src = {
 		.ops = &clk_rcg2_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 19200000},
@@ -923,7 +930,8 @@ static struct clk_rcg2 disp_cc_mdss_pclk0_clk_src = {
 		.ops = &clk_pixel_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 225000000,
@@ -947,7 +955,8 @@ static struct clk_rcg2 disp_cc_mdss_pclk1_clk_src = {
 		.ops = &clk_pixel_ops,
 	},
 	.clkr.vdd_data = {
-		.vdd_class = &vdd_mm,
+		.vdd_classes = disp_cc_sun_regulators,
+		.num_vdd_classes = ARRAY_SIZE(disp_cc_sun_regulators),
 		.num_rate_max = VDD_NUM,
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER_D1] = 225000000,

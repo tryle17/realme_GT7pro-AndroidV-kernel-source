@@ -46,12 +46,12 @@ static const struct pll_vco taycan_elu_vco[] = {
 
 static const struct alpha_pll_config video_cc_pll0_config = {
 	.l = 0x25,
-	.cal_l = 0x0,
+	.cal_l = 0x44,
 	.alpha = 0x8000,
 	.config_ctl_val = 0x19660387,
-	.config_ctl_hi_val = 0x058060a0,
-	.config_ctl_hi1_val = 0xb516cb20,
-	.user_ctl_val = 0x00000001,
+	.config_ctl_hi_val = 0x098060a0,
+	.config_ctl_hi1_val = 0xb416cb20,
+	.user_ctl_val = 0x00000000,
 	.user_ctl_hi_val = 0x00000002,
 };
 
@@ -73,8 +73,8 @@ static struct clk_alpha_pll video_cc_pll0 = {
 			.vdd_class = &vdd_mxc,
 			.num_rate_max = VDD_NUM,
 			.rate_max = (unsigned long[VDD_NUM]) {
-				[VDD_LOWER_D1] = 615000000,
-				[VDD_LOW] = 1066000000,
+				[VDD_LOWER_D1] = 1600000000,
+				[VDD_LOW] = 1600000000,
 				[VDD_LOW_L1] = 1600000000,
 				[VDD_NOMINAL] = 2000000000,
 				[VDD_HIGH] = 2500000000},
@@ -136,6 +136,7 @@ static const struct freq_tbl ftbl_video_cc_mvs0_clk_src[] = {
 	F(1260000000, P_VIDEO_CC_PLL0_OUT_MAIN, 1, 0, 0),
 	F(1332000000, P_VIDEO_CC_PLL0_OUT_MAIN, 1, 0, 0),
 	F(1600000000, P_VIDEO_CC_PLL0_OUT_MAIN, 1, 0, 0),
+	F(1710000000, P_VIDEO_CC_PLL0_OUT_MAIN, 1, 0, 0),
 	F(1890000000, P_VIDEO_CC_PLL0_OUT_MAIN, 1, 0, 0),
 	{ }
 };
