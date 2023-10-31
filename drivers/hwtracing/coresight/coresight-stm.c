@@ -148,6 +148,7 @@ struct stm_drvdata {
 	u32			stmheer;
 	u32			stmheter;
 	u32			stmhebsr;
+	bool			static_atid;
 };
 
 static void stm_hwevent_enable_hw(struct stm_drvdata *drvdata)
@@ -895,13 +896,17 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
 		goto stm_unregister;
 	}
 
-	trace_id = coresight_trace_id_get_system_id();
-	if (trace_id < 0) {
-		ret = trace_id;
-		goto cs_unregister;
+	if (!of_property_read_u32(adev->dev.of_node, "atid", &trace_id))
+		drvdata->static_atid = true;
+	else {
+		trace_id = coresight_trace_id_get_system_id();
+		if (trace_id < 0) {
+			ret = trace_id;
+			goto cs_unregister;
+		}
 	}
-	drvdata->traceid = (u8)trace_id;
 
+	drvdata->traceid = (u8)trace_id;
 	pm_runtime_put(&adev->dev);
 
 	dev_info(&drvdata->csdev->dev, "%s initialized\n",
@@ -920,7 +925,8 @@ static void stm_remove(struct amba_device *adev)
 {
 	struct stm_drvdata *drvdata = dev_get_drvdata(&adev->dev);
 
-	coresight_trace_id_put_system_id(drvdata->traceid);
+	if (!drvdata->static_atid)
+		coresight_trace_id_put_system_id(drvdata->traceid);
 	coresight_unregister(drvdata->csdev);
 
 	stm_unregister_device(&drvdata->stm);
