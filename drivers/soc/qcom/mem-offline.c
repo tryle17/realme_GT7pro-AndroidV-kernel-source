@@ -16,8 +16,6 @@
 #include <linux/kobject.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
-#include <linux/mailbox_client.h>
-#include <linux/mailbox/qmp.h>
 #ifdef CONFIG_MSM_RPM_SMD
 #include <soc/qcom/rpm-smd.h>
 #endif
@@ -25,6 +23,7 @@
 #include <linux/swap.h>
 #include <linux/mm_inline.h>
 #include <linux/compaction.h>
+#include <linux/soc/qcom/qcom_aoss.h>
 
 struct movable_zone_fill_control {
 	struct list_head freepages;
@@ -138,10 +137,7 @@ static phys_addr_t bootmem_dram_end_addr;
 
 static phys_addr_t offlinable_region_start_addr;
 
-static struct mem_offline_mailbox {
-	struct mbox_client cl;
-	struct mbox_chan *mbox;
-} mailbox;
+static struct qmp *qmp;
 
 struct memory_refresh_request {
 	u64 start;	/* Lower bit signifies action
@@ -222,7 +218,6 @@ static int mem_region_refresh_control(unsigned long pfn,
 
 static int aop_send_msg(unsigned long addr, bool online)
 {
-	struct qmp_pkt pkt;
 	char mbox_msg[MAX_LEN];
 	unsigned long addr_low, addr_high;
 
@@ -233,9 +228,7 @@ static int aop_send_msg(unsigned long addr, bool online)
 		 "{class: ddr, event: pasr, addr_hi: 0x%08lx, addr_lo: 0x%08lx, refresh: %s}",
 		 addr_high, addr_low, online ? "on" : "off");
 
-	pkt.size = MAX_LEN;
-	pkt.data = mbox_msg;
-	return mbox_send_message(mailbox.mbox, &pkt);
+	return qmp_send(qmp, mbox_msg, MAX_LEN);
 }
 
 static long get_memblk_bits(int seg_idx, unsigned long memblk_addr)
@@ -1391,22 +1384,17 @@ static int mem_parse_dt(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (!of_find_property(node, "mboxes", NULL)) {
+	if (!of_find_property(node, "qcom,qmp", NULL)) {
 		is_rpm_controller = true;
 		return 0;
 	}
 
-	mailbox.cl.dev = &pdev->dev;
-	mailbox.cl.tx_block = true;
-	mailbox.cl.tx_tout = 1000;
-	mailbox.cl.knows_txdone = false;
-
-	mailbox.mbox = mbox_request_channel(&mailbox.cl, 0);
-	if (IS_ERR(mailbox.mbox)) {
-		if (PTR_ERR(mailbox.mbox) != -EPROBE_DEFER)
-			pr_err("mem-offline: failed to get mailbox channel %pK %ld\n",
-				mailbox.mbox, PTR_ERR(mailbox.mbox));
-		return PTR_ERR(mailbox.mbox);
+	qmp = qmp_get(&pdev->dev);
+	if (IS_ERR(qmp)) {
+		if (PTR_ERR(qmp) != -EPROBE_DEFER)
+			pr_err("mem-offline: failed to get qmp channel %ld\n",
+			       PTR_ERR(qmp));
+		return PTR_ERR(qmp);
 	}
 
 	return 0;
@@ -1689,7 +1677,7 @@ static int update_dram_end_address_and_movable_bitmap(phys_addr_t *bootmem_dram_
 	}
 
 	*bootmem_dram_end_addr = addr;
-	pr_debug("mem-offline: bootmem_dram_end_addr 0x%pa\n", &bootmem_dram_end_addr);
+	pr_debug("mem-offline: bootmem_dram_end_addr 0x%pa\n", bootmem_dram_end_addr);
 
 	num_entries = num_cells / (nr_address_cells + nr_size_cells);
 	pos = prop->value;
