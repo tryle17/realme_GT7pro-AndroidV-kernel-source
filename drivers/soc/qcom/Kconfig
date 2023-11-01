@@ -98,6 +98,15 @@ config QTI_CPUCP_LOG
           This driver register with IPC_Logging framework, to have dedicated
           buffer for cpucp hw device.
 
+config GIC_INTERRUPT_ROUTING
+	tristate "GIC Interrupt Routing driver"
+	depends on ARM_GIC_V3
+	help
+	  GIC interrupt routing driver.
+	  The driver manages interrupt routing for shared peripheral interrupts.
+	  Say Y here to compile the driver as a part of kernel or M to compile
+	  as a module.
+
 config QCOM_LLCC
 	tristate "Qualcomm Technologies, Inc. LLCC driver"
 	depends on ARCH_QCOM || COMPILE_TEST
