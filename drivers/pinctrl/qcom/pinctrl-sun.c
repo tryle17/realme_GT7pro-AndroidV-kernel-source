@@ -587,8 +587,8 @@ enum sun_functions {
 	msm_mux_audio_ext_mclk0,
 	msm_mux_audio_ext_mclk1,
 	msm_mux_audio_ref_clk,
-	msm_mux_cam_asc_mclk2,
-	msm_mux_cam_asc_mclk4,
+	msm_mux_cam_aon_mclk2,
+	msm_mux_cam_aon_mclk4,
 	msm_mux_cam_mclk,
 	msm_mux_cci_async_in0,
 	msm_mux_cci_async_in1,
@@ -871,8 +871,9 @@ static const char *const gpio_groups[] = {
 	"gpio30", "gpio31", "gpio32", "gpio33", "gpio34", "gpio35",
 	"gpio36", "gpio37", "gpio38", "gpio39", "gpio40", "gpio41",
 	"gpio42", "gpio43", "gpio44", "gpio45", "gpio46", "gpio47",
-	"gpio52", "gpio53", "gpio54", "gpio55", "gpio56", "gpio57",
-	"gpio58", "gpio59", "gpio62", "gpio63", "gpio64", "gpio65",
+	"gpio48", "gpio49", "gpio50", "gpio51", "gpio52", "gpio53",
+	"gpio54", "gpio55", "gpio56", "gpio57", "gpio58", "gpio59",
+	"gpio60", "gpio61", "gpio62", "gpio63", "gpio64", "gpio65",
 	"gpio66", "gpio67", "gpio68", "gpio69", "gpio70", "gpio71",
 	"gpio72", "gpio73", "gpio74", "gpio75", "gpio76", "gpio77",
 	"gpio78", "gpio79", "gpio80", "gpio81", "gpio82", "gpio83",
@@ -941,10 +942,10 @@ static const char *const audio_ext_mclk1_groups[] = {
 static const char *const audio_ref_clk_groups[] = {
 	"gpio124",
 };
-static const char *const cam_asc_mclk2_groups[] = {
+static const char *const cam_aon_mclk2_groups[] = {
 	"gpio91",
 };
-static const char *const cam_asc_mclk4_groups[] = {
+static const char *const cam_aon_mclk4_groups[] = {
 	"gpio93",
 };
 static const char *const cam_mclk_groups[] = {
@@ -1788,8 +1789,8 @@ static const struct pinfunction sun_functions[] = {
 	MSM_PIN_FUNCTION(audio_ext_mclk0),
 	MSM_PIN_FUNCTION(audio_ext_mclk1),
 	MSM_PIN_FUNCTION(audio_ref_clk),
-	MSM_PIN_FUNCTION(cam_asc_mclk2),
-	MSM_PIN_FUNCTION(cam_asc_mclk4),
+	MSM_PIN_FUNCTION(cam_aon_mclk2),
+	MSM_PIN_FUNCTION(cam_aon_mclk4),
 	MSM_PIN_FUNCTION(cam_mclk),
 	MSM_PIN_FUNCTION(cci_async_in0),
 	MSM_PIN_FUNCTION(cci_async_in1),
@@ -2188,10 +2189,10 @@ static const struct msm_pingroup sun_groups[] = {
 			NA, NA, 0, -1),
 	[59] = PINGROUP(59, qup1_se6_l3, usb_phy, vsense_trigger_mirnat, NA, NA,
 			NA, NA, NA, NA, NA, NA, 0, -1),
-	[60] = PINGROUP(60, qup1_se7_l0, aoss_cti, sdc42, NA, NA, NA, NA, NA,
+	[60] = PINGROUP(60, qup1_se7_l0, aoss_cti, sdc42, NA, NA, NA, NA, NA, NA,
+			NA, NA, 0, -1),
+	[61] = PINGROUP(61, qup1_se7_l1, usb_phy, aoss_cti, NA, NA, NA, NA, NA,
 			NA, NA, NA, 0, -1),
-	[61] = PINGROUP(61, qup1_se7_l1, usb_phy, aoss_cti, sdc43, NA, NA, NA,
-			NA, NA, NA, NA, 0, -1),
 	[62] = PINGROUP(62, qup1_se7_l2, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 			0, -1),
 	[63] = PINGROUP(63, qup1_se7_l3, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA,
@@ -2249,11 +2250,11 @@ static const struct msm_pingroup sun_groups[] = {
 			NA, NA, 0, -1),
 	[90] = PINGROUP(90, cam_mclk, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0,
 			-1),
-	[91] = PINGROUP(91, cam_asc_mclk2, NA, NA, NA, NA, NA, NA, NA, NA, NA,
+	[91] = PINGROUP(91, cam_aon_mclk2, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 			NA, 0, -1),
 	[92] = PINGROUP(92, cam_mclk, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0,
 			-1),
-	[93] = PINGROUP(93, cam_asc_mclk4, NA, NA, NA, NA, NA, NA, NA, NA, NA,
+	[93] = PINGROUP(93, cam_aon_mclk4, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 			NA, 0, -1),
 	[94] = PINGROUP(94, cam_mclk, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0,
 			-1),
