@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -134,7 +134,7 @@ static int secure_etr_assign_to_mpss(struct secure_etr_drvdata *drvdata)
 	qmi_data->etr_data = etr_data;
 
 	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, qmi_data);
+		return helper_ops(qmi)->enable(qmi, CS_MODE_SYSFS, qmi_data);
 	return 0;
 }
 
@@ -160,7 +160,7 @@ static int secure_etr_assign_to_apss(struct secure_etr_drvdata *drvdata)
 	qmi_data->command = CS_QMI_ASSIGN_ETR_TO_APSS;
 	qmi_data->etr_data = etr_data;
 	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, qmi_data);
+		return helper_ops(qmi)->enable(qmi, CS_MODE_SYSFS, qmi_data);
 	return 0;
 }
 
@@ -175,7 +175,7 @@ static int secure_etr_reenable_remote_source(struct secure_etr_drvdata *drvdata)
 
 	qmi_data->command = CS_QMI_ENABLE_REMOTE_ETM;
 	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, qmi_data);
+		return helper_ops(qmi)->enable(qmi, CS_MODE_SYSFS, qmi_data);
 	return 0;
 }
 
@@ -476,7 +476,7 @@ static int enable_secure_etr_sink(struct coresight_device *csdev,
 	}
 
 	if (drvdata->mode == CS_MODE_SYSFS) {
-		atomic_inc(csdev->refcnt);
+		atomic_inc(&csdev->refcnt);
 		goto unlock_out;
 	}
 	/*
@@ -524,7 +524,7 @@ static int enable_secure_etr_sink(struct coresight_device *csdev,
 	 */
 	real_sink->busy = true;
 	drvdata->real_sink = real_sink;
-	atomic_inc(csdev->refcnt);
+	atomic_inc(&csdev->refcnt);
 	goto unlock_out;
 
 err:
@@ -547,7 +547,7 @@ static int disable_secure_etr_sink(struct coresight_device *csdev)
 		goto unlock_out;
 	}
 
-	if (atomic_dec_return(csdev->refcnt)) {
+	if (atomic_dec_return(&csdev->refcnt)) {
 		ret = -EBUSY;
 		goto unlock_out;
 	}

@@ -56,8 +56,8 @@ remote_etm_get_qmi_device(struct remote_etm_drvdata *drvdata)
 	if (!IS_ENABLED(CONFIG_CORESIGHT_QMI))
 		return NULL;
 
-	for (i = 0; i < etm->pdata->nr_outport; i++) {
-		tmp = etm->pdata->conns[i].child_dev;
+	for (i = 0; i < etm->pdata->nr_outconns; i++) {
+		tmp = etm->pdata->out_conns[i]->dest_dev;
 		if (tmp && coresight_is_qmi_device(tmp))
 			return tmp;
 	}
@@ -65,7 +65,8 @@ remote_etm_get_qmi_device(struct remote_etm_drvdata *drvdata)
 	return NULL;
 }
 
-static int qmi_assign_remote_etm_atid(struct remote_etm_drvdata *drvdata)
+static int qmi_assign_remote_etm_atid(struct remote_etm_drvdata *drvdata,
+			enum cs_mode mode)
 {
 	struct coresight_device *qmi = remote_etm_get_qmi_device(drvdata);
 	struct cs_qmi_data qmi_data;
@@ -86,11 +87,12 @@ static int qmi_assign_remote_etm_atid(struct remote_etm_drvdata *drvdata)
 	qmi_data.atid_data = atid_data;
 
 	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, &qmi_data);
+		return helper_ops(qmi)->enable(qmi, mode, &qmi_data);
 	return 0;
 }
 
-static int qmi_enable_remote_etm(struct remote_etm_drvdata *drvdata)
+static int qmi_enable_remote_etm(struct remote_etm_drvdata *drvdata,
+			enum cs_mode mode)
 {
 	struct coresight_device *qmi = remote_etm_get_qmi_device(drvdata);
 	struct cs_qmi_data qmi_data;
@@ -98,7 +100,7 @@ static int qmi_enable_remote_etm(struct remote_etm_drvdata *drvdata)
 	qmi_data.command = CS_QMI_ENABLE_REMOTE_ETM;
 
 	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, &qmi_data);
+		return helper_ops(qmi)->enable(qmi, mode, &qmi_data);
 	return 0;
 }
 
@@ -114,7 +116,6 @@ static int qmi_disable_remote_etm(struct remote_etm_drvdata *drvdata)
 	return 0;
 }
 
-
 static int remote_etm_enable(struct coresight_device *csdev,
 			     struct perf_event *event, u32 mode)
 {
@@ -128,14 +129,14 @@ static int remote_etm_enable(struct coresight_device *csdev,
 		coresight_csr_set_etr_atid(csdev, drvdata->traceids[i], true);
 
 	if (!drvdata->static_atid) {
-		ret = qmi_assign_remote_etm_atid(drvdata);
+		ret = qmi_assign_remote_etm_atid(drvdata, mode);
 		if (ret) {
 			dev_err(drvdata->dev, "Assign remote etm atid fail\n");
 			goto error;
 		}
 	}
 
-	ret = qmi_enable_remote_etm(drvdata);
+	ret = qmi_enable_remote_etm(drvdata, mode);
 	if (ret) {
 		dev_err(drvdata->dev, "Enable remote etm fail\n");
 		goto error;
