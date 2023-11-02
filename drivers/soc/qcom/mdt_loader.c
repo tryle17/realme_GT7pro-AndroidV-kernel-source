@@ -199,12 +199,13 @@ EXPORT_SYMBOL_GPL(qcom_mdt_read_metadata);
  * @pas_id:	PAS identifier
  * @mem_phys:	physical address of allocated memory region
  * @ctx:	PAS metadata context, to be released by caller
+ * @dma_phys_below_32b: True, if memory need to be allocated from lower 4G
  *
  * Returns 0 on success, negative errno otherwise.
  */
 int qcom_mdt_pas_init(struct device *dev, const struct firmware *fw,
 		      const char *fw_name, int pas_id, phys_addr_t mem_phys,
-		      struct qcom_scm_pas_metadata *ctx)
+		      struct qcom_scm_pas_metadata *ctx, bool dma_phys_below_32b)
 {
 	const struct elf32_phdr *phdrs;
 	const struct elf32_phdr *phdr;
@@ -243,7 +244,8 @@ int qcom_mdt_pas_init(struct device *dev, const struct firmware *fw,
 		goto out;
 	}
 
-	ret = qcom_scm_pas_init_image(pas_id, metadata, metadata_len, ctx);
+	ret = qcom_scm_pas_init_image(pas_id, metadata, metadata_len, ctx,
+				      (dma_phys_below_32b) ? dev : NULL);
 	kfree(metadata);
 	if (ret) {
 		/* Invalid firmware metadata */
@@ -414,7 +416,7 @@ int qcom_mdt_load(struct device *dev, const struct firmware *fw,
 {
 	int ret;
 
-	ret = qcom_mdt_pas_init(dev, fw, firmware, pas_id, mem_phys, NULL);
+	ret = qcom_mdt_pas_init(dev, fw, firmware, pas_id, mem_phys, NULL, false);
 	if (ret)
 		return ret;
 
