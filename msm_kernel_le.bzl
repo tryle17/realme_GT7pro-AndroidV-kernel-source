@@ -252,7 +252,7 @@ def define_msm_le(
         kernel_build = ":{}".format(target),
         build_boot = True,
         build_dtbo = True if dtbo_list else False,
-        build_initramfs = True,
+        build_initramfs = len(in_tree_module_list) > 0,
         dtbo_srcs = [":{}/".format(target) + d for d in dtbo_list] if dtbo_list else None,
         vendor_ramdisk_binaries = vendor_ramdisk_binaries,
         boot_image_outs = ["boot.img"],
