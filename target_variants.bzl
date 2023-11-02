@@ -12,12 +12,12 @@ la_variants = [
 
 le_targets = [
     # keep sorted
-    #"sun-allyes",
+    "sun-allyes",
 ]
 
 le_variants = [
     # keep sorted
-    #"perf-defconfig",
+    "perf-defconfig",
 ]
 
 vm_types = [
