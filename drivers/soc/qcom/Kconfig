@@ -369,7 +369,6 @@ config QCOM_SOC_WATCHDOG
 
 config QCOM_IRQ_STAT
 	bool "QCOM IRQ stats"
-	default y
 	depends on QCOM_WDT_CORE && ANDROID_VENDOR_OEM_DATA
 	help
 	  This give irq stats for top hitter at
