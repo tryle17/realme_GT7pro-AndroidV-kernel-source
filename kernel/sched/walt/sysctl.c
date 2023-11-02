@@ -46,7 +46,7 @@ unsigned int sysctl_sched_util_busy_hyst_cpu_util[WALT_NR_CPUS];
 unsigned int sysctl_sched_boost;
 unsigned int sysctl_sched_wake_up_idle[2];
 unsigned int sysctl_input_boost_ms;
-unsigned int sysctl_input_boost_freq[8];
+unsigned int sysctl_input_boost_freq[WALT_NR_CPUS];
 unsigned int sysctl_sched_boost_on_input;
 unsigned int sysctl_sched_early_up[MAX_MARGIN_LEVELS];
 unsigned int sysctl_sched_early_down[MAX_MARGIN_LEVELS];
@@ -61,28 +61,28 @@ unsigned int sysctl_sched_walt_rotate_big_tasks;
 unsigned int sysctl_sched_task_unfilter_period;
 unsigned int sysctl_walt_low_latency_task_threshold; /* disabled by default */
 unsigned int sysctl_sched_conservative_pl;
-unsigned int sysctl_sched_min_task_util_for_boost = 51;
-unsigned int sysctl_sched_min_task_util_for_uclamp = 51;
-unsigned int sysctl_sched_min_task_util_for_colocation = 35;
-unsigned int sysctl_sched_many_wakeup_threshold = WALT_MANY_WAKEUP_DEFAULT;
+unsigned int sysctl_sched_min_task_util_for_boost;
+unsigned int sysctl_sched_min_task_util_for_uclamp;
+unsigned int sysctl_sched_min_task_util_for_colocation;
+unsigned int sysctl_sched_many_wakeup_threshold;
 const int sched_user_hint_max = 1000;
-unsigned int sysctl_walt_rtg_cfs_boost_prio = 99; /* disabled by default */
-unsigned int sysctl_sched_sync_hint_enable = 1;
-unsigned int sysctl_panic_on_walt_bug = walt_debug_initial_values();
+unsigned int sysctl_walt_rtg_cfs_boost_prio; /* disabled by default */
+unsigned int sysctl_sched_sync_hint_enable;
+unsigned int sysctl_panic_on_walt_bug;
 unsigned int sysctl_sched_suppress_region2;
-unsigned int sysctl_sched_skip_sp_newly_idle_lb = 1;
-unsigned int sysctl_sched_hyst_min_coloc_ns = 80000000;
+unsigned int sysctl_sched_skip_sp_newly_idle_lb;
+unsigned int sysctl_sched_hyst_min_coloc_ns;
 unsigned int sysctl_sched_asymcap_boost;
 unsigned int sysctl_sched_long_running_rt_task_ms;
-unsigned int sysctl_sched_idle_enough = SCHED_IDLE_ENOUGH_DEFAULT;
-unsigned int sysctl_sched_cluster_util_thres_pct = SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT;
+unsigned int sysctl_sched_idle_enough;
+unsigned int sysctl_sched_cluster_util_thres_pct;
 unsigned int sysctl_sched_idle_enough_clust[MAX_CLUSTERS];
 unsigned int sysctl_sched_cluster_util_thres_pct_clust[MAX_CLUSTERS];
 unsigned int sysctl_ed_boost_pct;
-unsigned int sysctl_em_inflate_pct = 100;
-unsigned int sysctl_em_inflate_thres = 1024;
+unsigned int sysctl_em_inflate_pct;
+unsigned int sysctl_em_inflate_thres;
 unsigned int sysctl_sched_heavy_nr;
-unsigned int sysctl_max_freq_partial_halt = FREQ_QOS_MAX_DEFAULT_VALUE;
+unsigned int sysctl_max_freq_partial_halt;
 unsigned int sysctl_fmax_cap[MAX_CLUSTERS];
 unsigned int sysctl_sched_sbt_pause_cpus;
 unsigned int sysctl_sched_sbt_delay_windows;
@@ -1353,58 +1353,3 @@ struct ctl_table walt_table[] = {
 	{ }
 };
 
-void walt_tunables(void)
-{
-	int i, j;
-
-	for (i = 0; i < MAX_MARGIN_LEVELS; i++) {
-		sysctl_sched_capacity_margin_up_pct[i] = 95; /* ~5% margin */
-		sysctl_sched_capacity_margin_dn_pct[i] = 85; /* ~15% margin */
-		sysctl_sched_early_up[i] = 1077;
-		sysctl_sched_early_down[i] = 1204;
-	}
-
-	sysctl_sched_group_upmigrate_pct = 100;
-
-	sysctl_sched_group_downmigrate_pct = 95;
-
-	sysctl_sched_task_unfilter_period = 100000000;
-
-	sysctl_sched_window_stats_policy = WINDOW_STATS_MAX_RECENT_AVG;
-
-	sysctl_sched_ravg_window_nr_ticks = (HZ / NR_WINDOWS_PER_SEC);
-
-	sched_load_granule = DEFAULT_SCHED_RAVG_WINDOW / NUM_LOAD_INDICES;
-
-	for (i = 0; i < WALT_NR_CPUS; i++) {
-		sysctl_sched_coloc_busy_hyst_cpu[i] = 39000000;
-		sysctl_sched_coloc_busy_hyst_cpu_busy_pct[i] = 10;
-		sysctl_sched_util_busy_hyst_cpu[i] = 5000000;
-		sysctl_sched_util_busy_hyst_cpu_util[i] = 15;
-	}
-
-	sysctl_sched_coloc_busy_hyst_enable_cpus = 112;
-
-	sysctl_sched_util_busy_hyst_enable_cpus = 255;
-
-	sysctl_sched_coloc_busy_hyst_max_ms = 5000;
-
-	sched_ravg_window = DEFAULT_SCHED_RAVG_WINDOW;
-
-	sysctl_input_boost_ms = 40;
-
-	for (i = 0; i < 8; i++)
-		sysctl_input_boost_freq[i] = 0;
-
-	for (i = 0; i < MAX_CLUSTERS; i++) {
-		sysctl_fmax_cap[i] = FREQ_QOS_MAX_DEFAULT_VALUE;
-		high_perf_cluster_freq_cap[i] = FREQ_QOS_MAX_DEFAULT_VALUE;
-		sysctl_sched_idle_enough_clust[i] = SCHED_IDLE_ENOUGH_DEFAULT;
-		sysctl_sched_cluster_util_thres_pct_clust[i] = SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT;
-	}
-
-	for (i = 0; i < MAX_FREQ_CAP; i++) {
-		for (j = 0; j < MAX_CLUSTERS; j++)
-			fmax_cap[i][j] = FREQ_QOS_MAX_DEFAULT_VALUE;
-	}
-}
