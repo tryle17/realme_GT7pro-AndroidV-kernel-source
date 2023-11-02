@@ -99,6 +99,7 @@ def define_sun():
         "drivers/slimbus/slimbus.ko",
         "drivers/soc/qcom/boot_stats.ko",
         "drivers/soc/qcom/cmd-db.ko",
+        "drivers/soc/qcom/crm-v2.ko",
         "drivers/soc/qcom/dcc_v2.ko",
         "drivers/soc/qcom/eud.ko",
         "drivers/soc/qcom/llcc-qcom.ko",

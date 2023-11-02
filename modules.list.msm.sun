@@ -60,3 +60,4 @@ ufs_qcom.ko
 cambistmclkcc-sun.ko
 videocc-sun.ko
 clk-rpmh.ko
+crm-v2.ko
