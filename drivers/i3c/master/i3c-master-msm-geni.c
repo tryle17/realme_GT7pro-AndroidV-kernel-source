@@ -316,6 +316,7 @@ struct geni_i3c_dev {
 	dma_addr_t rx_phy;
 	bool gsi_err;
 	bool cfg_sent; /* gsi config sent flag */
+	bool disable_free_run_clks;
 	spinlock_t spinlock;
 	u32 clk_src_freq;
 	u32 dfs_idx;
@@ -381,6 +382,7 @@ struct geni_i3c_clk_fld {
 	u32 i2c_t_cycle_cnt;
 };
 
+static int geni_i3c_gsi_stop_on_bus(struct geni_i3c_dev *gi3c);
 static void geni_i3c_enable_ibi_ctrl(struct geni_i3c_dev *gi3c, bool enable);
 static void geni_i3c_enable_ibi_irq(struct geni_i3c_dev *gi3c, bool enable);
 static int geni_i3c_enable_naon_ibi_clks(struct geni_i3c_dev *gi3c, bool enable);
@@ -794,7 +796,6 @@ static void i3c_setup_go_tre(struct geni_i3c_dev *gi3c, struct geni_i3c_xfer_par
 {
 	struct msm_gpi_tre *go_t = &gi3c->gsi.tx.tre.go_t;
 	struct gsi_tre_queue *tx_tre_q = &gi3c->gsi.tx.tre_queue;
-	bool stretch = (xfer->m_param & STOP_STRETCH) ? 1 : 0;
 	bool use_7e = (xfer->m_param & USE_7E) ? 1 : 0;
 	bool nack_ibi = (xfer->m_param & IBI_NACK_TBL_CTRL) ? 1 : 0;
 	bool cont_mode = (xfer->m_param & CONTINUOUS_MODE_DAA) ? 1 : 0;
@@ -808,7 +809,7 @@ static void i3c_setup_go_tre(struct geni_i3c_dev *gi3c, struct geni_i3c_xfer_par
 	else
 		cur_len = gi3c->cur_len;
 
-	go_t->dword[0] = MSM_GPI_I3C_GO_TRE_DWORD0((stretch << 2 | bypass_addrspace << 7), ccc,
+	go_t->dword[0] = MSM_GPI_I3C_GO_TRE_DWORD0((1 << 2 | bypass_addrspace << 7), ccc,
 						   addr, xfer->m_cmd);
 	go_t->dword[1] = MSM_GPI_I3C_GO_TRE_DWORD1(use_7e << 0 | nack_ibi << 1 | cont_mode << 2);
 	if (gi3c->cur_rnw == READ_TRANSACTION) {
@@ -1850,6 +1851,7 @@ geni_i3c_master_gsi_priv_xfers(struct geni_i3c_dev *gi3c, struct i3c_priv_xfer *
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s Time took for %d xfers = %llu nsecs\n",
 		    __func__, num_xfers, (sched_clock() - start_time));
+	geni_i3c_gsi_stop_on_bus(gi3c);
 	return ret;
 }
 
@@ -2133,6 +2135,55 @@ static void geni_i3c_perform_daa(struct geni_i3c_dev *gi3c)
 daa_err:
 	kfree(tx_buf);
 	kfree(rx_buf);
+}
+
+/*
+ * geni_i3c_gsi_stop_on_bus() - Does gsi i3c stop command on the bus
+ *
+ * @gi3c: i3c master device handle
+ *
+ * Return: 0 on success, error code on failure
+ */
+static int geni_i3c_gsi_stop_on_bus(struct geni_i3c_dev *gi3c)
+{
+	struct msm_gpi_tre *go_t = &gi3c->gsi.tx.tre.go_t;
+	int tre_cnt = 0, ret = 0, time_remaining = 0;
+	bool tx_chan = true;
+
+	gi3c->err = 0;
+	gi3c->gsi_err = false;
+	gi3c->gsi.tx.tre.flags = 0;
+	reinit_completion(&gi3c->done);
+
+	go_t->dword[0] = MSM_GPI_I3C_GO_TRE_DWORD0(0, 0, 0, I2C_STOP_ON_BUS);
+	go_t->dword[1] = 0x0;
+	go_t->dword[2] = 0x0;
+	go_t->dword[3] = MSM_GPI_I3C_GO_TRE_DWORD3(0, 0, 1, 0, 0);
+
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+		    "%s: dword[0]:0x%x dword[1]:0x%x dword[2]:0x%x dword[3]:0x%x\n",
+		    __func__, go_t->dword[0], go_t->dword[1], go_t->dword[2], go_t->dword[3]);
+
+	gi3c->gsi.tx.tre.flags |= GO_TRE_SET;
+	tre_cnt = gsi_common_fill_tre_buf(&gi3c->gsi, tx_chan);
+	ret = gsi_common_prep_desc_and_submit(&gi3c->gsi,  tre_cnt, tx_chan, false);
+	if (ret < 0)
+		gi3c->err = ret;
+
+	time_remaining = wait_for_completion_timeout(&gi3c->done, XFER_TIMEOUT);
+	if (!time_remaining) {
+		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s:wait_for_completion timed out\n", __func__);
+		geni_i3c_err(gi3c, GENI_TIMEOUT);
+		gi3c->cur_buf = NULL;
+		gi3c->cur_len = 0;
+		gi3c->cur_idx = 0;
+		gi3c->cur_rnw = 0;
+		reinit_completion(&gi3c->done);
+	}
+
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s: ret:%d\n", __func__, ret);
+	return ret;
 }
 
 /*
@@ -2658,6 +2709,21 @@ static void geni_i3c_enable_ibi_irq(struct geni_i3c_dev *gi3c, bool enable)
 	}
 }
 
+/*
+ * geni_i3c_disable_free_running_clock() - fix free running clock
+ *
+ * @gi3c: i3c master device handle
+ *
+ * Return: None
+ */
+static void geni_i3c_disable_free_running_clock(struct geni_i3c_dev *gi3c)
+{
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "Force default\n");
+	writel(FORCE_DEFAULT, gi3c->se.base + GENI_FORCE_DEFAULT_REG);
+	writel_relaxed(0x7f, gi3c->se.base + GENI_OUTPUT_CTRL);
+	gi3c->disable_free_run_clks = true;
+}
+
 static void geni_i3c_enable_ibi_ctrl(struct geni_i3c_dev *gi3c, bool enable)
 {
 	u32 val, timeout;
@@ -2673,6 +2739,10 @@ static void geni_i3c_enable_ibi_ctrl(struct geni_i3c_dev *gi3c, bool enable)
 		/* Enable I3C IBI controller, if not in enabled state */
 		val = geni_read_reg(gi3c->ibi.ibi_base, IBI_GEN_CONFIG);
 		if (!(val & IBI_C_ENABLE)) {
+			/* SW WAR for HW BUG - Execute only once */
+			if (!gi3c->disable_free_run_clks)
+				geni_i3c_disable_free_running_clock(gi3c);
+
 			val |= IBI_C_ENABLE;
 			geni_write_reg(val, gi3c->ibi.ibi_base, IBI_GEN_CONFIG);
 
@@ -3362,6 +3432,7 @@ static int geni_i3c_probe(struct platform_device *pdev)
 	}
 
 	gi3c->i3c_rsc.proto = GENI_SE_I3C;
+	gi3c->disable_free_run_clks = false;
 
 	se_mode = geni_read_reg(gi3c->se.base, GENI_IF_DISABLE_RO);
 	if (se_mode) {
@@ -3422,6 +3493,14 @@ static int geni_i3c_probe(struct platform_device *pdev)
 	I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
 		"I3C bus freq:%ld, I2C bus fres:%ld\n",
 		gi3c->ctrlr.bus.scl_rate.i3c,  gi3c->ctrlr.bus.scl_rate.i2c);
+
+	if (gi3c->se_mode == GENI_GPI_DMA) {
+		if (geni_i3c_gsi_stop_on_bus(gi3c)) {
+			I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
+				    "I3C gsi stop on bus failed\n");
+			return -EINVAL;
+		}
+	}
 
 	// hot-join
 	gi3c->hj_wl = wakeup_source_register(gi3c->se.dev,
@@ -3542,6 +3621,7 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 	if (gi3c->se_mode != GENI_GPI_DMA) {
 		disable_irq(gi3c->irq);
 	} else {
+		geni_i3c_gsi_stop_on_bus(gi3c);
 		ret = geni_i3c_gpi_pause_resume(gi3c, true);
 		if (ret) {
 			I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
