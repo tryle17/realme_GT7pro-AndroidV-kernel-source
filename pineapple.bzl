@@ -55,6 +55,7 @@ def define_pineapple():
         "drivers/remoteproc/qcom_pil_info.ko",
         "drivers/remoteproc/qcom_q6v5.ko",
         "drivers/remoteproc/qcom_q6v5_pas.ko",
+        "drivers/remoteproc/qcom_spss.ko",
         "drivers/remoteproc/qcom_sysmon.ko",
         "drivers/rpmsg/glink_pkt.ko",
         "drivers/rpmsg/qcom_glink.ko",
