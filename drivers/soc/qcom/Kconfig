@@ -393,6 +393,14 @@ config QCOM_SOCINFO
 	 Say yes here to support the Qualcomm socinfo driver, providing
 	 information about the SoC to user space.
 
+config QCOM_CPU_PHYS_LOG_MAP
+        tristate "Enable Physical to logical MAP"
+        help
+	  Qualcomm Technologies, Inc. (QTI) CPU Physical Logical Map driver
+	  Enable the support for CPU Physical Logical Map, this driver
+	  makes it easy for clients to fetch the equivalent physical CPU
+	  for a given logical CPU.
+
 config QCOM_SPM
 	tristate "Qualcomm Subsystem Power Manager (SPM)"
 	depends on ARCH_QCOM || COMPILE_TEST
