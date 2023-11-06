@@ -91,3 +91,12 @@ config QTI_BCL_SOC_DRIVER
 	  thresholds and notify the thermal framework when the thresholds
 	  are reached and cleared. This will help to monitor and apply any
 	  mitigation when state of charge goes below a certain threshold.
+
+config QTI_USERSPACE_CDEV
+	tristate "QTI Userspace cooling device"
+	depends on THERMAL_OF
+	help
+	   This enables the QTI userspace cooling device, which will help
+	   send the mitigation notification via thermal framework netlink
+	   socket, so that userspace cooling device can perform a mitigation
+	   action.
