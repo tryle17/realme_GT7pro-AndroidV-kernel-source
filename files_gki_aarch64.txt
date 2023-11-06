@@ -4211,6 +4211,7 @@ include/trace/hooks/ftrace_dump.h
 include/trace/hooks/gic.h
 include/trace/hooks/gic_v3.h
 include/trace/hooks/iommu.h
+include/trace/hooks/mm.h
 include/trace/hooks/mpam.h
 include/trace/hooks/net.h
 include/trace/hooks/pm_domain.h
