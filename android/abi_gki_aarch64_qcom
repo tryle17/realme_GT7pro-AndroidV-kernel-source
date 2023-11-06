@@ -777,6 +777,7 @@
   devm_snd_soc_register_card
   devm_thermal_of_cooling_device_register
   devm_thermal_of_zone_register
+  devm_thermal_of_zone_unregister
   devm_usb_get_phy_by_node
   devm_usb_get_phy_by_phandle
   dev_nit_active
@@ -2308,6 +2309,7 @@
   of_clk_src_onecell_get
   of_clk_src_simple_get
   of_count_phandle_with_args
+  of_cpu_device_node_get
   of_cpu_node_to_id
   of_devfreq_cooling_register
   of_device_get_match_data
