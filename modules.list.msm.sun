@@ -74,3 +74,5 @@ cambistmclkcc-sun.ko
 videocc-sun.ko
 clk-rpmh.ko
 crm-v2.ko
+qcom_wdt_core.ko
+gh_virt_wdt.ko
