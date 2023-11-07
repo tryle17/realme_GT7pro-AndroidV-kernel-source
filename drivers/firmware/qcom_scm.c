@@ -174,7 +174,7 @@ static enum qcom_scm_convention __get_convention(void)
 	 * needed to dma_map_single to secure world
 	 */
 	probed_convention = SMC_CONVENTION_ARM_64;
-	ret = __scm_smc_call(NULL, &desc, probed_convention, &res, true);
+	ret = __scm_smc_call(NULL, &desc, probed_convention, &res, QCOM_SCM_CALL_ATOMIC);
 	if (!ret && res.result[0] == 1)
 		goto found;
 
@@ -191,7 +191,7 @@ static enum qcom_scm_convention __get_convention(void)
 	}
 
 	probed_convention = SMC_CONVENTION_ARM_32;
-	ret = __scm_smc_call(NULL, &desc, probed_convention, &res, true);
+	ret = __scm_smc_call(NULL, &desc, probed_convention, &res, QCOM_SCM_CALL_ATOMIC);
 	if (!ret && res.result[0] == 1)
 		goto found;
 
@@ -225,7 +225,7 @@ static int qcom_scm_call(struct device *dev, const struct qcom_scm_desc *desc,
 	switch (__get_convention()) {
 	case SMC_CONVENTION_ARM_32:
 	case SMC_CONVENTION_ARM_64:
-		return scm_smc_call(dev, desc, res, false);
+		return scm_smc_call(dev, desc, res, QCOM_SCM_CALL_NORMAL);
 	case SMC_CONVENTION_LEGACY:
 		return scm_legacy_call(dev, desc, res);
 	default:
@@ -250,7 +250,7 @@ static int qcom_scm_call_atomic(struct device *dev,
 	switch (__get_convention()) {
 	case SMC_CONVENTION_ARM_32:
 	case SMC_CONVENTION_ARM_64:
-		return scm_smc_call(dev, desc, res, true);
+		return scm_smc_call(dev, desc, res, QCOM_SCM_CALL_ATOMIC);
 	case SMC_CONVENTION_LEGACY:
 		return scm_legacy_call_atomic(dev, desc, res);
 	default:

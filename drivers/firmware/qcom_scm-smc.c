@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015,2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/io.h>
@@ -116,11 +117,12 @@ static int __scm_smc_do_quirk_handle_waitq(struct device *dev, struct arm_smccc_
 }
 
 static int __scm_smc_do(struct device *dev, struct arm_smccc_args *smc,
-			struct arm_smccc_res *res, bool atomic)
+			struct arm_smccc_res *res,
+			enum qcom_scm_call_type call_type)
 {
 	int ret, retry_count = 0;
 
-	if (atomic) {
+	if (call_type == QCOM_SCM_CALL_ATOMIC) {
 		__scm_smc_do_quirk(smc, res);
 		return 0;
 	}
@@ -136,7 +138,8 @@ static int __scm_smc_do(struct device *dev, struct arm_smccc_args *smc,
 			return ret;
 
 		if (res->a0 == QCOM_SCM_V2_EBUSY) {
-			if (retry_count++ > QCOM_SCM_EBUSY_MAX_RETRY)
+			if (retry_count++ > QCOM_SCM_EBUSY_MAX_RETRY ||
+				(call_type == QCOM_SCM_CALL_NORETRY))
 				break;
 			msleep(QCOM_SCM_EBUSY_WAIT_MS);
 		}
@@ -148,13 +151,14 @@ static int __scm_smc_do(struct device *dev, struct arm_smccc_args *smc,
 
 int __scm_smc_call(struct device *dev, const struct qcom_scm_desc *desc,
 		   enum qcom_scm_convention qcom_convention,
-		   struct qcom_scm_res *res, bool atomic)
+		   struct qcom_scm_res *res, enum qcom_scm_call_type call_type)
 {
 	int arglen = desc->arginfo & 0xf;
 	int i, ret;
 	dma_addr_t args_phys = 0;
 	void *args_virt = NULL;
 	size_t alloc_len;
+	const bool atomic = (call_type == QCOM_SCM_CALL_ATOMIC);
 	gfp_t flag = atomic ? GFP_ATOMIC : GFP_KERNEL;
 	u32 smccc_call_type = atomic ? ARM_SMCCC_FAST_CALL : ARM_SMCCC_STD_CALL;
 	u32 qcom_smccc_convention = (qcom_convention == SMC_CONVENTION_ARM_32) ?
@@ -204,7 +208,7 @@ int __scm_smc_call(struct device *dev, const struct qcom_scm_desc *desc,
 	}
 
 	/* ret error check follows after args_virt cleanup*/
-	ret = __scm_smc_do(dev, &smc, &smc_res, atomic);
+	ret = __scm_smc_do(dev, &smc, &smc_res, call_type);
 
 	if (args_virt) {
 		dma_unmap_single(dev, args_phys, alloc_len, DMA_TO_DEVICE);
