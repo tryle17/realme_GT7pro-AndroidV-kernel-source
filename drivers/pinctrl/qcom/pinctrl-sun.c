@@ -2550,8 +2550,20 @@ static const struct msm_pinctrl_soc_data sun_tlmm = {
 	.egpio_func = 11,
 };
 
+static const struct msm_pinctrl_soc_data sun_vm_tlmm = {
+	.pins = sun_pins,
+	.npins = ARRAY_SIZE(sun_pins),
+	.functions = sun_functions,
+	.nfunctions = ARRAY_SIZE(sun_functions),
+	.groups = sun_groups,
+	.ngroups = ARRAY_SIZE(sun_groups),
+	.ngpios = 216,
+	.egpio_func = 11,
+};
+
 static const struct of_device_id sun_tlmm_of_match[] = {
 	{ .compatible = "qcom,sun-tlmm", .data = &sun_tlmm},
+	{ .compatible = "qcom,sun-vm-tlmm", .data = &sun_vm_tlmm },
 	{},
 };
 
