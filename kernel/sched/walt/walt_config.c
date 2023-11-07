@@ -10,6 +10,7 @@
 void walt_config(void)
 {
 	int i, j;
+	const char *name = socinfo_get_id_string();
 
 	sysctl_sched_group_upmigrate_pct = 100;
 	sysctl_sched_group_downmigrate_pct = 95;
@@ -63,4 +64,7 @@ void walt_config(void)
 		for (j = 0; j < MAX_CLUSTERS; j++)
 			fmax_cap[i][j] = FREQ_QOS_MAX_DEFAULT_VALUE;
 	}
+
+	if (!strcmp(name, "SUN"))
+		sysctl_sched_suppress_region2 = 1;
 }
