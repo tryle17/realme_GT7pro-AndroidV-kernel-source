@@ -13,6 +13,7 @@ bool soc_enable_uclamp_boosted			= true;
 bool soc_enable_per_task_boost_on_mid		= true;
 bool soc_enable_silver_rt_spread;
 bool soc_enable_asym_siblings;
+bool soc_enable_boost_to_sibling;
 
 void walt_config(void)
 {
@@ -81,5 +82,6 @@ void walt_config(void)
 	} else if (!strcmp(name, "PINEAPPLE")) {
 		soc_enable_silver_rt_spread		= true;
 		soc_enable_asym_siblings		= true;
+		soc_enable_boost_to_sibling		= true;
 	}
 }
