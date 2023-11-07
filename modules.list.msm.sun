@@ -3,6 +3,7 @@
 arm_smmu.ko
 iommu-logger.ko
 phy-qcom-ufs.ko
+phy-qcom-ufs-qmp-v4-sun.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
 llcc-qcom.ko
 mem_buf.ko

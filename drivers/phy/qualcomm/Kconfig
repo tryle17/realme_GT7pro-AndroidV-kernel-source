@@ -121,16 +121,26 @@ config PHY_QCOM_UFS_V4
 	tristate "Qualcomm Technologies, Inc. UFS V4"
 	depends on PHY_QCOM_UFS
 	help
-	Support for 7nm UFS QMP phy present on QCOM chipsets.
+	  Support for 7nm UFS QMP phy present on QCOM chipsets.
+	  This is required to enable UFS on QCOM chipset.
+	  To compile this driver as a module, choose M here.
 
 config PHY_QCOM_UFS_QRBTC_SDM845
 	tristate "Qualcomm Technologies, Inc. UFS Presil Phy Driver"
 	depends on PHY_QCOM_UFS && REGULATOR_STUB
 	help
-          Enable this to support UFS PHY on pre-silicon platforms.
+	  Enable this to support UFS PHY on pre-silicon platforms.
 	  The support is restricted to HS-G1 only on both Tx and Rx.
 	  No low power mode support is present.
 	  Doesn't restrict number of lanes.
+
+config PHY_QCOM_UFS_V4_SUN
+	tristate "Qualcomm Technologies, Inc. UFS Sun Phy Driver"
+	depends on PHY_QCOM_UFS
+	help
+	  Support for UFS phy present on QCOM Sun chipsets.
+	  This is required to enable UFS on Sun chipset.
+	  To compile this driver as a module, choose M here.
 
 endif
 
