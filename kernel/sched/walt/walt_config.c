@@ -7,6 +7,9 @@
 #include "trace.h"
 #include <soc/qcom/socinfo.h>
 
+bool soc_enable_conservative_boost_topapp	= true;
+bool soc_enable_conservative_boost_fg		= true;
+
 void walt_config(void)
 {
 	int i, j;
@@ -65,6 +68,9 @@ void walt_config(void)
 			fmax_cap[i][j] = FREQ_QOS_MAX_DEFAULT_VALUE;
 	}
 
-	if (!strcmp(name, "SUN"))
-		sysctl_sched_suppress_region2 = 1;
+	if (!strcmp(name, "SUN")) {
+		sysctl_sched_suppress_region2		= 1;
+		soc_enable_conservative_boost_topapp	= false;
+		soc_enable_conservative_boost_fg	= false;
+	}
 }

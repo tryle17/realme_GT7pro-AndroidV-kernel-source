@@ -223,6 +223,8 @@ extern int min_possible_cluster_id;
 extern int max_possible_cluster_id;
 extern unsigned int __read_mostly sched_init_task_load_windows;
 extern unsigned int __read_mostly sched_load_granule;
+extern bool soc_enable_conservative_boost_topapp;
+extern bool soc_enable_conservative_boost_fg;
 
 #define SCHED_IDLE_ENOUGH_DEFAULT 30
 #define SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT 40
