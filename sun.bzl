@@ -105,6 +105,7 @@ def define_sun():
         "drivers/soc/qcom/boot_stats.ko",
         "drivers/soc/qcom/charger-ulog-glink.ko",
         "drivers/soc/qcom/cmd-db.ko",
+        "drivers/soc/qcom/crm-v2.ko",
         "drivers/soc/qcom/dcc_v2.ko",
         "drivers/soc/qcom/eud.ko",
         "drivers/soc/qcom/health_monitor.ko",
