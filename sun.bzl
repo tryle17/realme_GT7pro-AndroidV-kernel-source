@@ -47,6 +47,8 @@ def define_sun():
         "drivers/hwtracing/stm/stm_p_ost.ko",
         "drivers/i2c/busses/i2c-msm-geni.ko",
         "drivers/i3c/master/i3c-master-msm-geni.ko",
+        "drivers/iio/adc/qcom-spmi-adc5-gen3.ko",
+        "drivers/iio/adc/qcom-vadc-common.ko",
         "drivers/iio/adc/qti-glink-adc.ko",
         "drivers/input/misc/pm8941-pwrkey.ko",
         "drivers/interconnect/qcom/icc-bcm-voter.ko",
