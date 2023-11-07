@@ -225,6 +225,7 @@ extern unsigned int __read_mostly sched_init_task_load_windows;
 extern unsigned int __read_mostly sched_load_granule;
 extern bool soc_enable_conservative_boost_topapp;
 extern bool soc_enable_conservative_boost_fg;
+extern bool soc_enable_uclamp_boosted;
 
 #define SCHED_IDLE_ENOUGH_DEFAULT 30
 #define SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT 40
@@ -608,8 +609,9 @@ static inline enum sched_boost_policy task_boost_policy(struct task_struct *p)
 
 static inline bool walt_uclamp_boosted(struct task_struct *p)
 {
-	return ((uclamp_eff_value(p, UCLAMP_MIN) > 0) &&
-			(task_util(p) > sysctl_sched_min_task_util_for_uclamp));
+	return soc_enable_uclamp_boosted &&
+		((uclamp_eff_value(p, UCLAMP_MIN) > 0) &&
+		(task_util(p) > sysctl_sched_min_task_util_for_uclamp));
 }
 
 static inline unsigned long capacity_of(int cpu)

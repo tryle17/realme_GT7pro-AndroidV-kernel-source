@@ -9,6 +9,7 @@
 
 bool soc_enable_conservative_boost_topapp	= true;
 bool soc_enable_conservative_boost_fg		= true;
+bool soc_enable_uclamp_boosted			= true;
 
 void walt_config(void)
 {
@@ -72,5 +73,6 @@ void walt_config(void)
 		sysctl_sched_suppress_region2		= 1;
 		soc_enable_conservative_boost_topapp	= false;
 		soc_enable_conservative_boost_fg	= false;
+		soc_enable_uclamp_boosted		= false;
 	}
 }
