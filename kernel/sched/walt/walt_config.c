@@ -10,6 +10,7 @@
 bool soc_enable_conservative_boost_topapp	= true;
 bool soc_enable_conservative_boost_fg		= true;
 bool soc_enable_uclamp_boosted			= true;
+bool soc_enable_per_task_boost_on_mid		= true;
 
 void walt_config(void)
 {
@@ -74,5 +75,6 @@ void walt_config(void)
 		soc_enable_conservative_boost_topapp	= false;
 		soc_enable_conservative_boost_fg	= false;
 		soc_enable_uclamp_boosted		= false;
+		soc_enable_per_task_boost_on_mid	= false;
 	}
 }

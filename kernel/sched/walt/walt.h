@@ -226,6 +226,7 @@ extern unsigned int __read_mostly sched_load_granule;
 extern bool soc_enable_conservative_boost_topapp;
 extern bool soc_enable_conservative_boost_fg;
 extern bool soc_enable_uclamp_boosted;
+extern bool soc_enable_per_task_boost_on_mid;
 
 #define SCHED_IDLE_ENOUGH_DEFAULT 30
 #define SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT 40
@@ -679,6 +680,10 @@ static inline int per_task_boost(struct task_struct *p)
 			wts->boost = 0;
 		}
 	}
+
+	if (!soc_enable_per_task_boost_on_mid && (wts->boost == TASK_BOOST_ON_MID))
+		return 0;
+
 	return wts->boost;
 }
 
