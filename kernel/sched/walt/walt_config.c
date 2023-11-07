@@ -11,6 +11,8 @@ bool soc_enable_conservative_boost_topapp	= true;
 bool soc_enable_conservative_boost_fg		= true;
 bool soc_enable_uclamp_boosted			= true;
 bool soc_enable_per_task_boost_on_mid		= true;
+bool soc_enable_silver_rt_spread;
+bool soc_enable_asym_siblings;
 
 void walt_config(void)
 {
@@ -76,5 +78,8 @@ void walt_config(void)
 		soc_enable_conservative_boost_fg	= false;
 		soc_enable_uclamp_boosted		= false;
 		soc_enable_per_task_boost_on_mid	= false;
+	} else if (!strcmp(name, "PINEAPPLE")) {
+		soc_enable_silver_rt_spread		= true;
+		soc_enable_asym_siblings		= true;
 	}
 }

@@ -2898,7 +2898,7 @@ static void walt_update_cluster_topology(void)
 		for (i = 1; i < num_sched_clusters; i++)
 			nr_big_cpus += cpumask_weight(&sched_cluster[i]->cpus);
 
-	if (num_sched_clusters == 4) {
+	if (soc_enable_asym_siblings) {
 		cluster = NULL;
 		cpumask_clear(&asym_cap_sibling_cpus);
 		cpumask_clear(&shared_rail_sibling_cpus);
