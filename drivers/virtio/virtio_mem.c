@@ -3,13 +3,16 @@
  * Virtio-mem device driver.
  *
  * Copyright Red Hat, Inc. 2020
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Author(s): David Hildenbrand <david@redhat.com>
  */
 
 #include <linux/platform_device.h>
 #include <linux/of_address.h>
+#include <linux/mem-buf.h>
+#include <soc/qcom/secure_buffer.h>
+#include <linux/xarray.h>
 #include <linux/virtio.h>
 #include <linux/virtio_mem.h>
 #include <linux/workqueue.h>
@@ -24,6 +27,8 @@
 #include <linux/bitmap.h>
 #include <linux/lockdep.h>
 #include <linux/log2.h>
+#include <linux/sched/mm.h>
+#include "qti_virtio_mem.h"
 
 #include <acpi/acpi_numa.h>
 
@@ -62,206 +67,9 @@ MODULE_PARM_DESC(bbm_block_size,
  * onlined to the same zone - virtio-mem relies on this behavior.
  */
 
-/*
- * State of a Linux memory block in SBM.
- */
-enum virtio_mem_sbm_mb_state {
-	/* Unplugged, not added to Linux. Can be reused later. */
-	VIRTIO_MEM_SBM_MB_UNUSED = 0,
-	/* (Partially) plugged, not added to Linux. Error on add_memory(). */
-	VIRTIO_MEM_SBM_MB_PLUGGED,
-	/* Fully plugged, fully added to Linux, offline. */
-	VIRTIO_MEM_SBM_MB_OFFLINE,
-	/* Partially plugged, fully added to Linux, offline. */
-	VIRTIO_MEM_SBM_MB_OFFLINE_PARTIAL,
-	/* Fully plugged, fully added to Linux, onlined to a kernel zone. */
-	VIRTIO_MEM_SBM_MB_KERNEL,
-	/* Partially plugged, fully added to Linux, online to a kernel zone */
-	VIRTIO_MEM_SBM_MB_KERNEL_PARTIAL,
-	/* Fully plugged, fully added to Linux, onlined to ZONE_MOVABLE. */
-	VIRTIO_MEM_SBM_MB_MOVABLE,
-	/* Partially plugged, fully added to Linux, onlined to ZONE_MOVABLE. */
-	VIRTIO_MEM_SBM_MB_MOVABLE_PARTIAL,
-	VIRTIO_MEM_SBM_MB_COUNT
-};
-
-/*
- * State of a Big Block (BB) in BBM, covering 1..X Linux memory blocks.
- */
-enum virtio_mem_bbm_bb_state {
-	/* Unplugged, not added to Linux. Can be reused later. */
-	VIRTIO_MEM_BBM_BB_UNUSED = 0,
-	/* Plugged, not added to Linux. Error on add_memory(). */
-	VIRTIO_MEM_BBM_BB_PLUGGED,
-	/* Plugged and added to Linux. */
-	VIRTIO_MEM_BBM_BB_ADDED,
-	/* All online parts are fake-offline, ready to remove. */
-	VIRTIO_MEM_BBM_BB_FAKE_OFFLINE,
-	VIRTIO_MEM_BBM_BB_COUNT
-};
-
-struct virtio_mem {
-	struct platform_device *vdev;
-
-	/* We might first have to unplug all memory when starting up. */
-	bool unplug_all_required;
-
-	/* Workqueue that processes the plug/unplug requests. */
-	struct work_struct wq;
-	atomic_t wq_active;
-	atomic_t config_changed;
-
-	/* Wait for a host response to a guest request. */
-	wait_queue_head_t host_resp;
-
-	/* Space for one guest request and the host response. */
-	struct virtio_mem_req req;
-	struct virtio_mem_resp resp;
-
-	/* The current size of the device. */
-	uint64_t plugged_size;
-	/* The requested size of the device. */
-	uint64_t requested_size;
-
-	/* The device block size (for communicating with the device). */
-	uint64_t device_block_size;
-	/* The determined node id for all memory of the device. */
-	int nid;
-	/* Physical start address of the memory region. */
-	uint64_t addr;
-	/* Maximum region size in bytes. */
-	uint64_t region_size;
-
-	/* The parent resource for all memory added via this device. */
-	struct resource *parent_resource;
-	/*
-	 * Copy of "System RAM (virtio_mem)" to be used for
-	 * add_memory_driver_managed().
-	 */
-	const char *resource_name;
-	/* Memory group identification. */
-	int mgid;
-
-	/*
-	 * We don't want to add too much memory if it's not getting onlined,
-	 * to avoid running OOM. Besides this threshold, we allow to have at
-	 * least two offline blocks at a time (whatever is bigger).
-	 */
-#define VIRTIO_MEM_DEFAULT_OFFLINE_THRESHOLD		(1024 * 1024 * 1024)
-	atomic64_t offline_size;
-	uint64_t offline_threshold;
-
-	/* If set, the driver is in SBM, otherwise in BBM. */
-	bool in_sbm;
-
-	union {
-		struct {
-			/* Id of the first memory block of this device. */
-			unsigned long first_mb_id;
-			/* Id of the last usable memory block of this device. */
-			unsigned long last_usable_mb_id;
-			/* Id of the next memory bock to prepare when needed. */
-			unsigned long next_mb_id;
-
-			/* The subblock size. */
-			uint64_t sb_size;
-			/* The number of subblocks per Linux memory block. */
-			uint32_t sbs_per_mb;
-
-			/*
-			 * Some of the Linux memory blocks tracked as "partially
-			 * plugged" are completely unplugged and can be offlined
-			 * and removed -- which previously failed.
-			 */
-			bool have_unplugged_mb;
-
-			/* Summary of all memory block states. */
-			unsigned long mb_count[VIRTIO_MEM_SBM_MB_COUNT];
-
-			/*
-			 * One byte state per memory block. Allocated via
-			 * vmalloc(). Resized (alloc+copy+free) on demand.
-			 *
-			 * With 128 MiB memory blocks, we have states for 512
-			 * GiB of memory in one 4 KiB page.
-			 */
-			uint8_t *mb_states;
-
-			/*
-			 * Bitmap: one bit per subblock. Allocated similar to
-			 * sbm.mb_states.
-			 *
-			 * A set bit means the corresponding subblock is
-			 * plugged, otherwise it's unblocked.
-			 *
-			 * With 4 MiB subblocks, we manage 128 GiB of memory
-			 * in one 4 KiB page.
-			 */
-			unsigned long *sb_states;
-		} sbm;
-
-		struct {
-			/* Id of the first big block of this device. */
-			unsigned long first_bb_id;
-			/* Id of the last usable big block of this device. */
-			unsigned long last_usable_bb_id;
-			/* Id of the next device bock to prepare when needed. */
-			unsigned long next_bb_id;
-
-			/* Summary of all big block states. */
-			unsigned long bb_count[VIRTIO_MEM_BBM_BB_COUNT];
-
-			/* One byte state per big block. See sbm.mb_states. */
-			uint8_t *bb_states;
-
-			/* The block size used for plugging/adding/removing. */
-			uint64_t bb_size;
-		} bbm;
-	};
-
-	/*
-	 * Mutex that protects the sbm.mb_count, sbm.mb_states,
-	 * sbm.sb_states, bbm.bb_count, and bbm.bb_states
-	 *
-	 * When this lock is held the pointers can't change, ONLINE and
-	 * OFFLINE blocks can't change the state and no subblocks will get
-	 * plugged/unplugged.
-	 *
-	 * In kdump mode, used to serialize requests, last_block_addr and
-	 * last_block_plugged.
-	 */
-	struct mutex hotplug_mutex;
-	bool hotplug_active;
-
-	/* An error occurred we cannot handle - stop processing requests. */
-	bool broken;
-
-	/* Cached valued of is_kdump_kernel() when the device was probed. */
-	bool in_kdump;
-
-	/* The driver is being removed. */
-	spinlock_t removal_lock;
-	bool removing;
-
-	/* Timer for retrying to plug/unplug memory. */
-	struct hrtimer retry_timer;
-	unsigned int retry_timer_ms;
-#define VIRTIO_MEM_RETRY_TIMER_MIN_MS		50000
-#define VIRTIO_MEM_RETRY_TIMER_MAX_MS		300000
-
-	/* Memory notifier (online/offline events). */
-	struct notifier_block memory_notifier;
-
-#ifdef CONFIG_PROC_VMCORE
-	/* vmcore callback for /proc/vmcore handling in kdump mode */
-	struct vmcore_cb vmcore_cb;
-	uint64_t last_block_addr;
-	bool last_block_plugged;
-#endif /* CONFIG_PROC_VMCORE */
-
-	/* Next device in the list of virtio-mem devices. */
-	struct list_head next;
-};
+/* For now, only allow one virtio-mem device */
+struct virtio_mem *virtio_mem_dev;
+static DEFINE_XARRAY(xa_membuf);
 
 /*
  * We have to share a single online_page callback among all virtio-mem
@@ -278,6 +86,8 @@ static void virtio_mem_fake_offline_cancel_offline(unsigned long pfn,
 static void virtio_mem_retry(struct virtio_mem *vm);
 static int virtio_mem_create_resource(struct virtio_mem *vm);
 static void virtio_mem_delete_resource(struct virtio_mem *vm);
+static int virtio_mem_send_unplug_request(struct virtio_mem *vm, uint64_t addr,
+					  uint64_t size);
 
 /*
  * Register a virtio-mem device so it will be considered for the online_page
@@ -1361,23 +1171,110 @@ static void virtio_mem_online_page_cb(struct page *page, unsigned int order)
 	generic_online_page(page, order);
 }
 
+/* Default error values to -ENOMEM - virtio_mem_run_wq expects certain rc only */
+static int virtio_mem_convert_error_code(int rc)
+{
+	if (rc == -ENOSPC || rc == -ETXTBSY || rc == -EBUSY || rc == -EAGAIN)
+		return rc;
+	return -ENOMEM;
+}
+
+/*
+ * mem-buf currently is handle based. This means we must break up requests into
+ * the common unit size(device_block_size). GH_RM_MEM_DONATE does not actually require
+ * tracking the handle, so this could be optimized further.
+ *
+ * This function must return one of ENOSPC, ETXTBSY, EBUSY, ENOMEM, EAGAIN
+ */
 static int virtio_mem_send_plug_request(struct virtio_mem *vm, uint64_t addr,
 					uint64_t size)
 {
+	void *membuf;
+	struct mem_buf_allocation_data alloc_data;
+	u32 vmids[1];
+	u32 perms[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
+	struct gh_sgl_desc *gh_sgl;
+	uint64_t orig_addr = addr;
+	int ret;
+	u64 block_size = vm->device_block_size;
 
 	dev_dbg(&vm->vdev->dev, "plugging memory: 0x%llx - 0x%llx\n", addr,
 		addr + size - 1);
-	WARN_ON(1);
-	return -EINVAL;
+
+	vmids[0] = mem_buf_current_vmid();
+
+	alloc_data.size = block_size;
+	alloc_data.nr_acl_entries = ARRAY_SIZE(vmids);
+	alloc_data.vmids = vmids;
+	alloc_data.perms = perms;
+	alloc_data.trans_type = GH_RM_TRANS_TYPE_DONATE;
+	gh_sgl = kzalloc(offsetof(struct gh_sgl_desc, sgl_entries[1]), GFP_KERNEL);
+	if (!gh_sgl)
+		return -ENOMEM;
+	/* ipa_base/size configured below */
+	gh_sgl->n_sgl_entries = 1;
+
+	alloc_data.sgl_desc = gh_sgl;
+	alloc_data.src_mem_type = MEM_BUF_BUDDY_MEM_TYPE;
+	alloc_data.src_data = NULL;
+	alloc_data.dst_mem_type = MEM_BUF_BUDDY_MEM_TYPE;
+	alloc_data.dst_data = NULL;
+
+	while (size) {
+		gh_sgl->sgl_entries[0].ipa_base = addr;
+		gh_sgl->sgl_entries[0].size = block_size;
+
+		membuf = mem_buf_alloc(&alloc_data);
+		if (IS_ERR(membuf)) {
+			dev_err(&vm->vdev->dev, "mem_buf_alloc failed with %ld\n", PTR_ERR(membuf));
+			ret = virtio_mem_convert_error_code(PTR_ERR(membuf));
+			goto err_mem_buf_alloc;
+		}
+
+		xa_store(&xa_membuf, addr, membuf, GFP_KERNEL);
+		vm->plugged_size += block_size;
+
+		size -= block_size;
+		addr += block_size;
+	}
+
+	kfree(gh_sgl);
+	return 0;
+
+err_mem_buf_alloc:
+	if (addr > orig_addr)
+		virtio_mem_send_unplug_request(vm, orig_addr, addr - orig_addr);
+	kfree(gh_sgl);
+	return ret;
 }
 
 static int virtio_mem_send_unplug_request(struct virtio_mem *vm, uint64_t addr,
 					  uint64_t size)
 {
+	void *membuf;
+	u64 block_size = vm->device_block_size;
+	uint64_t saved_size = size;
+
 	dev_dbg(&vm->vdev->dev, "unplugging memory: 0x%llx - 0x%llx\n", addr,
 		addr + size - 1);
-	WARN_ON(1);
-	return -EINVAL;
+
+	while (size) {
+		membuf = xa_load(&xa_membuf, addr);
+		if (WARN(!membuf, "No membuf for %llx\n", addr))
+			return -EINVAL;
+
+		mem_buf_free(membuf);
+
+		size -= block_size;
+		addr += block_size;
+	}
+
+	/*
+	 * Only update if all successful to be in-line with how errors
+	 * are handled by this function's callers
+	 */
+	vm->plugged_size -= saved_size;
+	return 0;
 }
 
 static int virtio_mem_send_unplug_all_request(struct virtio_mem *vm)
@@ -1906,7 +1803,7 @@ static int virtio_mem_sbm_unplug_any_sb_online(struct virtio_mem *vm,
 		if (!rc) {
 			*nb_sb -= vm->sbm.sbs_per_mb;
 			goto unplugged;
-		} else if (rc != -EBUSY)
+		} else if (rc != -EBUSY && rc != -ENOMEM)
 			return rc;
 	}
 
@@ -2286,6 +2183,7 @@ static void virtio_mem_run_wq(struct work_struct *work)
 	struct virtio_mem *vm = container_of(work, struct virtio_mem, wq);
 	uint64_t diff;
 	int rc;
+	unsigned int noreclaim_flag;
 
 	if (unlikely(vm->in_kdump)) {
 		dev_warn_once(&vm->vdev->dev,
@@ -2299,6 +2197,7 @@ static void virtio_mem_run_wq(struct work_struct *work)
 		return;
 
 	atomic_set(&vm->wq_active, 1);
+
 retry:
 	rc = 0;
 
@@ -2318,7 +2217,9 @@ retry:
 	if (!rc && vm->requested_size != vm->plugged_size) {
 		if (vm->requested_size > vm->plugged_size) {
 			diff = vm->requested_size - vm->plugged_size;
+			noreclaim_flag = memalloc_noreclaim_save();
 			rc = virtio_mem_plug_request(vm, diff);
+			memalloc_noreclaim_restore(noreclaim_flag);
 		} else {
 			diff = vm->plugged_size - vm->requested_size;
 			rc = virtio_mem_unplug_request(vm, diff);
@@ -2599,11 +2500,72 @@ static int virtio_mem_init_kdump(struct virtio_mem *vm)
 #endif /* CONFIG_PROC_VMCORE */
 }
 
+static int virtio_mem_encryption_setup(struct virtio_mem *vm)
+{
+	char *propname;
+	struct device_node *np = vm->vdev->dev.of_node;
+	u32 flags;
+	u64 size, ipa_base;
+	const struct range pluggable_range = mhp_get_pluggable_range(true);
+	struct range range;
+	int ret;
+
+	propname = "qcom,memory-encryption";
+	vm->use_memory_encryption = of_property_read_bool(np, propname);
+
+	propname = "qcom,max-size";
+	ret = of_property_read_u64(np, propname, &size);
+	if (ret) {
+		dev_err(&vm->vdev->dev, "Missing %s\n", propname);
+		return -EINVAL;
+	}
+	if (!IS_ALIGNED(size, memory_block_size_bytes())) {
+		dev_err(&vm->vdev->dev, "%s must be aligned to %lx\n",
+			propname, memory_block_size_bytes());
+		return -EINVAL;
+	}
+
+	/* qcom,ipa-range includes range.start & range.end */
+	propname = "qcom,ipa-range";
+	ret = of_property_read_u64_index(np, propname, 0, &range.start);
+	ret |= of_property_read_u64_index(np, propname, 1, &range.end);
+	if (ret) {
+		dev_err(&vm->vdev->dev, "Missing %s\n", propname);
+		return -EINVAL;
+	}
+
+	range.start = max(range.start, pluggable_range.start);
+	range.end = min(range.end, pluggable_range.end);
+
+	/*
+	 * Using the DEFAULT flag will request the same encryption level
+	 * as the base kernel memory.
+	 */
+	if (vm->use_memory_encryption)
+		flags = GH_RM_IPA_RESERVE_DEFAULT;
+	else
+		flags = GH_RM_IPA_RESERVE_NORMAL;
+
+	ret = gh_rm_ipa_reserve(size, memory_block_size_bytes(),
+				range, flags, 0,
+				&ipa_base);
+	if (ret) {
+		if (ret == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+
+		dev_err(&vm->vdev->dev, "Hypervisor ipa reserve not supported\n");
+		return ret;
+	}
+
+	vm->addr = ipa_base;
+	vm->region_size = size;
+	return 0;
+}
+
 static int virtio_mem_init(struct virtio_mem *vm)
 {
 	uint16_t node_id;
 	int ret;
-	struct resource res;
 	u32 device_block_size;
 
 	/* Fetch all properties that can't change. */
@@ -2617,13 +2579,11 @@ static int virtio_mem_init(struct virtio_mem *vm)
 
 	node_id = NUMA_NO_NODE;
 	vm->nid = virtio_mem_translate_node_id(vm, node_id);
-	ret = of_address_to_resource(vm->vdev->dev.of_node, 0, &res);
-	if (ret) {
-		dev_err(&vm->vdev->dev, "Failed to parse reg property\n");
-		return -EINVAL;
-	}
-	vm->addr = res.start;
-	vm->region_size = resource_size(&res);
+
+	/* Also determines the ipa_address and size */
+	ret = virtio_mem_encryption_setup(vm);
+	if (ret)
+		return ret;
 
 	/* Determine the nid for the device based on the lowest address. */
 	if (vm->nid == NUMA_NO_NODE)
@@ -2730,6 +2690,8 @@ static int virtio_mem_probe(struct platform_device *vdev)
 	if (rc)
 		goto out_free_vm;
 
+	virtio_mem_dev = vm;
+
 	/* trigger a config update to start processing the requested_size */
 	if (!vm->in_kdump) {
 		atomic_set(&vm->config_changed, 1);
@@ -2832,7 +2794,7 @@ static int virtio_mem_remove(struct platform_device *vdev)
 	return 0;
 }
 
-static void __maybe_unused virtio_mem_config_changed(struct platform_device *vdev)
+void virtio_mem_config_changed(struct platform_device *vdev)
 {
 	struct virtio_mem *vm = platform_get_drvdata(vdev);
 
