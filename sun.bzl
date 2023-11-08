@@ -25,6 +25,7 @@ def define_sun():
         "drivers/clk/qcom/gpucc-sun.ko",
         "drivers/clk/qcom/tcsrcc-sun.ko",
         "drivers/clk/qcom/videocc-sun.ko",
+        "drivers/cpuidle/governors/qcom_lpm.ko",
         "drivers/dma-buf/heaps/qcom_dma_heaps.ko",
         "drivers/dma/qcom/msm_gpi.ko",
         "drivers/edac/qcom_edac.ko",
