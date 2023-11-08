@@ -21,7 +21,7 @@
 #define IRQ_i_CFG_TYPE_MASK	0x7
 #define IRQ_i_CFG_DISTANCE	0x4
 
-#define IRQ_i_GP_IRQ_SELECT	0x4900
+/* IRQ_i_GP_IRQ_SELECT Register */
 #define IRQ_i_GP_IRQ_DISTANCE	0x14
 
 struct irq_map {
@@ -33,6 +33,7 @@ struct irq_map {
 struct pdc_match_data {
 	const struct irq_map *map;
 	u32 size;
+	u32 irq_select_offset;
 };
 
 static const struct pdc_match_data *d;
@@ -47,7 +48,8 @@ enum pdc_irq_config_bits {
 	PDC_EDGE_DUAL		= 0b111,
 };
 
-static int pdc_cfg_irq(u32 irq, u32 mux, int mux_select, unsigned int type, bool enable)
+static int pdc_cfg_irq(u32 irq, u32 mux, int mux_select, unsigned int type,
+		u32 irq_select_offset, bool enable)
 {
 	unsigned long flags;
 	u32 value;
@@ -84,7 +86,7 @@ static int pdc_cfg_irq(u32 irq, u32 mux, int mux_select, unsigned int type, bool
 
 	raw_spin_lock_irqsave(&pdc_lock, flags);
 
-	writel_relaxed(value, pcie_pdc_base + IRQ_i_GP_IRQ_SELECT +
+	writel_relaxed(value, pcie_pdc_base + irq_select_offset +
 		       mux_select * IRQ_i_GP_IRQ_DISTANCE);
 	writel_relaxed(pdc_type, pcie_pdc_base + IRQ_i_CFG + irq * IRQ_i_CFG_DISTANCE);
 
@@ -114,7 +116,8 @@ int pcie_pdc_cfg_irq(u32 gpio, unsigned int type, bool enable)
 
 	for (i = 0; i < d->size; i++) {
 		if (gpio == d->map[i].gpio)
-			return pdc_cfg_irq(d->map[i].irq, d->map[i].mux, i, type, enable);
+			return pdc_cfg_irq(d->map[i].irq, d->map[i].mux, i, type,
+					d->irq_select_offset, enable);
 	}
 
 	return -EINVAL;
@@ -134,6 +137,16 @@ static int qcom_pcie_pdc_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct irq_map sun_irq_map[] = {
+	{ 103, 64, 10 },
+};
+
+static const struct pdc_match_data sun_pdc_match_data = {
+	.map = sun_irq_map,
+	.size = ARRAY_SIZE(sun_irq_map),
+	.irq_select_offset = 0x4800,
+};
+
 static const struct irq_map pineapple_irq_map[] = {
 	{ 95, 67, 10 },
 	{ 98, 50, 11 },
@@ -142,6 +155,7 @@ static const struct irq_map pineapple_irq_map[] = {
 static const struct pdc_match_data pineapple_pdc_match_data = {
 	.map = pineapple_irq_map,
 	.size = ARRAY_SIZE(pineapple_irq_map),
+	.irq_select_offset = 0x4900,
 };
 
 static const struct irq_map cliffs_irq_map[] = {
@@ -151,9 +165,11 @@ static const struct irq_map cliffs_irq_map[] = {
 static const struct pdc_match_data cliffs_pdc_match_data = {
 	.map = cliffs_irq_map,
 	.size = ARRAY_SIZE(cliffs_irq_map),
+	.irq_select_offset = 0x4900,
 };
 
 static const struct of_device_id qcom_pcie_pdc_match_table[] = {
+	{ .compatible = "qcom,sun-pcie-pdc", .data = &sun_pdc_match_data },
 	{ .compatible = "qcom,pineapple-pcie-pdc", .data = &pineapple_pdc_match_data },
 	{ .compatible = "qcom,cliffs-pcie-pdc", .data = &cliffs_pdc_match_data },
 	{}
