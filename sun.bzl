@@ -153,6 +153,7 @@ def define_sun():
         "drivers/soc/qcom/memory_dump_v2.ko",
         "drivers/soc/qcom/msm_performance.ko",
         "drivers/soc/qcom/panel_event_notifier.ko",
+        "drivers/soc/qcom/pcie-pdc.ko",
         "drivers/soc/qcom/pdr_interface.ko",
         "drivers/soc/qcom/pmic-glink-debug.ko",
         "drivers/soc/qcom/pmic-pon-log.ko",
