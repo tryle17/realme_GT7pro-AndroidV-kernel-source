@@ -1742,6 +1742,7 @@
   input_unregister_device
   input_unregister_handle
   input_unregister_handler
+  insert_resource
   interval_tree_insert
   interval_tree_iter_first
   interval_tree_iter_next
@@ -2159,6 +2160,8 @@
   __module_put_and_kthread_exit
   module_refcount
   __msecs_to_jiffies
+  msi_domain_first_desc
+  msi_next_desc
   msleep
   msleep_interruptible
   mtree_load
@@ -3796,6 +3799,10 @@
   ufshcd_get_local_unipro_ver
   ufshcd_hba_stop
   ufshcd_hold
+  ufshcd_mcq_config_esi
+  ufshcd_mcq_enable_esi
+  ufshcd_mcq_poll_cqe_lock
+  ufshcd_mcq_write_cqis
   ufshcd_pltfrm_init
   ufshcd_pltfrm_shutdown
   ufshcd_query_attr
@@ -3807,8 +3814,11 @@
   ufshcd_runtime_resume
   ufshcd_runtime_suspend
   ufshcd_suspend_prepare
+  ufshcd_system_freeze
+  ufshcd_system_restore
   ufshcd_system_resume
   ufshcd_system_suspend
+  ufshcd_system_thaw
   ufshcd_uic_hibern8_enter
   ufshcd_uic_hibern8_exit
   __uio_register_device
