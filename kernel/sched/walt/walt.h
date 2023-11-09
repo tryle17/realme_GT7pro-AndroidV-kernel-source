@@ -230,6 +230,7 @@ extern bool soc_enable_per_task_boost_on_mid;
 extern bool soc_enable_silver_rt_spread;
 extern bool soc_enable_asym_siblings;
 extern bool soc_enable_boost_to_sibling;
+extern bool soc_enable_sw_cycle_counter;
 
 #define SCHED_IDLE_ENOUGH_DEFAULT 30
 #define SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT 40

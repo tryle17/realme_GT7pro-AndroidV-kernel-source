@@ -14,6 +14,7 @@ bool soc_enable_per_task_boost_on_mid		= true;
 bool soc_enable_silver_rt_spread;
 bool soc_enable_asym_siblings;
 bool soc_enable_boost_to_sibling;
+bool soc_enable_sw_cycle_counter;
 
 void walt_config(void)
 {
