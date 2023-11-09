@@ -820,6 +820,21 @@ static const char *status_to_str(int status)
 	}
 }
 
+static void wcd_usbss_pd_pu_enable(void)
+{
+	regmap_update_bits(wcd_usbss_ctxt_->regmap, WCD_USBSS_PMP_OUT1, 0x20, 0x00);
+	/* Enable D+/D- 1M & 400K PLDN */
+	regmap_update_bits(wcd_usbss_ctxt_->regmap, WCD_USBSS_BIAS_TOP, 0x20, 0x00);
+
+	/* Enable DP/DN 2K PLDN */
+	regmap_update_bits(wcd_usbss_ctxt_->regmap, WCD_USBSS_DP_BIAS, 0x01, 0x01);
+	regmap_update_bits(wcd_usbss_ctxt_->regmap, WCD_USBSS_DN_BIAS, 0x01, 0x01);
+
+	/* Enable SBU1/2 2K PLDN */
+	regmap_update_bits(wcd_usbss_ctxt_->regmap, WCD_USBSS_MG1_BIAS, 0x01, 0x01);
+	regmap_update_bits(wcd_usbss_ctxt_->regmap, WCD_USBSS_MG2_BIAS, 0x01, 0x01);
+}
+
 /* to use with DPDM switch selection */
 #define DPDM_SEL_MASK       (WCD_USBSS_SWITCH_SELECT0_DPR_SWITCHES_MASK |\
 					WCD_USBSS_SWITCH_SELECT0_DNL_SWITCHES_MASK)
@@ -1029,6 +1044,7 @@ int wcd_usbss_switch_update(enum wcd_usbss_cable_types ctype,
 	} else if (connect_status == WCD_USBSS_CABLE_CONNECT) {
 		wcd_usbss_ctxt_->cable_status |= BIT(ctype);
 
+		wcd_usbss_pd_pu_enable();
 		wcd_usbss_standby_control_locked(false);
 
 		switch (ctype) {
@@ -1335,6 +1351,7 @@ static int wcd_usbss_sdam_handle_events_locked(int req_state)
 
 	switch (req_state) {
 	case WCD_USBSS_LPD_USB_MODE_CLEAR:
+		regmap_update_bits(priv->regmap, WCD_USBSS_PMP_OUT1, 0x20, 0x00);
 		/* Enable D+/D- 1M & 400K PLDN */
 		regmap_update_bits(priv->regmap, WCD_USBSS_BIAS_TOP, 0x20, 0x00);
 
@@ -1354,6 +1371,7 @@ static int wcd_usbss_sdam_handle_events_locked(int req_state)
 	case WCD_USBSS_LPD_MODE_SET:
 		fallthrough;
 	case WCD_USBSS_LPD_USB_MODE_SET:
+		regmap_update_bits(priv->regmap, WCD_USBSS_PMP_OUT1, 0x20, 0x20);
 		/* Disable D+/D- 1M & 400K PLDN */
 		regmap_update_bits(priv->regmap, WCD_USBSS_BIAS_TOP, 0x20, 0x20);
 		/* Disable DP/DN 2K PLDN */
@@ -1370,6 +1388,7 @@ static int wcd_usbss_sdam_handle_events_locked(int req_state)
 		wcd_usbss_standby_control_locked(false);
 		break;
 	case WCD_USBSS_USB_MODE_SET:
+		regmap_update_bits(priv->regmap, WCD_USBSS_PMP_OUT1, 0x20, 0x00);
 		/* Enable D+/D- 1M & 400K PLDN */
 		regmap_update_bits(priv->regmap, WCD_USBSS_BIAS_TOP, 0x20, 0x00);
 		/* Enable DP/DN 2K PLDN */
