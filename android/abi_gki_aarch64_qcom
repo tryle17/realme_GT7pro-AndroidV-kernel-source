@@ -347,6 +347,7 @@
   cfg80211_update_owe_info_event
   cfg80211_vendor_cmd_get_sender
   cfg80211_vendor_cmd_reply
+  cgroup_mutex
   cgroup_path_ns
   cgroup_taskset_first
   cgroup_taskset_next
@@ -467,6 +468,7 @@
   cpufreq_generic_frequency_table_verify
   cpufreq_get_driver_data
   cpufreq_get_policy
+  cpufreq_quick_get
   cpufreq_quick_get_max
   cpufreq_register_driver
   cpufreq_register_governor
@@ -557,6 +559,7 @@
   crypto_unregister_skcipher
   __crypto_xor
   css_next_child
+  css_set_lock
   csum_ipv6_magic
   csum_partial
   csum_tcpudp_nofold
@@ -2053,8 +2056,12 @@
   lockdep_rht_mutex_is_held
   lockdep_rtnl_is_held
   lock_is_held_type
+  lock_pin_lock
   lock_release
+  lock_repin_lock
+  lock_set_class
   lock_sock_nested
+  lock_unpin_lock
   log_post_read_mmio
   log_post_write_mmio
   log_read_mmio
@@ -2308,6 +2315,7 @@
   of_clk_src_onecell_get
   of_clk_src_simple_get
   of_count_phandle_with_args
+  of_cpu_device_node_get
   of_cpu_node_to_id
   of_devfreq_cooling_register
   of_device_get_match_data
@@ -2797,6 +2805,7 @@
   rcu_read_lock_any_held
   rcu_read_lock_bh_held
   rcu_read_lock_held
+  rcu_read_lock_sched_held
   __rcu_read_unlock
   rcu_read_unlock_trace_special
   rcuref_get_slowpath
@@ -3007,6 +3016,7 @@
   scatterwalk_ffwd
   scatterwalk_map_and_copy
   sched_clock
+  sched_domains_mutex
   sched_feat_keys
   sched_feat_names
   sched_setattr
@@ -3502,6 +3512,7 @@
   __traceiter_android_rvh_check_preempt_wakeup_ignore
   __traceiter_android_rvh_cpu_cgroup_attach
   __traceiter_android_rvh_cpu_cgroup_online
+  __traceiter_android_rvh_cpufreq_transition
   __traceiter_android_rvh_cpu_overutilized
   __traceiter_android_rvh_dequeue_entity
   __traceiter_android_rvh_dequeue_task
@@ -3604,6 +3615,7 @@
   __tracepoint_android_rvh_check_preempt_wakeup_ignore
   __tracepoint_android_rvh_cpu_cgroup_attach
   __tracepoint_android_rvh_cpu_cgroup_online
+  __tracepoint_android_rvh_cpufreq_transition
   __tracepoint_android_rvh_cpu_overutilized
   __tracepoint_android_rvh_dequeue_entity
   __tracepoint_android_rvh_dequeue_task
