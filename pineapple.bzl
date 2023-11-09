@@ -111,6 +111,7 @@ def define_pineapple():
         "drivers/thermal/qcom/qcom-spmi-temp-alarm.ko",
         "drivers/tty/hvc/hvc_gunyah.ko",
         "drivers/ufs/host/ufs-qcom.ko",
+        "drivers/uio/msm_sharedmem/msm_sharedmem.ko",
         "drivers/usb/dwc3/dwc3-msm.ko",
         "drivers/usb/gadget/function/usb_f_ccid.ko",
         "drivers/usb/gadget/function/usb_f_cdev.ko",
