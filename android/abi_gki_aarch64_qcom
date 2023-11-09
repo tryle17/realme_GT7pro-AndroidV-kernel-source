@@ -2161,7 +2161,9 @@
   module_refcount
   __msecs_to_jiffies
   msi_domain_first_desc
+  msi_lock_descs
   msi_next_desc
+  msi_unlock_descs
   msleep
   msleep_interruptible
   mtree_load
@@ -2911,6 +2913,7 @@
   remove_cpu
   remove_memory
   remove_proc_entry
+  remove_resource
   remove_wait_queue
   report_iommu_fault
   request_any_context_irq
