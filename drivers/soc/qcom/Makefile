@@ -50,6 +50,7 @@ obj-$(CONFIG_QCOM_VA_MINIDUMP) += qcom_va_minidump.o
 obj-$(CONFIG_QCOM_LOGBUF_VENDOR_HOOKS) += qcom_logbuf_vendor_hooks.o
 obj-$(CONFIG_QCOM_LOGBUF_BOOTLOG) += qcom_logbuf_boot_log.o
 obj-$(CONFIG_GIC_INTERRUPT_ROUTING) += gic_intr_routing.o
+obj-$(CONFIG_QCOM_HUNG_TASK_ENH) += hung_task_enh.o
 obj-$(CONFIG_QCOM_ICC_BWMON)	+= icc-bwmon.o
 qcom_ice-objs			+= ice.o
 obj-$(CONFIG_QCOM_INLINE_CRYPTO_ENGINE)	+= qcom_ice.o
