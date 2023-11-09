@@ -62,6 +62,8 @@ def define_sun():
         "drivers/iommu/qcom_iommu_debug.ko",
         "drivers/iommu/qcom_iommu_util.ko",
         "drivers/irqchip/qcom-pdc.ko",
+        "drivers/leds/flash/leds-qcom-flash.ko",
+        "drivers/leds/leds-qti-flash.ko",
         "drivers/leds/rgb/leds-qcom-lpg.ko",
         "drivers/mailbox/gunyah-msgq.ko",
         "drivers/mailbox/msm_qmp.ko",
