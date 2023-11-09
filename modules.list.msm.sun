@@ -7,6 +7,7 @@ phy-qcom-ufs.ko
 phy-qcom-ufs-qmp-v4-sun.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
 llcc-qcom.ko
+cpu_phys_log_map.ko
 mem_buf.ko
 mem_buf_dev.ko
 mem_buf_msgq.ko
