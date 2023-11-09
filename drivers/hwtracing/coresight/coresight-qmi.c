@@ -325,7 +325,8 @@ err:
 	return ret;
 }
 
-static int coresight_qmi_enable(struct coresight_device *csdev, void *data)
+static int coresight_qmi_enable(struct coresight_device *csdev, enum cs_mode mode,
+				void *data)
 {
 	struct cs_qmi_data *qmi_data = data;
 
