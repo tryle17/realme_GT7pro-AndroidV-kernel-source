@@ -2896,7 +2896,7 @@ static void walt_update_cluster_topology(void)
 		for (i = 1; i < num_sched_clusters; i++)
 			nr_big_cpus += cpumask_weight(&sched_cluster[i]->cpus);
 
-	if (soc_enable_asym_siblings) {
+	if (soc_feat(SOC_ENABLE_ASYM_SIBLINGS)) {
 		cluster = NULL;
 		cpumask_clear(&asym_cap_sibling_cpus);
 		cpumask_clear(&shared_rail_sibling_cpus);
@@ -2975,7 +2975,7 @@ static void walt_init_cycle_counter(void)
 	char *walt_cycle_cntr_path = "/soc/walt";
 	struct device_node *np = NULL;
 
-	if (soc_enable_sw_cycle_counter) {
+	if (soc_feat(SOC_ENABLE_SW_CYCLE_COUNTER)) {
 		walt_cycle_counter_init();
 	} else {
 		np = of_find_node_by_path(walt_cycle_cntr_path);

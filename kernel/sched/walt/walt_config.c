@@ -7,14 +7,7 @@
 #include "trace.h"
 #include <soc/qcom/socinfo.h>
 
-bool soc_enable_conservative_boost_topapp	= true;
-bool soc_enable_conservative_boost_fg		= true;
-bool soc_enable_uclamp_boosted			= true;
-bool soc_enable_per_task_boost_on_mid		= true;
-bool soc_enable_silver_rt_spread;
-bool soc_enable_asym_siblings;
-bool soc_enable_boost_to_next_cluster;
-bool soc_enable_sw_cycle_counter;
+unsigned long __read_mostly soc_flags;
 
 void walt_config(void)
 {
@@ -74,15 +67,19 @@ void walt_config(void)
 			fmax_cap[i][j] = FREQ_QOS_MAX_DEFAULT_VALUE;
 	}
 
+	soc_feat_set(SOC_ENABLE_CONSERVATIVE_BOOST_TOPAPP);
+	soc_feat_set(SOC_ENABLE_CONSERVATIVE_BOOST_FG);
+	soc_feat_set(SOC_ENABLE_UCLAMP_BOOSTED);
+	soc_feat_set(SOC_ENABLE_PER_TASK_BOOST_ON_MID);
 	if (!strcmp(name, "SUN")) {
 		sysctl_sched_suppress_region2		= 1;
-		soc_enable_conservative_boost_topapp	= false;
-		soc_enable_conservative_boost_fg	= false;
-		soc_enable_uclamp_boosted		= false;
-		soc_enable_per_task_boost_on_mid	= false;
+		soc_feat_unset(SOC_ENABLE_CONSERVATIVE_BOOST_TOPAPP);
+		soc_feat_unset(SOC_ENABLE_CONSERVATIVE_BOOST_FG);
+		soc_feat_unset(SOC_ENABLE_UCLAMP_BOOSTED);
+		soc_feat_unset(SOC_ENABLE_PER_TASK_BOOST_ON_MID);
 	} else if (!strcmp(name, "PINEAPPLE")) {
-		soc_enable_silver_rt_spread		= true;
-		soc_enable_asym_siblings		= true;
-		soc_enable_boost_to_next_cluster	= true;
+		soc_feat_set(SOC_ENABLE_SILVER_RT_SPREAD);
+		soc_feat_set(SOC_ENABLE_ASYM_SIBLINGS);
+		soc_feat_set(SOC_ENABLE_BOOST_TO_NEXT_CLUSTER);
 	}
 }

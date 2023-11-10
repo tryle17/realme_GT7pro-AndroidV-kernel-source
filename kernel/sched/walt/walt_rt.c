@@ -116,7 +116,7 @@ static void walt_rt_energy_aware_wake_cpu(struct task_struct *task, struct cpuma
 
 	rcu_read_lock();
 
-	if (soc_enable_silver_rt_spread && order_index == 0)
+	if (soc_feat(SOC_ENABLE_SILVER_RT_SPREAD) && order_index == 0)
 		end_index = 1;
 
 	for (cluster = 0; cluster < num_sched_clusters; cluster++) {

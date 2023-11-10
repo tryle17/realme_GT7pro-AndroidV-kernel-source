@@ -72,6 +72,17 @@ enum freq_caps {
 	MAX_FREQ_CAP,
 };
 
+enum soc_tunables {
+	SOC_ENABLE_CONSERVATIVE_BOOST_TOPAPP,
+	SOC_ENABLE_CONSERVATIVE_BOOST_FG,
+	SOC_ENABLE_UCLAMP_BOOSTED,
+	SOC_ENABLE_PER_TASK_BOOST_ON_MID,
+	SOC_ENABLE_SILVER_RT_SPREAD,
+	SOC_ENABLE_ASYM_SIBLINGS,
+	SOC_ENABLE_BOOST_TO_NEXT_CLUSTER,
+	SOC_ENABLE_SW_CYCLE_COUNTER,
+};
+
 #define WALT_LOW_LATENCY_PROCFS		BIT(0)
 #define WALT_LOW_LATENCY_BINDER		BIT(1)
 #define WALT_LOW_LATENCY_PIPELINE	BIT(2)
@@ -229,14 +240,10 @@ extern int min_possible_cluster_id;
 extern int max_possible_cluster_id;
 extern unsigned int __read_mostly sched_init_task_load_windows;
 extern unsigned int __read_mostly sched_load_granule;
-extern bool soc_enable_conservative_boost_topapp;
-extern bool soc_enable_conservative_boost_fg;
-extern bool soc_enable_uclamp_boosted;
-extern bool soc_enable_per_task_boost_on_mid;
-extern bool soc_enable_silver_rt_spread;
-extern bool soc_enable_asym_siblings;
-extern bool soc_enable_boost_to_next_cluster;
-extern bool soc_enable_sw_cycle_counter;
+extern unsigned long __read_mostly soc_flags;
+#define soc_feat(feat)		(soc_flags & BIT_ULL(feat))
+#define soc_feat_set(feat)	(soc_flags |= BIT_ULL(feat))
+#define soc_feat_unset(feat)	(soc_flags &= ~BIT_ULL(feat))
 
 #define SCHED_IDLE_ENOUGH_DEFAULT 30
 #define SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT 40
@@ -620,7 +627,7 @@ static inline enum sched_boost_policy task_boost_policy(struct task_struct *p)
 
 static inline bool walt_uclamp_boosted(struct task_struct *p)
 {
-	return soc_enable_uclamp_boosted &&
+	return soc_feat(SOC_ENABLE_UCLAMP_BOOSTED) &&
 		((uclamp_eff_value(p, UCLAMP_MIN) > 0) &&
 		(task_util(p) > sysctl_sched_min_task_util_for_uclamp));
 }
@@ -691,7 +698,7 @@ static inline int per_task_boost(struct task_struct *p)
 		}
 	}
 
-	if (!soc_enable_per_task_boost_on_mid && (wts->boost == TASK_BOOST_ON_MID))
+	if (!(soc_feat(SOC_ENABLE_PER_TASK_BOOST_ON_MID)) && (wts->boost == TASK_BOOST_ON_MID))
 		return 0;
 
 	return wts->boost;
