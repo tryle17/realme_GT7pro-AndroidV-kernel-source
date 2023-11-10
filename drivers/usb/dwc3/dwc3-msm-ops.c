@@ -41,6 +41,7 @@ static int entry_dwc3_gadget_run_stop(struct kretprobe_instance *ri,
 		struct irq_desc *irq_desc = irq_to_desc(dwc->irq_gadget);
 		struct irqaction *action = irq_desc ? irq_desc->action : NULL;
 
+		dwc3_msm_notify_event(dwc, DWC3_GSI_EVT_BUF_SETUP, 0);
 		for ( ; action != NULL; action = action->next) {
 			if (action->thread) {
 				dev_info(dwc->dev, "Set IRQ thread:%s pid:%d to SCHED_NORMAL prio\n",
@@ -124,20 +125,6 @@ static int exit_dwc3_gadget_pullup(struct kretprobe_instance *ri,
 	return 0;
 }
 
-static int entry___dwc3_gadget_start(struct kretprobe_instance *ri,
-				   struct pt_regs *regs)
-{
-	struct dwc3 *dwc = (struct dwc3 *)regs->regs[0];
-
-	/*
-	 * Setup USB GSI event buffer as controller soft reset has cleared
-	 * configured event buffer.
-	 */
-	dwc3_msm_notify_event(dwc, DWC3_GSI_EVT_BUF_SETUP, 0);
-
-	return 0;
-}
-
 static int entry_trace_event_raw_event_dwc3_log_request(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
@@ -214,7 +201,6 @@ static struct kretprobe dwc3_msm_probes[] = {
 	ENTRY(dwc3_gadget_reset_interrupt),
 	ENTRY(__dwc3_gadget_ep_enable),
 	ENTRY_EXIT(dwc3_gadget_pullup),
-	ENTRY(__dwc3_gadget_start),
 	ENTRY(trace_event_raw_event_dwc3_log_request),
 	ENTRY(trace_event_raw_event_dwc3_log_gadget_ep_cmd),
 	ENTRY(trace_event_raw_event_dwc3_log_trb),
