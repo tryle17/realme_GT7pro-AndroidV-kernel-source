@@ -514,7 +514,6 @@ static void android_rvh_get_nohz_timer_target(void *unused, int *cpu, bool *done
 {
 	int i, default_cpu = -1;
 	struct sched_domain *sd;
-	cpumask_t unhalted;
 
 	*done = true;
 
@@ -539,9 +538,9 @@ static void android_rvh_get_nohz_timer_target(void *unused, int *cpu, bool *done
 	}
 
 	if (default_cpu == -1) {
-		cpumask_complement(&unhalted, cpu_halt_mask);
-		for_each_cpu_and(i, &unhalted,
-				 housekeeping_cpumask(HK_TYPE_TIMER)) {
+		for_each_cpu_andnot(i,
+				 housekeeping_cpumask(HK_TYPE_TIMER),
+				 cpu_halt_mask) {
 			if (*cpu == i)
 				continue;
 
@@ -552,7 +551,7 @@ static void android_rvh_get_nohz_timer_target(void *unused, int *cpu, bool *done
 		}
 
 		/* no active, non-halted, not-idle, choose any */
-		default_cpu = cpumask_any(&unhalted);
+		default_cpu = cpumask_first_zero(cpu_halt_mask);
 
 		if (unlikely(default_cpu >= nr_cpu_ids))
 			goto unlock;

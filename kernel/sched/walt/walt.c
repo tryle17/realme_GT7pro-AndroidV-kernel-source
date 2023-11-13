@@ -11,10 +11,10 @@
 #include <linux/sched/stat.h>
 #include <linux/module.h>
 #include <linux/kmemleak.h>
-#include <linux/qcom-cpufreq-hw.h>
 #include <linux/cpumask.h>
 #include <linux/arch_topology.h>
 #include <linux/cpu.h>
+#include <linux/sysctl.h>
 
 #include <trace/hooks/sched.h>
 #include <trace/hooks/cpufreq.h>
@@ -442,6 +442,11 @@ update_window_start(struct rq *rq, u64 wallclock, int event)
 	rollover_top_tasks(rq, full_window);
 
 	return old_window_start;
+}
+
+u64 qcom_cpufreq_get_cpu_cycle_counter(int cpu)
+{
+	return U64_MAX;
 }
 
 /*
@@ -4711,12 +4716,6 @@ static void walt_sched_init_rq(struct rq *rq)
 	wrq->task_exec_scale = 1024;
 	wrq->push_task = NULL;
 
-	/*
-	 * All cpus part of same cluster by default. This avoids the
-	 * need to check for wrq->cluster being non-NULL in hot-paths
-	 * like select_best_cpu()
-	 */
-	wrq->cluster = &init_cluster;
 	wrq->curr_runnable_sum = wrq->prev_runnable_sum = 0;
 	wrq->nt_curr_runnable_sum = wrq->nt_prev_runnable_sum = 0;
 	memset(&wrq->grp_time, 0, sizeof(struct group_cpu_time));
@@ -5343,8 +5342,6 @@ static int walt_init_stop_handler(void *data)
 
 	create_default_coloc_group();
 
-	walt_update_cluster_topology();
-
 	walt_disabled = false;
 
 	for_each_possible_cpu(cpu) {
@@ -5367,7 +5364,7 @@ static void walt_init_tg_pointers(void)
 
 static void walt_init(struct work_struct *work)
 {
-	struct ctl_table_header *hdr;
+	struct ctl_table_header *hdr, *hdr2;
 	static atomic_t already_inited = ATOMIC_INIT(0);
 	struct root_domain *rd = cpu_rq(cpumask_first(cpu_active_mask))->rd;
 	int i;
@@ -5404,6 +5401,8 @@ static void walt_init(struct work_struct *work)
 		wait_for_completion_interruptible(&rebuild_domains_completion);
 	}
 
+	walt_update_cluster_topology();
+
 	stop_machine(walt_init_stop_handler, NULL, NULL);
 
 	/*
@@ -5418,8 +5417,11 @@ static void walt_init(struct work_struct *work)
 			 "root domain's perf-domain values not initialized rd->pd=%p.",
 			 rd->pd);
 
-	hdr = register_sysctl_table(walt_base_table);
+	hdr = register_sysctl("walt", walt_table);
+	hdr2 = register_sysctl("walt/input_boost", input_boost_sysctls);
+
 	kmemleak_not_leak(hdr);
+	kmemleak_not_leak(hdr2);
 
 	input_boost_init();
 	core_ctl_init();

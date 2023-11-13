@@ -1130,11 +1130,6 @@ struct ctl_table walt_table[] = {
 		.extra2		= &two_hundred_fifty_five,
 	},
 	{
-		.procname	= "input_boost",
-		.mode		= 0555,
-		.child		= input_boost_sysctls,
-	},
-	{
 		.procname	= "sched_wake_up_idle",
 		.data		= (int *) WAKE_UP_IDLE,
 		.maxlen		= sizeof(unsigned int) * 2,
@@ -1356,15 +1351,6 @@ struct ctl_table walt_table[] = {
 		.proc_handler	= sched_fmax_cap_handler,
 	},
 	{ }
-};
-
-struct ctl_table walt_base_table[] = {
-	{
-		.procname	= "walt",
-		.mode		= 0555,
-		.child		= walt_table,
-	},
-	{ },
 };
 
 void walt_tunables(void)
