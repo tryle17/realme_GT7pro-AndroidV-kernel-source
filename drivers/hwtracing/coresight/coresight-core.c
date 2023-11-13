@@ -27,7 +27,7 @@
 #include "coresight-common.h"
 #include "coresight-syscfg.h"
 
-#define MAX_SINK_NAME 20
+#define MAX_SINK_NAME 25
 
 static DEFINE_MUTEX(coresight_mutex);
 static DEFINE_PER_CPU(struct coresight_device *, csdev_sink);
@@ -488,7 +488,6 @@ static struct coresight_device *coresight_get_source(struct list_head *path)
 
 	return csdev;
 }
-
 
 /*
  * coresight_disable_path_from : Disable components in the given path beyond
@@ -1178,6 +1177,20 @@ static int coresight_validate_source(struct coresight_device *csdev,
 	return 0;
 }
 
+static int coresight_validate_sink(struct coresight_device *source,
+					struct coresight_device *sink)
+{
+
+
+	if (of_coresight_secure_node(sink) && !of_coresight_secure_node(source)) {
+		dev_err(&sink->dev, "dont support this source: %s\n",
+				dev_name(&source->dev));
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int coresight_store_path(struct coresight_device *csdev,
 		struct list_head *path)
 {
@@ -1315,6 +1328,10 @@ int coresight_enable(struct coresight_device *csdev)
 		ret = -EINVAL;
 		goto out;
 	}
+
+	ret = coresight_validate_sink(csdev, sink);
+	if (ret)
+		goto out;
 
 	path = coresight_build_path(csdev, sink);
 	if (IS_ERR(path)) {

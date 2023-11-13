@@ -1251,7 +1251,8 @@ static struct etr_buf *tmc_etr_get_sysfs_buffer(struct coresight_device *csdev)
 		}
 	}
 
-	if (drvdata->reading || drvdata->mode == CS_MODE_PERF) {
+	if (drvdata->reading || drvdata->mode == CS_MODE_PERF ||
+		drvdata->busy) {
 		ret = -EBUSY;
 		goto unlock_out;
 	}
@@ -1735,7 +1736,7 @@ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, void *data)
 
 	spin_lock_irqsave(&drvdata->spinlock, flags);
 	 /* Don't use this sink if it is already claimed by sysFS */
-	if (drvdata->mode == CS_MODE_SYSFS) {
+	if (drvdata->mode == CS_MODE_SYSFS || drvdata->busy) {
 		rc = -EBUSY;
 		goto unlock_out;
 	}
