@@ -23,6 +23,10 @@
 /* AMOLED AB register definitions */
 #define AB_REVISION2				0x01
 
+#define AB_SUBTYPE				0x05
+ #define PM8350B_ECM				6
+ #define PMD802X_ECM				7
+
 /* AMOLED ECM register definitions */
 #define AB_ECM_EN_CTL				0xA0
  #define ECM_EN					BIT(7)
@@ -98,8 +102,9 @@
 #define ECM_SDAM_SAMPLE_END_ADDR		0xBF
 
 /* ECM specific definitions */
-#define ECM_SAMPLE_GAIN_V1			15
-#define ECM_SAMPLE_GAIN_V2			16
+#define PM8350B_ECM_SAMPLE_GAIN_V1		15
+#define PM8350B_ECM_SAMPLE_GAIN_V2		16
+#define PMD802X_ECM_SAMPLE_GAIN			50
 #define ECM_MIN_M_SAMPLES			10
 #define AMOLED_AB_REVISION_1P0			0
 #define AMOLED_AB_REVISION_2P0			1
@@ -160,6 +165,7 @@ struct amoled_ecm_data {
  * @num_sdams:		Number of SDAMs used for AMOLED ECM
  * @base:		Base address of the AMOLED ECM module
  * @ab_revision:	Revision of the AMOLED AB module
+ * @subtype:		ECM hardware subtype
  * @enable:		Flag to enable/disable AMOLED ECM
  * @abort:		Flag to indicated AMOLED ECM has aborted
  * @reenable:		Flag to reenable ECM when display goes unblank
@@ -176,6 +182,7 @@ struct amoled_ecm {
 	u32			num_sdams;
 	u32			base;
 	u8			ab_revision;
+	u8			subtype;
 	bool			enable;
 	bool			abort;
 	bool			reenable;
@@ -269,13 +276,6 @@ static int amoled_ecm_enable(struct amoled_ecm *ecm)
 		data->mode = ECM_MODE_CONTINUOUS;
 	}
 
-	if ((ecm->ab_revision != AMOLED_AB_REVISION_1P0) &&
-			(ecm->ab_revision != AMOLED_AB_REVISION_2P0)) {
-		dev_err(ecm->dev, "ECM is not supported for AB version %u\n",
-			ecm->ab_revision);
-		return -ENODEV;
-	}
-
 	rc = ecm_reset_sdam_config(ecm);
 	if (rc < 0) {
 		dev_err(ecm->dev, "Failed to reset ECM SDAM configuration, rc=%d\n",
@@ -291,17 +291,21 @@ static int amoled_ecm_enable(struct amoled_ecm *ecm)
 		return rc;
 	}
 
-	rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_EN_CTL, ECM_EN);
-	if (rc < 0) {
-		dev_err(ecm->dev, "Failed to enable ECM, rc=%d\n", rc);
-		return rc;
-	}
+	if (ecm->subtype == PM8350B_ECM) {
+		rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_EN_CTL,
+				ECM_EN);
+		if (rc < 0) {
+			dev_err(ecm->dev, "Failed to enable ECM, rc=%d\n", rc);
+			return rc;
+		}
 
-	rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_COUNTER_CTL,
-		ECM_COUNTER_START);
-	if (rc < 0) {
-		dev_err(ecm->dev, "Failed to enable ECM counter, rc=%d\n", rc);
-		return rc;
+		rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_COUNTER_CTL,
+				ECM_COUNTER_START);
+		if (rc < 0) {
+			dev_err(ecm->dev, "Failed to enable ECM counter, rc=%d\n",
+				rc);
+			return rc;
+		}
 	}
 
 	if (data->mode == ECM_MODE_CONTINUOUS)
@@ -317,16 +321,20 @@ static int amoled_ecm_disable(struct amoled_ecm *ecm)
 {
 	int rc;
 
-	rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_COUNTER_CTL, 0);
-	if (rc < 0) {
-		dev_err(ecm->dev, "Failed to disable ECM counter, rc=%d\n", rc);
-		return rc;
-	}
+	if (ecm->subtype == PM8350B_ECM) {
+		rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_COUNTER_CTL,
+				0);
+		if (rc < 0) {
+			dev_err(ecm->dev, "Failed to disable ECM counter, rc=%d\n",
+				rc);
+			return rc;
+		}
 
-	rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_EN_CTL, 0);
-	if (rc < 0) {
-		dev_err(ecm->dev, "Failed to disable ECM, rc=%d\n", rc);
-		return rc;
+		rc = regmap_write(ecm->regmap, ecm->base + AB_ECM_EN_CTL, 0);
+		if (rc < 0) {
+			dev_err(ecm->dev, "Failed to disable ECM, rc=%d\n", rc);
+			return rc;
+		}
 	}
 
 	rc = ecm_nvmem_device_write(ecm->sdam[0].nvmem, ECM_AVERAGE_LSB, 2,
@@ -584,6 +592,29 @@ static int get_sdam_index(struct nvmem_device *nvmem, int sdam_num, u8 *index)
 	return nvmem_device_read(nvmem, addr, 1, index);
 }
 
+static u16 get_ecm_gain(struct amoled_ecm *ecm)
+{
+	if (ecm->subtype == PM8350B_ECM) {
+		/*
+		 * For AMOLED AB peripheral,
+		 * Revision 1.0:
+		 * ECM measured current = 15 times of each LSB
+		 *
+		 * Revision 2.0:
+		 * ECM measured current = 16 times of each LSB
+		 */
+
+		if (ecm->ab_revision == AMOLED_AB_REVISION_1P0)
+			return PM8350B_ECM_SAMPLE_GAIN_V1;
+		else
+			return PM8350B_ECM_SAMPLE_GAIN_V2;
+	} else if (ecm->subtype == PMD802X_ECM) {
+		return PMD802X_ECM_SAMPLE_GAIN;
+	}
+
+	return 0;
+}
+
 static irqreturn_t sdam_full_irq_handler(int irq, void *_ecm)
 {
 	struct amoled_ecm *ecm = _ecm;
@@ -659,19 +690,9 @@ static irqreturn_t sdam_full_irq_handler(int irq, void *_ecm)
 		goto irq_exit;
 	}
 
-	/*
-	 * For AMOLED AB peripheral,
-	 * Revision 1.0:
-	 * ECM measured current = 15 times of each LSB
-	 *
-	 * Revision 2.0:
-	 * ECM measured current = 16 times of each LSB
-	 */
-
-	if (ecm->ab_revision == AMOLED_AB_REVISION_1P0)
-		gain = ECM_SAMPLE_GAIN_V1;
-	else
-		gain = ECM_SAMPLE_GAIN_V2;
+	gain = get_ecm_gain(ecm);
+	if (!gain)
+		goto irq_exit;
 
 	for (i = sdam_start; i < sdam_index; i += 2) {
 		rc = nvmem_device_read(ecm->sdam[sdam_num].nvmem, i, 2, buf);
@@ -926,12 +947,34 @@ static int qti_amoled_ecm_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+	rc = regmap_read(ecm->regmap, ecm->base + AB_SUBTYPE, &temp);
+	if (rc < 0) {
+		dev_err(&pdev->dev, "Failed to read AB subtype, rc=%d\n", rc);
+		return rc;
+	}
+	ecm->subtype = temp;
+
+	if (ecm->subtype != PM8350B_ECM && ecm->subtype != PMD802X_ECM) {
+		dev_err(&pdev->dev, "ECM not supported for unknown subtype %u\n",
+			ecm->subtype);
+		return -ENODEV;
+	}
+
 	rc = regmap_read(ecm->regmap, ecm->base + AB_REVISION2, &temp);
 	if (rc < 0) {
 		dev_err(&pdev->dev, "Failed to read AB revision, rc=%d\n", rc);
 		return rc;
 	}
 	ecm->ab_revision = temp;
+
+	if (ecm->subtype == PM8350B_ECM) {
+		if (ecm->ab_revision != AMOLED_AB_REVISION_1P0 &&
+		    ecm->ab_revision != AMOLED_AB_REVISION_2P0) {
+			dev_err(&pdev->dev, "ECM is not supported for AB version %u\n",
+				ecm->ab_revision);
+			return -ENODEV;
+		}
+	}
 
 	ecm->enable = false;
 	ecm->abort = false;
