@@ -38,6 +38,8 @@ def define_sun():
         "drivers/firmware/qcom-scm.ko",
         "drivers/gpu/drm/display/drm_display_helper.ko",
         "drivers/gpu/drm/display/drm_dp_aux_bus.ko",
+        "drivers/hwmon/hwmon.ko",
+        "drivers/hwmon/qti_amoled_ecm.ko",
         "drivers/hwspinlock/qcom_hwspinlock.ko",
         "drivers/hwtracing/coresight/coresight.ko",
         "drivers/hwtracing/coresight/coresight-csr.ko",
