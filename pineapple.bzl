@@ -19,6 +19,7 @@ def define_pineapple():
         "drivers/clk/qcom/gpucc-pineapple.ko",
         "drivers/clk/qcom/tcsrcc-pineapple.ko",
         "drivers/clk/qcom/videocc-pineapple.ko",
+        "drivers/cpufreq/qcom-cpufreq-hw.ko",
         "drivers/dma-buf/heaps/qcom_dma_heaps.ko",
         "drivers/firmware/arm_scmi/qcom_scmi_vendor.ko",
         "drivers/firmware/qcom-scm.ko",
