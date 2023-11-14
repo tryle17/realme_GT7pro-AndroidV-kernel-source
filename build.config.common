@@ -11,10 +11,10 @@ DTC=$(command -v dtc || { echo "WARNING: $BUILD_CONFIG loaded without Kleaf herm
     echo "${ROOT_DIR}/${BUILDTOOLS_PREBUILT_BIN}/dtc";
 })
 
-if ! "$DTC" -Wno-interrupt_provider --version; then
-    echo "WARNING: $("$DTC" --version) does not support -Wno-interrupt_provider"
+if ! "$DTC" -Wno-interrupt_provider --version > /dev/null 2>&1; then
+    echo "WARNING: $("$DTC" --version) does not support -Wno-interrupt_provider" >&2
     DTC="${ROOT_DIR}/${BUILDTOOLS_PREBUILT_BIN}/dtc"
-    echo "WARNING: Falling back to $DTC"
+    echo "WARNING: Falling back to $DTC" >&2
 fi
 
 KCFLAGS="${KCFLAGS} -D__ANDROID_COMMON_KERNEL__"
