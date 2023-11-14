@@ -803,13 +803,24 @@ static void i3c_setup_go_tre(struct geni_i3c_dev *gi3c, struct geni_i3c_xfer_par
 	u8 addr =  (xfer->m_param >> SLV_ADDR_SHFT) & I3C_ADDR_MASK;
 	u8 ccc = (xfer->m_param & CCC_HDR_CMD_MSK) >> CCC_HDR_CMD_SHFT;
 	u32 cur_len;
+	bool stretch;
+
+	/*
+	 * Currently implemented as SWA.
+	 * Fix is present from qup-core version 4.0.0 onwards[major = 4, minor = 0].
+	 * So below SWA is not applicable from qup-core version 4.0.0 onwards.
+	 */
+	if (gi3c->ver_info.hw_major_ver < 4)
+		stretch = true;
+	else
+		stretch = (xfer->m_param & STOP_STRETCH) ? true : false;
 
 	if (multi_tre_tx_xfer)
 		cur_len = tx_tre_q->len[idx % GSI_MAX_NUM_TRE_MSGS];
 	else
 		cur_len = gi3c->cur_len;
 
-	go_t->dword[0] = MSM_GPI_I3C_GO_TRE_DWORD0((1 << 2 | bypass_addrspace << 7), ccc,
+	go_t->dword[0] = MSM_GPI_I3C_GO_TRE_DWORD0((stretch << 2 | bypass_addrspace << 7), ccc,
 						   addr, xfer->m_cmd);
 	go_t->dword[1] = MSM_GPI_I3C_GO_TRE_DWORD1(use_7e << 0 | nack_ibi << 1 | cont_mode << 2);
 	if (gi3c->cur_rnw == READ_TRANSACTION) {
@@ -2150,6 +2161,14 @@ static int geni_i3c_gsi_stop_on_bus(struct geni_i3c_dev *gi3c)
 	int tre_cnt = 0, ret = 0, time_remaining = 0;
 	bool tx_chan = true;
 
+	/*
+	 * Currently implemented as SWA.
+	 * Fix is present from qup-core version 4.0.0 onwards[major = 4, minor = 0].
+	 * So below SWA is not applicable from qup-core version 4.0.0 onwards.
+	 */
+	if (gi3c->ver_info.hw_major_ver >= 4)
+		return 0;
+
 	gi3c->err = 0;
 	gi3c->gsi_err = false;
 	gi3c->gsi.tx.tre.flags = 0;
@@ -2718,9 +2737,16 @@ static void geni_i3c_enable_ibi_irq(struct geni_i3c_dev *gi3c, bool enable)
  */
 static void geni_i3c_disable_free_running_clock(struct geni_i3c_dev *gi3c)
 {
-	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "Force default\n");
-	writel(FORCE_DEFAULT, gi3c->se.base + GENI_FORCE_DEFAULT_REG);
-	writel_relaxed(0x7f, gi3c->se.base + GENI_OUTPUT_CTRL);
+	/*
+	 * Currently implemented as SWA.
+	 * Fix is present from qup-core version 4.0.0 onwards[major = 4, minor = 0].
+	 * So below SWA is not applicable from qup-core version 4.0.0 onwards.
+	 */
+	if (gi3c->ver_info.hw_major_ver < 4) {
+		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "Force default\n");
+		writel(FORCE_DEFAULT, gi3c->se.base + GENI_FORCE_DEFAULT_REG);
+		writel(0x7f, gi3c->se.base + GENI_OUTPUT_CTRL);
+	}
 	gi3c->disable_free_run_clks = true;
 }
 
@@ -3235,6 +3261,9 @@ static void geni_i3c_get_ver_info(struct geni_i3c_dev *gi3c)
 		"%s hw_ver: 0x%x Major:%d Minor:%d step:%d\n",
 		__func__, hw_ver, major, minor, step);
 
+	gi3c->ver_info.hw_major_ver = major;
+	gi3c->ver_info.hw_minor_ver = minor;
+	gi3c->ver_info.hw_step_ver = step;
 	gi3c->ver_info.m_fw_ver = geni_se_common_get_m_fw(gi3c->se.base);
 	gi3c->ver_info.s_fw_ver = geni_se_common_get_s_fw(gi3c->se.base);
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s:FW Ver:0x%x%x\n",
