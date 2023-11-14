@@ -2305,6 +2305,7 @@
   of_clk_src_onecell_get
   of_clk_src_simple_get
   of_count_phandle_with_args
+  of_cpu_device_node_get
   of_cpu_node_to_id
   of_devfreq_cooling_register
   of_device_get_match_data
