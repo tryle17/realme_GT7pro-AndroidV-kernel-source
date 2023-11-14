@@ -2898,7 +2898,7 @@ static void walt_update_cluster_topology(void)
 		for (i = 1; i < num_sched_clusters; i++)
 			nr_big_cpus += cpumask_weight(&sched_cluster[i]->cpus);
 
-	if (num_sched_clusters == 4) {
+	if (soc_enable_asym_siblings) {
 		cluster = NULL;
 		cpumask_clear(&asym_cap_sibling_cpus);
 		cpumask_clear(&shared_rail_sibling_cpus);
@@ -5374,8 +5374,6 @@ static void walt_init(struct work_struct *work)
 	if (atomic_cmpxchg(&already_inited, 0, 1))
 		return;
 
-	walt_tunables();
-
 	register_syscore_ops(&walt_syscore_ops);
 	BUG_ON(alloc_related_thread_groups());
 	walt_init_cycle_counter();
@@ -5452,6 +5450,8 @@ static int walt_module_init(void)
 	/* compile time checks for vendor data size */
 	WALT_VENDOR_DATA_SIZE_TEST(struct walt_task_struct, struct task_struct);
 	WALT_VENDOR_DATA_SIZE_TEST(struct walt_task_group, struct task_group);
+
+	walt_config();
 
 	register_trace_android_vh_update_topology_flags_workfn(
 			android_vh_update_topology_flags_workfn, NULL);

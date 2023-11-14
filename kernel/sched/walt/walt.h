@@ -223,10 +223,20 @@ extern int min_possible_cluster_id;
 extern int max_possible_cluster_id;
 extern unsigned int __read_mostly sched_init_task_load_windows;
 extern unsigned int __read_mostly sched_load_granule;
+extern bool soc_enable_conservative_boost_topapp;
+extern bool soc_enable_conservative_boost_fg;
+extern bool soc_enable_uclamp_boosted;
+extern bool soc_enable_per_task_boost_on_mid;
+extern bool soc_enable_silver_rt_spread;
+extern bool soc_enable_asym_siblings;
+extern bool soc_enable_boost_to_sibling;
+extern bool soc_enable_sw_cycle_counter;
 
 #define SCHED_IDLE_ENOUGH_DEFAULT 30
 #define SCHED_CLUSTER_UTIL_THRES_PCT_DEFAULT 40
 
+extern unsigned int sysctl_sched_idle_enough;
+extern unsigned int sysctl_sched_cluster_util_thres_pct;
 extern unsigned int sysctl_sched_idle_enough_clust[MAX_CLUSTERS];
 extern unsigned int sysctl_sched_cluster_util_thres_pct_clust[MAX_CLUSTERS];
 
@@ -247,10 +257,14 @@ extern unsigned int sysctl_sched_util_busy_hyst_cpu_util[WALT_NR_CPUS];
 extern unsigned int sysctl_sched_boost; /* To/from userspace */
 extern unsigned int sysctl_sched_capacity_margin_up[MAX_MARGIN_LEVELS];
 extern unsigned int sysctl_sched_capacity_margin_down[MAX_MARGIN_LEVELS];
+extern unsigned int sysctl_sched_capacity_margin_up_pct[MAX_MARGIN_LEVELS];
+extern unsigned int sysctl_sched_capacity_margin_dn_pct[MAX_MARGIN_LEVELS];
+extern unsigned int sysctl_sched_early_up[MAX_MARGIN_LEVELS];
+extern unsigned int sysctl_sched_early_down[MAX_MARGIN_LEVELS];
 extern unsigned int sched_boost_type; /* currently activated sched boost */
 extern enum sched_boost_policy boost_policy;
 extern unsigned int sysctl_input_boost_ms;
-extern unsigned int sysctl_input_boost_freq[8];
+extern unsigned int sysctl_input_boost_freq[WALT_NR_CPUS];
 extern unsigned int sysctl_sched_boost_on_input;
 extern unsigned int sysctl_sched_user_hint;
 extern unsigned int sysctl_sched_conservative_pl;
@@ -337,7 +351,7 @@ extern unsigned int sysctl_sched_skip_sp_newly_idle_lb;
 extern unsigned int sysctl_sched_asymcap_boost;
 extern struct ctl_table input_boost_sysctls[];
 extern struct ctl_table walt_table[];
-extern void walt_tunables(void);
+extern void walt_config(void);
 extern void walt_update_group_thresholds(void);
 extern void sched_window_nr_ticks_change(void);
 extern unsigned long sched_user_hint_reset_time;
@@ -600,8 +614,9 @@ static inline enum sched_boost_policy task_boost_policy(struct task_struct *p)
 
 static inline bool walt_uclamp_boosted(struct task_struct *p)
 {
-	return ((uclamp_eff_value(p, UCLAMP_MIN) > 0) &&
-			(task_util(p) > sysctl_sched_min_task_util_for_uclamp));
+	return soc_enable_uclamp_boosted &&
+		((uclamp_eff_value(p, UCLAMP_MIN) > 0) &&
+		(task_util(p) > sysctl_sched_min_task_util_for_uclamp));
 }
 
 static inline unsigned long capacity_of(int cpu)
@@ -669,6 +684,10 @@ static inline int per_task_boost(struct task_struct *p)
 			wts->boost = 0;
 		}
 	}
+
+	if (!soc_enable_per_task_boost_on_mid && (wts->boost == TASK_BOOST_ON_MID))
+		return 0;
+
 	return wts->boost;
 }
 
