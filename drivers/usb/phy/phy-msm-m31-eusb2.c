@@ -37,8 +37,8 @@
 #define SIDDQ				BIT(2)
 #define RETENABLEN			BIT(3)
 #define FSEL				(0x7 << 4)
-#define FSEL_19_2_MHZ_VAL		(0x0 << 4)
-#define FSEL_38_4_MHZ_VAL		(0x4 << 4)
+#define FSEL_19_2_MHZ_VAL		(0x4 << 4)
+#define FSEL_38_4_MHZ_VAL		(0x6 << 4)
 
 #define USB_PHY_CFG_CTRL_1		(0x58)
 #define PHY_CFG_PLL_CPBIAS_CNTRL	(0xfe)
@@ -137,7 +137,7 @@ struct eusb_phy_tbl {
 	u32 val;
 };
 
-#define EUSB_PHY_INIT_CFG(o, v, b)	\
+#define EUSB_PHY_INIT_CFG(o, b, v)	\
 	{				\
 		.offset = o,		\
 		.bit_mask = b,		\
@@ -461,9 +461,8 @@ static void msm_m31_eusb2_ref_clk_init(struct usb_phy *uphy)
 {
 	struct m31_eusb2_phy *phy = container_of(uphy, struct m31_eusb2_phy, phy);
 
-	/* setting to 19.2 mHz as per the ref_clk frequency */
 	msm_m31_eusb2_write_readback(phy->base, USB_PHY_HS_PHY_CTRL_COMMON0,
-						FSEL, FSEL_19_2_MHZ_VAL);
+						FSEL, FSEL_38_4_MHZ_VAL);
 
 }
 
