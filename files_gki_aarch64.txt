@@ -4164,7 +4164,6 @@ include/trace/events/page_pool.h
 include/trace/events/pagemap.h
 include/trace/events/percpu.h
 include/trace/events/power.h
-include/trace/events/preemptirq.h
 include/trace/events/printk.h
 include/trace/events/pwm.h
 include/trace/events/qdisc.h
@@ -4201,6 +4200,7 @@ include/trace/events/workqueue.h
 include/trace/events/writeback.h
 include/trace/events/xdp.h
 include/trace/hooks/avc.h
+include/trace/hooks/binder.h
 include/trace/hooks/cgroup.h
 include/trace/hooks/cpufreq.h
 include/trace/hooks/cpuidle.h
@@ -4210,6 +4210,7 @@ include/trace/hooks/epoch.h
 include/trace/hooks/ftrace_dump.h
 include/trace/hooks/gic.h
 include/trace/hooks/gic_v3.h
+include/trace/hooks/hung_task.h
 include/trace/hooks/iommu.h
 include/trace/hooks/mm.h
 include/trace/hooks/mpam.h
@@ -4947,12 +4948,7 @@ kernel/ksysfs.c
 kernel/kthread.c
 kernel/locking/lock_events.h
 kernel/locking/lock_events_list.h
-kernel/locking/lockdep.c
-kernel/locking/lockdep_internals.h
-kernel/locking/lockdep_proc.c
-kernel/locking/lockdep_states.h
 kernel/locking/mcs_spinlock.h
-kernel/locking/mutex-debug.c
 kernel/locking/mutex.c
 kernel/locking/mutex.h
 kernel/locking/osq_lock.c
@@ -4966,7 +4962,6 @@ kernel/locking/rtmutex_common.h
 kernel/locking/rwsem.c
 kernel/locking/semaphore.c
 kernel/locking/spinlock.c
-kernel/locking/spinlock_debug.c
 kernel/locking/ww_mutex.h
 kernel/module/gki_module.c
 kernel/module/internal.h
@@ -5132,7 +5127,6 @@ kernel/trace/trace_kprobe_selftest.h
 kernel/trace/trace_nop.c
 kernel/trace/trace_output.c
 kernel/trace/trace_output.h
-kernel/trace/trace_preemptirq.c
 kernel/trace/trace_printk.c
 kernel/trace/trace_probe.c
 kernel/trace/trace_probe.h
