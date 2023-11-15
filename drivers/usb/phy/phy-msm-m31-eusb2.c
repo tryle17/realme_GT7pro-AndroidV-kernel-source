@@ -147,7 +147,7 @@ struct eusb_phy_tbl {
 static const struct eusb_phy_tbl m31_eusb_phy_tbl[] = {
 	EUSB_PHY_INIT_CFG(USB_PHY_CFG0, BIT(1), 1),
 	EUSB_PHY_INIT_CFG(USB_PHY_UTMI_CTRL5, BIT(1), 1),
-	EUSB_PHY_INIT_CFG(USB_PHY_CFG1_PLL_EN, BIT(0), 1),
+	EUSB_PHY_INIT_CFG(USB_PHY_CFG1, BIT(0), 1),
 	EUSB_PHY_INIT_CFG(USB_PHY_FSEL_SEL, BIT(0), 1),
 };
 
@@ -497,9 +497,6 @@ static void msm_m31_eusb2_phy_write_configs(struct m31_eusb2_phy *phy,
 	for (i = 0 ; i < num; i++, t++) {
 		dev_dbg(phy->phy.dev, "Offset:%x BitMask:%x Value:%x",
 					t->offset, t->bit_mask, t->val);
-
-		/* for dbg, in case the values is greater than the offset */
-		BUG_ON((t->val << __ffs(t->bit_mask)) > t->bit_mask);
 
 		msm_m31_eusb2_write_readback(phy->base,
 					t->offset, t->bit_mask,
