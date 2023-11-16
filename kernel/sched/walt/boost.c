@@ -42,7 +42,8 @@ void walt_init_topapp_tg(struct task_group *tg)
 	wtg->colocate = true;
 	wtg->sched_boost_enable[NO_BOOST] = false;
 	wtg->sched_boost_enable[FULL_THROTTLE_BOOST] = true;
-	wtg->sched_boost_enable[CONSERVATIVE_BOOST] = soc_enable_conservative_boost_topapp;
+	wtg->sched_boost_enable[CONSERVATIVE_BOOST] =
+		soc_feat(SOC_ENABLE_CONSERVATIVE_BOOST_TOPAPP);
 	wtg->sched_boost_enable[RESTRAINED_BOOST] = false;
 	wtg->sched_boost_enable[STORAGE_BOOST] = true;
 }
@@ -56,7 +57,7 @@ void walt_init_foreground_tg(struct task_group *tg)
 	wtg->colocate = false;
 	wtg->sched_boost_enable[NO_BOOST] = false;
 	wtg->sched_boost_enable[FULL_THROTTLE_BOOST] = true;
-	wtg->sched_boost_enable[CONSERVATIVE_BOOST] = soc_enable_conservative_boost_fg;
+	wtg->sched_boost_enable[CONSERVATIVE_BOOST] = soc_feat(SOC_ENABLE_CONSERVATIVE_BOOST_FG);
 	wtg->sched_boost_enable[RESTRAINED_BOOST] = false;
 	wtg->sched_boost_enable[STORAGE_BOOST] = true;
 }

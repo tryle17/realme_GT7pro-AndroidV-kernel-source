@@ -15,6 +15,7 @@
 #include <linux/arch_topology.h>
 #include <linux/cpu.h>
 #include <linux/sysctl.h>
+#include <linux/of_platform.h>
 
 #include <trace/hooks/sched.h>
 #include <trace/hooks/cpufreq.h>
@@ -54,8 +55,10 @@ DEFINE_PER_CPU(struct walt_rq, walt_rq);
 unsigned int sysctl_sched_user_hint;
 static u64 sched_clock_last;
 static bool walt_clock_suspended;
+DECLARE_COMPLETION(walt_get_cycle_counts_cb_completion);
+bool use_cycle_counter;
+u64 (*walt_get_cycle_counts_cb)(int cpu, u64 wc);
 
-static bool use_cycle_counter;
 static DEFINE_MUTEX(cluster_lock);
 static u64 walt_load_reported_window;
 
@@ -444,11 +447,6 @@ update_window_start(struct rq *rq, u64 wallclock, int event)
 	return old_window_start;
 }
 
-u64 qcom_cpufreq_get_cpu_cycle_counter(int cpu)
-{
-	return U64_MAX;
-}
-
 /*
  * Assumes rq_lock is held and wallclock was recorded in the same critical
  * section as this function's invocation.
@@ -458,7 +456,7 @@ static inline u64 read_cycle_counter(int cpu, u64 wallclock)
 	struct walt_rq *wrq = &per_cpu(walt_rq, cpu);
 
 	if (wrq->last_cc_update != wallclock) {
-		wrq->cycles = qcom_cpufreq_get_cpu_cycle_counter(cpu);
+		wrq->cycles = walt_get_cycle_counts_cb(cpu, wallclock);
 		wrq->last_cc_update = wallclock;
 	}
 
@@ -2898,7 +2896,7 @@ static void walt_update_cluster_topology(void)
 		for (i = 1; i < num_sched_clusters; i++)
 			nr_big_cpus += cpumask_weight(&sched_cluster[i]->cpus);
 
-	if (soc_enable_asym_siblings) {
+	if (soc_feat(SOC_ENABLE_ASYM_SIBLINGS)) {
 		cluster = NULL;
 		cpumask_clear(&asym_cap_sibling_cpus);
 		cpumask_clear(&shared_rail_sibling_cpus);
@@ -2922,7 +2920,10 @@ static void walt_update_cluster_topology(void)
 	walt_clusters_parsed = true;
 }
 
-static int cpufreq_notifier_trans(struct notifier_block *nb,
+/* Legacy Code - not needed anymore as chispets have dedicated
+ * hardware for cycle counters
+ */
+/*static int cpufreq_notifier_trans(struct notifier_block *nb,
 		unsigned long val, void *data)
 {
 	struct cpufreq_freqs *freq = (struct cpufreq_freqs *)data;
@@ -2967,16 +2968,22 @@ static int cpufreq_notifier_trans(struct notifier_block *nb,
 static struct notifier_block notifier_trans_block = {
 	.notifier_call = cpufreq_notifier_trans
 };
+*/
 
 static void walt_init_cycle_counter(void)
 {
-	if (qcom_cpufreq_get_cpu_cycle_counter(smp_processor_id()) != U64_MAX) {
-		use_cycle_counter = true;
-		return;
+	char *walt_cycle_cntr_path = "/soc/walt";
+	struct device_node *np = NULL;
+
+	if (soc_feat(SOC_ENABLE_SW_CYCLE_COUNTER)) {
+		walt_cycle_counter_init();
+	} else {
+		np = of_find_node_by_path(walt_cycle_cntr_path);
+		of_platform_populate(np, NULL, NULL, NULL);
 	}
 
-	cpufreq_register_notifier(&notifier_trans_block,
-				  CPUFREQ_TRANSITION_NOTIFIER);
+	wait_for_completion_interruptible(&walt_get_cycle_counts_cb_completion);
+	return;
 }
 
 static void transfer_busy_time(struct rq *rq,
@@ -5376,7 +5383,6 @@ static void walt_init(struct work_struct *work)
 
 	register_syscore_ops(&walt_syscore_ops);
 	BUG_ON(alloc_related_thread_groups());
-	walt_init_cycle_counter();
 	init_clusters();
 	walt_init_tg_pointers();
 
@@ -5400,6 +5406,7 @@ static void walt_init(struct work_struct *work)
 	}
 
 	walt_update_cluster_topology();
+	walt_init_cycle_counter();
 
 	stop_machine(walt_init_stop_handler, NULL, NULL);
 
@@ -5458,6 +5465,9 @@ static int walt_module_init(void)
 
 	if (topology_update_done)
 		schedule_work(&walt_init_work);
+
+	walt_cpufreq_cycle_cntr_driver_register();
+	walt_gclk_cycle_counter_driver_register();
 
 	return 0;
 }

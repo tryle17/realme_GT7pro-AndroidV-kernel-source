@@ -201,7 +201,7 @@ static void walt_get_indicies(struct task_struct *p, int *order_index,
 		walt_task_skip_min_cpu(p)) {
 		*energy_eval_needed = false;
 		*order_index = 1;
-		if (soc_enable_boost_to_sibling)
+		if (soc_feat(SOC_ENABLE_BOOST_TO_NEXT_CLUSTER))
 			*end_index = 1;
 
 		if (sysctl_sched_asymcap_boost) {
