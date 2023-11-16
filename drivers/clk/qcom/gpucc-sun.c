@@ -495,19 +495,6 @@ static struct clk_branch gpu_cc_memnoc_gfx_clk = {
 	},
 };
 
-static struct clk_branch gpu_cc_sleep_clk = {
-	.halt_reg = 0x90cc,
-	.halt_check = BRANCH_HALT,
-	.clkr = {
-		.enable_reg = 0x90cc,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gpu_cc_sleep_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
 static struct clk_regmap *gpu_cc_sun_clocks[] = {
 	[GPU_CC_AHB_CLK] = &gpu_cc_ahb_clk.clkr,
 	[GPU_CC_CX_ACCU_SHIFT_CLK] = &gpu_cc_cx_accu_shift_clk.clkr,
@@ -531,7 +518,6 @@ static struct clk_regmap *gpu_cc_sun_clocks[] = {
 	[GPU_CC_MEMNOC_GFX_CLK] = &gpu_cc_memnoc_gfx_clk.clkr,
 	[GPU_CC_PLL0] = &gpu_cc_pll0.clkr,
 	[GPU_CC_PLL0_OUT_EVEN] = &gpu_cc_pll0_out_even.clkr,
-	[GPU_CC_SLEEP_CLK] = &gpu_cc_sleep_clk.clkr,
 };
 
 static const struct qcom_reset_map gpu_cc_sun_resets[] = {
@@ -586,12 +572,14 @@ static int gpu_cc_sun_probe(struct platform_device *pdev)
 	 *	gpu_cc_gx_ahb_ff_clk
 	 *	gpu_cc_rscc_hub_aon_clk
 	 *	gpu_cc_rscc_xo_aon_clk
+	 *	gpu_cc_sleep_clk
 	 */
 	regmap_update_bits(regmap, 0x93a4, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x9008, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x9064, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x93a8, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x9004, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x90cc, BIT(0), BIT(0));
 
 	ret = qcom_cc_really_probe(pdev, &gpu_cc_sun_desc, regmap);
 	if (ret) {
