@@ -323,6 +323,7 @@ const struct clk_ops clk_debug_mux_ops = {
 	.get_parent = clk_debug_mux_get_parent,
 	.set_parent = clk_debug_mux_set_parent,
 	.debug_init = clk_debug_measure_add,
+	.determine_rate = clk_hw_determine_rate_no_reparent,
 	.init = clk_debug_mux_init,
 };
 EXPORT_SYMBOL(clk_debug_mux_ops);
