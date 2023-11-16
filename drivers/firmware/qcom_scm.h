@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2010-2015,2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __QCOM_SCM_INT_H
 #define __QCOM_SCM_INT_H
@@ -72,9 +73,9 @@ int scm_get_wq_ctx(u32 *wq_ctx, u32 *flags, u32 *more_pending);
 #define SCM_SMC_FNID(s, c)	((((s) & 0xFF) << 8) | ((c) & 0xFF))
 extern int __scm_smc_call(struct device *dev, const struct qcom_scm_desc *desc,
 			  enum qcom_scm_convention qcom_convention,
-			  struct qcom_scm_res *res, bool atomic);
-#define scm_smc_call(dev, desc, res, atomic) \
-	__scm_smc_call((dev), (desc), qcom_scm_convention, (res), (atomic))
+			  struct qcom_scm_res *res, enum qcom_scm_call_type call_type);
+#define scm_smc_call(dev, desc, res, call_type) \
+	__scm_smc_call((dev), (desc), qcom_scm_convention, (res), (call_type))
 
 #define SCM_LEGACY_FNID(s, c)	(((s) << 10) | ((c) & 0x3ff))
 extern int scm_legacy_call_atomic(struct device *dev,
