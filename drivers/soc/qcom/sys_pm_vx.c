@@ -36,7 +36,7 @@
 #define VX_FLAG_MASK_FLUSH_THRESH	0xFF
 #define VX_FLAG_SHIFT_FLUSH_THRESH	24
 
-#define MAX_DRV_NAMES	26
+#define MAX_DRV_NAMES	27
 
 #define read_word(base, itr) ({					\
 		u32 v;						\
@@ -103,6 +103,16 @@ static const char * const drv_names_pineapple[][MAX_DRV_NAMES] = {
 			"DDR AUX", "ARC CPRF", ""},
 	[AOSS_DRV_NAME] = {"APPS", "SP", "AUDIO", "AOP", "DEBUG", "GPU", "DISPLAY", "COMPUTE",
 			"TME", "MODEM", "WLAN RF", "WLAN BB", "CAM", "PCIE", ""},
+};
+
+static const char * const drv_names_sun[][MAX_DRV_NAMES] = {
+	[CXPC_DRV_NAME] = {"TZ", "L3", "HLOS", "HYP", "SECPROC", "AUDIO", "AUDIO CESTA", "AOP",
+			"DEBUG", "GPU", "DISPLAY", "COMPUTE_DSP", "TME_HW", "TME_SW", "MDM SW",
+			"MDM HW", "MDM Q6 CESTA", "WLAN RF", "WLAN BB", "CAM_IFE0 CESTA",
+			"CAM_IFE1", "CAM_IFE2", "PCI0 CESTA", "MM CESTA",
+			"DDR AUX", "ARC CPRF", ""},
+	[AOSS_DRV_NAME] = {"APPS", "SP", "AUDIO", "AOP", "DEBUG", "GPU", "DISPLAY", "COMPUTE",
+			"TME", "MODEM", "WLAN BB", "CAM", "PCIE", "MM", ""},
 };
 
 static const char **vx_get_drvs_info(u8 type, struct vx_platform_data *pd,
@@ -300,6 +310,8 @@ static const struct of_device_id drv_match_table[] = {
 	  .data = drv_names_kalama },
 	{ .compatible = "qcom,sys-pm-pineapple",
 	  .data = drv_names_pineapple },
+	{ .compatible = "qcom,sys-pm-sun",
+	  .data = drv_names_sun },
 	{ }
 };
 
