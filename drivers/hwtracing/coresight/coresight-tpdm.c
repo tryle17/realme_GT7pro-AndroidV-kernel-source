@@ -139,8 +139,11 @@ do {									\
 #define HW_ENABLE_CHECK_VALUE   0x10
 
 
-#define ATBCNTRL_VAL_32		0xC00F1409
-#define ATBCNTRL_VAL_64		0xC01F1409
+#define ATBCNTRL_VAL_32		0x400e9700
+#define ATBCNTRL_VAL_64		0x401e9700
+#define ATBCNTRL_VAL_32_CMB	0x400e9540
+#define ATBCNTRL_VAL_64_CMB	0x401e9540
+
 
 #define TPDA_KEY	"-tpda-"
 #define TRACE_NOC_KEY	"-tracenoc-"
@@ -937,22 +940,21 @@ static ssize_t integration_test_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	if (val != 1 && val != 2)
+	if (val != 1)
 		return -EINVAL;
 
 	if (!drvdata->enable)
 		return -EINVAL;
 
-	if (val == 1)
-		val = ATBCNTRL_VAL_64;
-	else
-		val = ATBCNTRL_VAL_32;
 	TPDM_UNLOCK(drvdata);
 	tpdm_writel(drvdata, 0x1, TPDM_ITCNTRL);
 
-	for (i = 1; i < 5; i++)
-		tpdm_writel(drvdata, val, TPDM_ITATBCNTRL);
-
+	for (i = 1; i < 50; i++) {
+		tpdm_writel(drvdata, ATBCNTRL_VAL_32_CMB, TPDM_ITATBCNTRL);
+		tpdm_writel(drvdata, ATBCNTRL_VAL_64_CMB, TPDM_ITATBCNTRL);
+		tpdm_writel(drvdata, ATBCNTRL_VAL_64, TPDM_ITATBCNTRL);
+		tpdm_writel(drvdata, ATBCNTRL_VAL_32, TPDM_ITATBCNTRL);
+	}
 	tpdm_writel(drvdata, 0, TPDM_ITCNTRL);
 	TPDM_LOCK(drvdata);
 	return size;
