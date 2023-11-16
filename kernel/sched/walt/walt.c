@@ -597,10 +597,10 @@ static inline u64 freq_policy_load(struct rq *rq, unsigned int *reason)
 	if (sched_freq_aggr_en) {
 		load = wrq->prev_runnable_sum + aggr_grp_load;
 		*reason = CPUFREQ_REASON_FREQ_AGR;
-	}
-	else
+	} else {
 		load = wrq->prev_runnable_sum +
 					wrq->grp_time.prev_runnable_sum;
+	}
 
 	if (cpu_ksoftirqd && READ_ONCE(cpu_ksoftirqd->__state) == TASK_RUNNING) {
 		kload = task_load(cpu_ksoftirqd);
@@ -2920,56 +2920,6 @@ static void walt_update_cluster_topology(void)
 	walt_clusters_parsed = true;
 }
 
-/* Legacy Code - not needed anymore as chispets have dedicated
- * hardware for cycle counters
- */
-/*static int cpufreq_notifier_trans(struct notifier_block *nb,
-		unsigned long val, void *data)
-{
-	struct cpufreq_freqs *freq = (struct cpufreq_freqs *)data;
-	unsigned int cpu = freq->policy->cpu, new_freq = freq->new;
-	unsigned long flags;
-	struct walt_sched_cluster *cluster;
-	struct walt_rq *wrq = &per_cpu(walt_rq, cpu);
-	struct cpumask policy_cpus = wrq->freq_domain_cpumask;
-	int i, j;
-
-	if (use_cycle_counter)
-		return NOTIFY_DONE;
-	wrq = &per_cpu(walt_rq, cpumask_first(&policy_cpus));
-	if (wrq->cluster == &init_cluster)
-		return NOTIFY_DONE;
-
-	if (val != CPUFREQ_POSTCHANGE)
-		return NOTIFY_DONE;
-
-	if (cpu_cur_freq(cpu) == new_freq)
-		return NOTIFY_OK;
-
-	for_each_cpu(i, &policy_cpus) {
-		wrq = &per_cpu(walt_rq, i);
-		cluster = wrq->cluster;
-
-		for_each_cpu(j, &cluster->cpus) {
-			struct rq *rq = cpu_rq(j);
-
-			raw_spin_lock_irqsave(&rq->__lock, flags);
-			walt_update_task_ravg(rq->curr, rq, TASK_UPDATE, walt_sched_clock(), 0);
-			raw_spin_unlock_irqrestore(&rq->__lock, flags);
-		}
-
-		cluster->cur_freq = new_freq;
-		cpumask_andnot(&policy_cpus, &policy_cpus, &cluster->cpus);
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block notifier_trans_block = {
-	.notifier_call = cpufreq_notifier_trans
-};
-*/
-
 static void walt_init_cycle_counter(void)
 {
 	char *walt_cycle_cntr_path = "/soc/walt";
@@ -2983,7 +2933,6 @@ static void walt_init_cycle_counter(void)
 	}
 
 	wait_for_completion_interruptible(&walt_get_cycle_counts_cb_completion);
-	return;
 }
 
 static void transfer_busy_time(struct rq *rq,
@@ -4391,6 +4340,7 @@ static inline void irq_work_restrict_to_mig_clusters(cpumask_t *lock_cpus)
 
 	for_each_sched_cluster(cluster) {
 		bool keep_locked = false;
+
 		for_each_cpu(cpu, &cluster->cpus) {
 			rq = cpu_rq(cpu);
 			wrq = &per_cpu(walt_rq, cpu_of(rq));

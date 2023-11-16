@@ -916,7 +916,7 @@ static struct attribute *waltgov_attrs[] = {
 };
 ATTRIBUTE_GROUPS(waltgov);
 
-static struct kobj_type waltgov_tunables_ktype = {
+static const struct kobj_type waltgov_tunables_ktype = {
 	.default_groups = waltgov_groups,
 	.sysfs_ops	= &governor_sysfs_ops,
 };
