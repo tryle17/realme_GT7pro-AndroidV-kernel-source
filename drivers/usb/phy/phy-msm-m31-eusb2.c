@@ -15,7 +15,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
-#include <linux/qcom_scm.h>
+#include <linux/firmware/qcom/qcom_scm.h>
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/slab.h>
@@ -37,8 +37,8 @@
 #define SIDDQ				BIT(2)
 #define RETENABLEN			BIT(3)
 #define FSEL				(0x7 << 4)
-#define FSEL_19_2_MHZ_VAL		(0x0 << 4)
-#define FSEL_38_4_MHZ_VAL		(0x4 << 4)
+#define FSEL_19_2_MHZ_VAL		(0x4 << 4)
+#define FSEL_38_4_MHZ_VAL		(0x6 << 4)
 
 #define USB_PHY_CFG_CTRL_1		(0x58)
 #define PHY_CFG_PLL_CPBIAS_CNTRL	(0xfe)
@@ -137,7 +137,7 @@ struct eusb_phy_tbl {
 	u32 val;
 };
 
-#define EUSB_PHY_INIT_CFG(o, v, b)	\
+#define EUSB_PHY_INIT_CFG(o, b, v)	\
 	{				\
 		.offset = o,		\
 		.bit_mask = b,		\
@@ -147,7 +147,7 @@ struct eusb_phy_tbl {
 static const struct eusb_phy_tbl m31_eusb_phy_tbl[] = {
 	EUSB_PHY_INIT_CFG(USB_PHY_CFG0, BIT(1), 1),
 	EUSB_PHY_INIT_CFG(USB_PHY_UTMI_CTRL5, BIT(1), 1),
-	EUSB_PHY_INIT_CFG(USB_PHY_CFG1_PLL_EN, BIT(0), 1),
+	EUSB_PHY_INIT_CFG(USB_PHY_CFG1, BIT(0), 1),
 	EUSB_PHY_INIT_CFG(USB_PHY_FSEL_SEL, BIT(0), 1),
 };
 
@@ -461,9 +461,8 @@ static void msm_m31_eusb2_ref_clk_init(struct usb_phy *uphy)
 {
 	struct m31_eusb2_phy *phy = container_of(uphy, struct m31_eusb2_phy, phy);
 
-	/* setting to 19.2 mHz as per the ref_clk frequency */
 	msm_m31_eusb2_write_readback(phy->base, USB_PHY_HS_PHY_CTRL_COMMON0,
-						FSEL, FSEL_19_2_MHZ_VAL);
+						FSEL, FSEL_38_4_MHZ_VAL);
 
 }
 
@@ -497,9 +496,6 @@ static void msm_m31_eusb2_phy_write_configs(struct m31_eusb2_phy *phy,
 	for (i = 0 ; i < num; i++, t++) {
 		dev_dbg(phy->phy.dev, "Offset:%x BitMask:%x Value:%x",
 					t->offset, t->bit_mask, t->val);
-
-		/* for dbg, in case the values is greater than the offset */
-		BUG_ON((t->val << __ffs(t->bit_mask)) > t->bit_mask);
 
 		msm_m31_eusb2_write_readback(phy->base,
 					t->offset, t->bit_mask,
