@@ -1470,6 +1470,7 @@
   i2c_bus_type
   i2c_del_adapter
   i2c_del_driver
+  i2c_find_device_by_fwnode
   i2c_for_each_dev
   i2c_get_adapter
   i2c_get_device_id
