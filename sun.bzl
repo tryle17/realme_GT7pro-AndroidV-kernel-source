@@ -154,6 +154,7 @@ def define_sun():
         "drivers/soc/qcom/smp2p.ko",
         "drivers/soc/qcom/socinfo.ko",
         "drivers/soc/qcom/sps/sps_drv.ko",
+        "drivers/soc/qcom/sys_pm_vx.ko",
         "drivers/spi/q2spi-geni.ko",
         "drivers/spi/spi-msm-geni.ko",
         "drivers/spmi/spmi-pmic-arb.ko",
