@@ -1216,7 +1216,6 @@ void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
 static struct etr_buf *tmc_etr_get_sysfs_buffer(struct coresight_device *csdev)
 {
 	int ret = 0;
-	unsigned long flags;
 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	struct etr_buf *sysfs_buf = NULL, *new_buf = NULL, *free_buf = NULL;
 
@@ -1228,7 +1227,6 @@ static struct etr_buf *tmc_etr_get_sysfs_buffer(struct coresight_device *csdev)
 	 * buffer, provided the size matches. Any allocation has to be done
 	 * with the lock released.
 	 */
-	spin_lock_irqsave(&drvdata->spinlock, flags);
 	if ((drvdata->out_mode == TMC_ETR_OUT_MODE_MEM)
 		|| (drvdata->out_mode == TMC_ETR_OUT_MODE_USB &&
 			drvdata->usb_data->usb_mode ==
@@ -1239,24 +1237,31 @@ static struct etr_buf *tmc_etr_get_sysfs_buffer(struct coresight_device *csdev)
 					|| (drvdata->out_mode == TMC_ETR_OUT_MODE_USB
 					&& drvdata->usb_data->usb_mode == TMC_ETR_USB_SW
 					&&  sysfs_buf->size != TMC_ETR_SW_USB_BUF_SIZE)) {
-			spin_unlock_irqrestore(&drvdata->spinlock, flags);
 
 			/* Allocate memory with the locks released */
 			free_buf = new_buf = tmc_etr_setup_sysfs_buf(drvdata);
 			if (IS_ERR(new_buf))
 				return new_buf;
-
-			/* Let's try again */
-			spin_lock_irqsave(&drvdata->spinlock, flags);
+			free_buf = sysfs_buf;
+			drvdata->sysfs_buf = new_buf;
 		}
 	}
 
-	if (drvdata->reading || drvdata->mode == CS_MODE_PERF ||
-		drvdata->busy) {
-		ret = -EBUSY;
-		goto unlock_out;
-	}
+	if (free_buf)
+		tmc_etr_free_sysfs_buf(free_buf);
 
+	return ret ? ERR_PTR(ret) : drvdata->sysfs_buf;
+}
+
+static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+{
+	int ret = 0;
+	unsigned long flags;
+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+	struct etr_buf *sysfs_buf = NULL;
+
+
+	spin_lock_irqsave(&drvdata->spinlock, flags);
 	/*
 	 * In sysFS mode we can have multiple writers per sink.  Since this
 	 * sink is already enabled no memory is needed and the HW need not be
@@ -1267,57 +1272,29 @@ static struct etr_buf *tmc_etr_get_sysfs_buffer(struct coresight_device *csdev)
 		goto unlock_out;
 	}
 
-	/*
-	 * If we don't have a buffer or it doesn't match the requested size,
-	 * use the buffer allocated above. Otherwise reuse the existing buffer.
-	 */
-	if ((drvdata->out_mode == TMC_ETR_OUT_MODE_MEM) ||
-		(drvdata->out_mode == TMC_ETR_OUT_MODE_USB &&
-			drvdata->usb_data->usb_mode ==
-			TMC_ETR_USB_SW)) {
-		sysfs_buf = READ_ONCE(drvdata->sysfs_buf);
-		if (!sysfs_buf || (new_buf && sysfs_buf->size != new_buf->size)) {
-			free_buf = sysfs_buf;
-			drvdata->sysfs_buf = new_buf;
-		}
-
+	if (drvdata->reading || drvdata->mode == CS_MODE_PERF ||
+		drvdata->busy) {
+		ret = -EBUSY;
+		goto unlock_out;
 	}
-
-	drvdata->mode = CS_MODE_SYSFS;
-	atomic_inc(&csdev->refcnt);
-
-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-	if (drvdata->out_mode == TMC_ETR_OUT_MODE_USB) {
-		ret = tmc_usb_enable(drvdata->usb_data);
-		if (ret) {
-			atomic_dec(&csdev->refcnt);
-			drvdata->mode = CS_MODE_DISABLED;
-		}
-	}
-	goto out;
-
-unlock_out:
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 
-out:
-	/* Free memory outside the spinlock if need be */
-	if (free_buf)
-		tmc_etr_free_sysfs_buf(free_buf);
-	return ret ? ERR_PTR(ret) : drvdata->sysfs_buf;
-}
-
-static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
-{
-	int ret;
-	unsigned long flags;
-	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-	struct etr_buf *sysfs_buf = tmc_etr_get_sysfs_buffer(csdev);
+	sysfs_buf = tmc_etr_get_sysfs_buffer(csdev);
 
 	if (IS_ERR(sysfs_buf))
 		return PTR_ERR(sysfs_buf);
 
 	spin_lock_irqsave(&drvdata->spinlock, flags);
-	ret = tmc_etr_enable_hw(drvdata, sysfs_buf);
+
+	if ((drvdata->out_mode == TMC_ETR_OUT_MODE_MEM) ||
+		(drvdata->out_mode == TMC_ETR_OUT_MODE_USB &&
+			drvdata->usb_data->usb_mode ==
+			TMC_ETR_USB_SW)) {
+		ret = tmc_etr_enable_hw(drvdata, sysfs_buf);
+		if (ret)
+			goto unlock_out;
+	}
+
 	if (!ret) {
 		drvdata->mode = CS_MODE_SYSFS;
 		atomic_inc(&csdev->refcnt);
@@ -1325,11 +1302,17 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
 
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 
-	if (!ret) {
-		if (drvdata->out_mode == TMC_ETR_OUT_MODE_MEM)
-			tmc_etr_byte_cntr_start(drvdata->byte_cntr);
-		dev_dbg(&csdev->dev, "TMC-ETR enabled\n");
-	}
+	if (drvdata->out_mode == TMC_ETR_OUT_MODE_MEM)
+		tmc_etr_byte_cntr_start(drvdata->byte_cntr);
+	if (drvdata->out_mode == TMC_ETR_OUT_MODE_USB)
+		tmc_usb_enable(drvdata->usb_data);
+
+	dev_dbg(&csdev->dev, "TMC-ETR enabled\n");
+
+	return 0;
+
+unlock_out:
+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 
 	return ret;
 }
