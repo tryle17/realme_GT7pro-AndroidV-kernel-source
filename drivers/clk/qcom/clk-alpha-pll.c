@@ -326,6 +326,8 @@ EXPORT_SYMBOL_GPL(clk_alpha_pll_regs);
 /* PONGO ELU PLL specific setting and offsets */
 #define PONGO_PLL_OUT_MASK		0x3
 #define PONGO_PLL_L_VAL_MASK		GENMASK(11, 0)
+#define PONGO_XO_PRESENT		BIT(10)
+#define PONGO_CLOCK_SELECT		BIT(12)
 
 /* ZONDA PLL specific */
 #define ZONDA_PLL_OUT_MASK	0xf
@@ -3273,6 +3275,7 @@ void clk_pongo_elu_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 {
 	u32 lval = config->l;
 	u32 regval;
+	int ret;
 
 	regmap_update_bits(regmap, PLL_USER_CTL(pll), PONGO_PLL_OUT_MASK, PONGO_PLL_OUT_MASK);
 
@@ -3302,9 +3305,24 @@ void clk_pongo_elu_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 	/* Disable PLL output */
 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_OUTCTRL, 0);
 
-	/* Set operation mode to STANDBY and de-assert the reset */
-	regmap_write(regmap, PLL_OPMODE(pll), PLL_STANDBY);
+	/* Enable PLL intially to one-time calibrate against XO. */
+	regmap_write(regmap, PLL_OPMODE(pll), PLL_RUN);
 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_RESET_N, PLL_RESET_N);
+	regmap_update_bits(regmap, PLL_MODE(pll), PONGO_XO_PRESENT, PONGO_XO_PRESENT);
+
+	pll->clkr.regmap = regmap;
+
+	ret = wait_for_pll_enable_lock(pll);
+	if (ret)
+		pr_warn("%s PLL didn't lock for initial calibration: ret=%d\n",
+			qcom_clk_hw_get_name(&pll->clkr.hw), ret);
+
+	/* Disable PLL after one-time calibration. */
+	regmap_write(regmap, PLL_OPMODE(pll), PLL_STANDBY);
+	regmap_update_bits(regmap, PLL_MODE(pll), PONGO_XO_PRESENT, 0);
+
+	/* Select internally generated clock. */
+	regmap_update_bits(regmap, PLL_MODE(pll), PONGO_CLOCK_SELECT, PONGO_CLOCK_SELECT);
 }
 EXPORT_SYMBOL(clk_pongo_elu_pll_configure);
 
