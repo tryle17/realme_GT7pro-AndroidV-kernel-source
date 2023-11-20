@@ -140,6 +140,7 @@ obj-$(CONFIG_SM_GPUCC_SUN) += gpucc-sun.o
 obj-$(CONFIG_SM_DISPCC_SUN) += dispcc-sun.o
 obj-$(CONFIG_SM_CAMBISTMCLKCC_SUN) += cambistmclkcc-sun.o
 obj-$(CONFIG_SM_TCSRCC_SUN) += tcsrcc-sun.o
+obj-$(CONFIG_SM_DEBUGCC_SUN) += debugcc-sun.o
 obj-$(CONFIG_SM_GPUCC_6115) += gpucc-sm6115.o
 obj-$(CONFIG_SM_GPUCC_6125) += gpucc-sm6125.o
 obj-$(CONFIG_SM_GPUCC_6350) += gpucc-sm6350.o
