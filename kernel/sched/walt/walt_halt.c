@@ -46,7 +46,7 @@ void
 detach_one_task_core(struct task_struct *p, struct rq *rq,
 		     struct list_head *tasks)
 {
-	lockdep_assert_held(&rq->__lock);
+	walt_lockdep_assert_rq(rq, p);
 
 	p->on_rq = TASK_ON_RQ_MIGRATING;
 	deactivate_task(rq, p, 0);
@@ -57,7 +57,7 @@ void attach_tasks_core(struct list_head *tasks, struct rq *rq)
 {
 	struct task_struct *p;
 
-	lockdep_assert_held(&rq->__lock);
+	walt_lockdep_assert_rq(rq, NULL);
 
 	while (!list_empty(tasks)) {
 		p = list_first_entry(tasks, struct task_struct, se.group_node);
@@ -514,6 +514,7 @@ static void android_rvh_get_nohz_timer_target(void *unused, int *cpu, bool *done
 {
 	int i, default_cpu = -1;
 	struct sched_domain *sd;
+	cpumask_t unhalted;
 
 	*done = true;
 
@@ -521,6 +522,19 @@ static void android_rvh_get_nohz_timer_target(void *unused, int *cpu, bool *done
 		if (!available_idle_cpu(*cpu))
 			return;
 		default_cpu = *cpu;
+	}
+
+	/*
+	 * find first cpu halted by core control and try to avoid
+	 * affecting externally halted cpus.
+	 */
+	if (!cpumask_andnot(&unhalted, cpu_active_mask, cpu_halt_mask)) {
+		if (cpumask_weight(&cpus_paused_by_us))
+			*cpu = cpumask_first(&cpus_paused_by_us);
+		else
+			*cpu = cpumask_first(cpu_halt_mask);
+
+		return;
 	}
 
 	rcu_read_lock();
@@ -538,9 +552,8 @@ static void android_rvh_get_nohz_timer_target(void *unused, int *cpu, bool *done
 	}
 
 	if (default_cpu == -1) {
-		for_each_cpu_andnot(i,
-				 housekeeping_cpumask(HK_TYPE_TIMER),
-				 cpu_halt_mask) {
+		for_each_cpu_and(i, &unhalted,
+				 housekeeping_cpumask(HK_TYPE_TIMER)) {
 			if (*cpu == i)
 				continue;
 

@@ -43,6 +43,7 @@
 #define MAX_MARGIN_LEVELS (MAX_CLUSTERS - 1)
 
 extern bool walt_disabled;
+extern bool waltgov_disabled;
 
 enum task_event {
 	PUT_PREV_TASK	= 0,
@@ -189,6 +190,7 @@ extern struct completion walt_get_cycle_counts_cb_completion;
 extern bool use_cycle_counter;
 extern struct walt_sched_cluster *sched_cluster[WALT_NR_CPUS];
 extern cpumask_t part_haltable_cpus;
+extern cpumask_t cpus_paused_by_us;
 /*END SCHED.H PORT*/
 
 extern u64 (*walt_get_cycle_counts_cb)(int cpu, u64 wc);
@@ -376,6 +378,7 @@ extern char sched_lib_name[LIB_PATH_LENGTH];
 extern unsigned int sched_lib_mask_force;
 
 extern cpumask_t cpus_for_sbt_pause;
+extern unsigned int sysctl_sched_sbt_enable;
 extern unsigned int sysctl_sched_sbt_delay_windows;
 
 extern cpumask_t cpus_for_pipeline;
@@ -831,7 +834,7 @@ extern struct cpumask __cpu_partial_halt_mask;
 static bool check_for_higher_capacity(int cpu1, int cpu2)
 {
 	if (cpu_partial_halted(cpu1) && is_min_possible_cluster_cpu(cpu2))
-		return true;
+		return false;
 
 	if (is_min_possible_cluster_cpu(cpu1) && cpu_partial_halted(cpu2))
 		return false;
@@ -1157,11 +1160,14 @@ static inline bool has_internal_freq_limit_changed(struct walt_sched_cluster *cl
 	int i;
 
 	internal_freq = cluster->walt_internal_freq_limit;
-
 	cluster->walt_internal_freq_limit = cluster->max_freq;
-	for (i = 0; i < MAX_FREQ_CAP; i++)
-		cluster->walt_internal_freq_limit = min(fmax_cap[i][cluster->id],
+
+	if (likely(!waltgov_disabled)) {
+		for (i = 0; i < MAX_FREQ_CAP; i++)
+			cluster->walt_internal_freq_limit = min(fmax_cap[i][cluster->id],
 					     cluster->walt_internal_freq_limit);
+	}
+
 	return cluster->walt_internal_freq_limit != internal_freq;
 }
 
@@ -1263,5 +1269,29 @@ static inline bool is_walt_sentinel(void)
 		}								\
 	}									\
 })
+
+static inline void walt_lockdep_assert(int cond, int cpu, struct task_struct *p)
+{
+	if (!cond) {
+		pr_err("LOCKDEP: %pS %ps %ps %ps\n",
+		       __builtin_return_address(0),
+		       __builtin_return_address(1),
+		       __builtin_return_address(2),
+		       __builtin_return_address(3));
+		WALT_BUG(WALT_BUG_WALT, p,
+			 "running_cpu=%d cpu_rq=%d cpu_rq lock not held",
+			 raw_smp_processor_id(), cpu);
+	}
+}
+
+#ifdef CONFIG_LOCKDEP
+#define walt_lockdep_assert_held(l, cpu, p)				\
+	walt_lockdep_assert(lockdep_is_held(l) != LOCK_STATE_NOT_HELD, cpu, p)
+#else
+#define walt_lockdep_assert_held(l, cpu, p) do { (void)(l); } while (0)
+#endif
+
+#define walt_lockdep_assert_rq(rq, p)			\
+	walt_lockdep_assert_held(&rq->__lock, cpu_of(rq), p)
 
 #endif /* _WALT_H */
