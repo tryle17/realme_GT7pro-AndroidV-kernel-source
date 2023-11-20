@@ -490,7 +490,7 @@ static int adspsleepmon_smem_init(void)
 
 	if (IS_ERR_OR_NULL(g_adspsleepmon.lpm_stats) ||
 		(sizeof(struct sleep_stats) > size)) {
-		pr_err("Failed to get sleep stats from SMEM for ADSP: %d, size: %d\n",
+		pr_err("Failed to get sleep stats from SMEM for ADSP: %ld, size: %lu\n",
 				PTR_ERR(g_adspsleepmon.lpm_stats), size);
 		return -ENOMEM;
 	}
@@ -502,7 +502,7 @@ static int adspsleepmon_smem_init(void)
 
 	if (IS_ERR_OR_NULL(g_adspsleepmon.lpi_stats) ||
 		(sizeof(struct sleep_stats) > size)) {
-		pr_err("Failed to get LPI sleep stats from SMEM for ADSP: %d, size: %d\n",
+		pr_err("Failed to get LPI sleep stats from SMEM for ADSP: %ld, size: %lu\n",
 				PTR_ERR(g_adspsleepmon.lpi_stats), size);
 		return -ENOMEM;
 	}
@@ -514,7 +514,7 @@ static int adspsleepmon_smem_init(void)
 
 	if (IS_ERR_OR_NULL(g_adspsleepmon.dsppm_stats) ||
 		(sizeof(struct dsppm_stats) > size)) {
-		pr_err("Failed to get DSPPM stats from SMEM for ADSP: %d, size: %d\n",
+		pr_err("Failed to get DSPPM stats from SMEM for ADSP: %ld, size: %lu\n",
 				PTR_ERR(g_adspsleepmon.dsppm_stats), size);
 		return -ENOMEM;
 	}
@@ -524,7 +524,7 @@ static int adspsleepmon_smem_init(void)
 						&size);
 
 	if (IS_ERR_OR_NULL(stats) || !size) {
-		pr_err("Failed to get SysMon stats from SMEM for ADSP: %d, size: %d\n",
+		pr_err("Failed to get SysMon stats from SMEM for ADSP: %ld, size: %lu\n",
 				PTR_ERR(stats), size);
 		return -ENOMEM;
 	}
@@ -643,7 +643,7 @@ static int debugfs_panic_state_write(void *data, u64 val)
 DEFINE_DEBUGFS_ATTRIBUTE(panic_state_fops,
 			debugfs_panic_state_read,
 			debugfs_panic_state_write,
-			"%u\n");
+			"%llu\n");
 
 
 static int read_panic_state_show(struct seq_file *s, void *d)
@@ -716,7 +716,7 @@ static int debugfs_adsp_panic_state_write(void *data, u64 val)
 DEFINE_DEBUGFS_ATTRIBUTE(adsp_panic_state_fops,
 			debugfs_adsp_panic_state_read,
 			debugfs_adsp_panic_state_write,
-			"%u\n");
+			"%llu\n");
 
 static int read_adsp_panic_state_show(struct seq_file *s, void *d)
 {
@@ -758,7 +758,7 @@ static void print_complete_dsppm_info(void)
 
 	if (g_adspsleepmon.dsppm_clients.result ==
 			DSPPM_CLIENT_DATA_FETCH_SUCCESS) {
-		pr_err("TS:0x%llX,AC:%u,TMIPS:%u,TMPPS:%u,QCLK:%u,KF:%u,DDRAB:%u,DDRIB:%u,SNOCAB:%u,SNOCIB:%u,AL:%u,SL:%u,AHBE:%u,AHBI:%u,ASL:%u\n",
+		pr_err("TS:0x%llX,AC:%u,TMIPS:%u,TMPPS:%u,QCLK:%u,KF:%u,DDRAB:%llu,DDRIB:%llu,SNOCAB:%llu,SNOCIB:%llu,AL:%u,SL:%u,AHBE:%u,AHBI:%u,ASL:%u\n",
 		g_adspsleepmon.dsppm_clients.timestamp, g_adspsleepmon.dsppm_clients.num_clients,
 		g_adspsleepmon.dsppm_clients.agg_data.agg_mips.mips,
 		g_adspsleepmon.dsppm_clients.agg_data.agg_mips.mpps,
@@ -775,7 +775,7 @@ static void print_complete_dsppm_info(void)
 		g_adspsleepmon.dsppm_clients.agg_data.agg_latency);
 
 		for (i = 0; i < g_adspsleepmon.dsppm_clients.num_clients; i++) {
-			pr_err("%u:N:%s,ID:%u,RTS:%u,TMIPS:%u,MIPSPT:%u,TMPPS:%u,ADSPFCLK:%u,BPS:%u,UP:%u,SL:%u,POW:%u,PD:%s,ISP:%u\n",
+			pr_err("%u:N:%s,ID:%u,RTS:%llX,TMIPS:%u,MIPSPT:%u,TMPPS:%u,ADSPFCLK:%u,BPS:%llu,UP:%u,SL:%u,POW:%u,PD:%s,ISP:%u\n",
 			i, g_adspsleepmon.dsppm_clients.clients[i].clientname,
 			g_adspsleepmon.dsppm_clients.clients[i].clientid,
 			g_adspsleepmon.dsppm_clients.clients[i].timestamp,
@@ -841,7 +841,7 @@ int adsp_sleepmon_log_master_stats(u32 mask)
 			pr_info("Sleep latency(usec): %u\n",
 					g_adspsleepmon.dsppm_stats->latency_us ?
 					g_adspsleepmon.dsppm_stats->latency_us : U32_MAX);
-			pr_info("Timestamp: %llu\n", g_adspsleepmon.dsppm_stats->timestamp);
+			pr_info("Timestamp: %u\n", g_adspsleepmon.dsppm_stats->timestamp);
 
 			for (int i = 0; i < ADSPSLEEPMON_DSPPMSTATS_NUMPD; i++) {
 				pr_info("Pid: %d, Num active clients: %d\n",
@@ -946,7 +946,7 @@ static int master_stats_show(struct seq_file *s, void *d)
 		seq_printf(s, "Sleep latency(usec): %u\n",
 					g_adspsleepmon.dsppm_stats->latency_us ?
 					g_adspsleepmon.dsppm_stats->latency_us : U32_MAX);
-		seq_printf(s, "Timestamp: %llu\n", g_adspsleepmon.dsppm_stats->timestamp);
+		seq_printf(s, "Timestamp: %u\n", g_adspsleepmon.dsppm_stats->timestamp);
 
 		for (; i < ADSPSLEEPMON_DSPPMSTATS_NUMPD; i++) {
 			seq_printf(s, "Pid: %d, Num active clients: %d\n",
@@ -1066,7 +1066,7 @@ static void adspsleepmon_lpm_adsp_panic_overall(void)
 {
 	if (g_adspsleepmon.b_config_adsp_panic_lpm_overall) {
 
-		pr_err("Sending panic command to ADSP for LPM violation, monitored duration (msec): %u, num resumes: %u\n",
+		pr_err("Sending panic command to ADSP for LPM violation, monitored duration (msec): %llu, num resumes: %u\n",
 			(g_adspsleepmon.accumulated_duration /
 				ADSPSLEEPMON_SYS_CLK_TICKS_PER_MILLISEC),
 			g_adspsleepmon.accumulated_resumes);
@@ -1116,7 +1116,7 @@ static void sleepmon_lpm_exception_check(u64 curr_timestamp, u64 elapsed_time)
 			pr_err("ADSP clock: %u, sleep latency: %u\n",
 					sysmon_event_stats.core_clk,
 					sysmon_event_stats.sleep_latency);
-			pr_err("Monitored duration (msec):%u,Sleep duration(msec): %u\n",
+			pr_err("Monitored duration (msec):%llu,Sleep duration(msec): %llu\n",
 				(elapsed_time /
 				ADSPSLEEPMON_SYS_CLK_TICKS_PER_MILLISEC),
 				((curr_lpm_stats.accumulated -
@@ -1200,7 +1200,7 @@ static void sleepmon_lpi_exception_check(u64 curr_timestamp, u64 elapsed_time)
 			pr_err("ADSP clock: %u, sleep latency: %u\n",
 					sysmon_event_stats.core_clk,
 					sysmon_event_stats.sleep_latency);
-			pr_err("Monitored duration (msec):%u,LPI duration(msec): %u\n",
+			pr_err("Monitored duration (msec):%llu,LPI duration(msec): %llu\n",
 				(elapsed_time /
 				ADSPSLEEPMON_SYS_CLK_TICKS_PER_MILLISEC),
 				((curr_lpi_stats.accumulated -

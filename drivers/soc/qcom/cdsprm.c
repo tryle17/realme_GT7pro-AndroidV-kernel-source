@@ -18,6 +18,7 @@
 #include <linux/completion.h>
 #include <linux/string.h>
 #include <linux/err.h>
+#include <linux/cpu.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -706,7 +707,7 @@ static void set_qos_latency(int latency)
 {
 	int err = 0;
 	u32 ii = 0;
-	int cpu;
+	unsigned int cpu;
 
 	if (gcdsprm.b_silver_en) {
 
@@ -726,7 +727,7 @@ static void set_qos_latency(int latency)
 			}
 
 			if (err < 0) {
-				pr_err("%s: %s: PM voting cpu:%d fail,err %d,QoS update %d\n",
+				pr_err("%s: %s: PM voting cpu:%u fail,err %d,QoS update %d\n",
 					current->comm, __func__, cpu,
 					err, gcdsprm.qos_request);
 				break;
@@ -1057,7 +1058,7 @@ static int cdsprm_rpmsg_callback(struct rpmsg_device *dev, void *data,
 			len, sizeof(*msg));
 		return -EINVAL;
 	} else if ((msg->feature_id >= SYSMON_CDSP_DCVS_CLIENTS_RX_STATUS) &&
-		((msg_v2->size != len) || (len < sizeof(*msg_v2)))) {
+			(msg_v2->size != len)) {
 		dev_err(&dev->dev,
 			"Invalid message in rpmsg callback, length: %d, expected: >= %lu\n",
 			len, sizeof(*msg_v2));
@@ -1129,6 +1130,8 @@ static int cdsprm_rpmsg_callback(struct rpmsg_device *dev, void *data,
 				gcdsprm.b_resmgr_pdkill_override, msg->fs.crm_pdkill_status);
 	} else if (msg->feature_id == SYSMON_CDSP_DCVS_CLIENTS_RX_STATUS) {
 		gcdsprm.dcvs_clients_votes.status = 0;
+		memset(&gcdsprm.dcvs_clients_votes, 0, sizeof(gcdsprm.dcvs_clients_votes));
+		memcpy(&gcdsprm.dcvs_clients_votes, &msg_v2->fs.dcvs_clients_votes, msg_v2->size);
 		gcdsprm.dcvs_clients_votes = msg_v2->fs.dcvs_clients_votes;
 		complete(&gcdsprm.dcvs_clients_votes_complete);
 		dev_dbg(&dev->dev, "Received DCVS clients information");
@@ -1305,7 +1308,7 @@ static int cdsprm_resmgr_pdkill_override_write(void *data, u64 val)
 {
 	int result = cdsprm_resmgr_pdkill_config((unsigned int)val);
 
-	pr_info("resmgr pdkill override %d sent to NSP, returned %d\n", val, result);
+	pr_info("resmgr pdkill override %llu sent to NSP, returned %d\n", val, result);
 
 	return result;
 }
@@ -1687,7 +1690,7 @@ static void print_dcvs_clients_votes(void)
 				dcvs_client_p[i].ceng_params.perf_mode ? "LOW" : "HIGH");
 
 		if (dcvs_client_p[i].ceng_params.bwBytePerSec)
-			pr_info("    Q6->CENG BW : %u bytes per second, Q6->CENG BW Usage Percentage : %u\n",
+			pr_info("    Q6->CENG BW : %llu bytes per second, Q6->CENG BW Usage Percentage : %u\n",
 					dcvs_client_p[i].ceng_params.bwBytePerSec,
 					dcvs_client_p[i].ceng_params.busbwUsagePercentage);
 
