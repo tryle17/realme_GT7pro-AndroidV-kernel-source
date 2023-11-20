@@ -14,6 +14,7 @@ qcom-pdc.ko
 qcom-dload-mode.ko
 pinctrl-msm.ko
 pinctrl-sun.ko
+qcom_tsens.ko
 qcom_dma_heaps.ko
 qcom_iommu_util.ko
 qcom-reboot-reason.ko
