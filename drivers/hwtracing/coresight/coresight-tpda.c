@@ -158,10 +158,10 @@ static int tpda_alloc_trace_id(struct coresight_device *csdev)
 	int trace_id;
 	int i, nr_conns;
 
-	nr_conns = csdev->pdata->nr_inport;
+	nr_conns = csdev->pdata->nr_inconns;
 
 	for (i = 0; i < nr_conns; i++)
-		if (atomic_read(&csdev->refcnt[i]) != 0)
+		if (atomic_read(&csdev->pdata->in_conns[i]->dest_refcnt) != 0)
 			return 0;
 
 	trace_id = coresight_trace_id_get_system_id();
@@ -178,10 +178,10 @@ static void tpda_release_trace_id(struct coresight_device *csdev)
 	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);/*  */
 	int i, nr_conns;
 
-	nr_conns = csdev->pdata->nr_inport;
+	nr_conns = csdev->pdata->nr_inconns;
 
 	for (i = 0; i < nr_conns; i++)
-		if (atomic_read(&csdev->refcnt[i]) != 0)
+		if (atomic_read(&csdev->pdata->in_conns[i]->dest_refcnt) != 0)
 			return;
 
 	coresight_trace_id_put_system_id(drvdata->atid);

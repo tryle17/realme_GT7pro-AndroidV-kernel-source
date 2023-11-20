@@ -312,6 +312,7 @@ static void coresight_disable_sink(struct coresight_device *csdev)
 	if (ret)
 		return;
 	csdev->enable = false;
+	csdev->activated = false;
 }
 
 static int coresight_enable_link(struct coresight_device *csdev,

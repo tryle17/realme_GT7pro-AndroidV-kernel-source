@@ -3942,10 +3942,10 @@ static int coresight_get_aggre_atid(struct coresight_device *csdev)
 	/*
 	 * Recursively explore each port found on this element.
 	 */
-	for (i = 0; i < csdev->pdata->nr_outport; i++) {
+	for (i = 0; i < csdev->pdata->nr_outconns; i++) {
 		struct coresight_device *child_dev;
 
-		child_dev = csdev->pdata->conns[i].child_dev;
+		child_dev = csdev->pdata->out_conns[i]->dest_dev;
 		if (child_dev)
 			atid = coresight_get_aggre_atid(child_dev);
 		if (atid > 0)
