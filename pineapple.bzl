@@ -154,6 +154,7 @@ def define_pineapple():
         "drivers/virt/gunyah/gunyah_vcpu.ko",
         "kernel/trace/qcom_ipc_logging.ko",
         "net/qrtr/qrtr.ko",
+        "net/qrtr/qrtr-mhi.ko",
         "net/qrtr/qrtr-smd.ko",
         "net/qrtr/qrtr-tun.ko",
     ]
