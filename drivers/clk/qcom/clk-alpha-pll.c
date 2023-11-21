@@ -357,7 +357,8 @@ static int wait_for_pll(struct clk_alpha_pll *pll, u32 mask, bool inverse,
 	if (ret)
 		return ret;
 
-	for (count = 200; count > 0; count--) {
+	/* Pongo PLLs using a 32KHz reference can take upwards of 1500us to lock. */
+	for (count = 1500; count > 0; count--) {
 		ret = regmap_read(pll->clkr.regmap, PLL_MODE(pll), &val);
 		if (ret)
 			return ret;
@@ -3319,7 +3320,6 @@ void clk_pongo_elu_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 
 	/* Disable PLL after one-time calibration. */
 	regmap_write(regmap, PLL_OPMODE(pll), PLL_STANDBY);
-	regmap_update_bits(regmap, PLL_MODE(pll), PONGO_XO_PRESENT, 0);
 
 	/* Select internally generated clock. */
 	regmap_update_bits(regmap, PLL_MODE(pll), PONGO_CLOCK_SELECT, PONGO_CLOCK_SELECT);
