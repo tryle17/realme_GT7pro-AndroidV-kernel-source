@@ -114,15 +114,10 @@ secure_etr_get_qmi_device(struct secure_etr_drvdata *drvdata)
 static int secure_etr_assign_to_mpss(struct secure_etr_drvdata *drvdata)
 {
 	struct coresight_device *qmi = secure_etr_get_qmi_device(drvdata);
-	struct cs_qmi_data *qmi_data;
 	struct coresight_etr_assign_req_msg_v01 *etr_data;
 
 	etr_data = kzalloc(sizeof(*etr_data), GFP_KERNEL);
 	if (!etr_data)
-		return -ENOMEM;
-
-	qmi_data = kzalloc(sizeof(*qmi_data), GFP_KERNEL);
-	if (!qmi_data)
 		return -ENOMEM;
 
 	etr_data->subsys_id = MPSS;
@@ -130,26 +125,18 @@ static int secure_etr_assign_to_mpss(struct secure_etr_drvdata *drvdata)
 	etr_data->buffer_base = drvdata->etr_buf->paddr;
 	etr_data->buffer_size = drvdata->etr_buf->size;
 
-	qmi_data->command = CS_QMI_ASSIGN_ETR_TO_MPSS;
-	qmi_data->etr_data = etr_data;
-
-	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, CS_MODE_SYSFS, qmi_data);
+	if (qmi)
+		return coresight_qmi_etr_assign(qmi, etr_data);
 	return 0;
 }
 
 static int secure_etr_assign_to_apss(struct secure_etr_drvdata *drvdata)
 {
 	struct coresight_device *qmi = secure_etr_get_qmi_device(drvdata);
-	struct cs_qmi_data *qmi_data;
 	struct coresight_etr_assign_req_msg_v01 *etr_data;
 
 	etr_data = kzalloc(sizeof(*etr_data), GFP_KERNEL);
 	if (!etr_data)
-		return -ENOMEM;
-
-	qmi_data = kzalloc(sizeof(*qmi_data), GFP_KERNEL);
-	if (!qmi_data)
 		return -ENOMEM;
 
 	etr_data->subsys_id = APSS;
@@ -157,25 +144,17 @@ static int secure_etr_assign_to_apss(struct secure_etr_drvdata *drvdata)
 	etr_data->buffer_base = drvdata->etr_buf->paddr;
 	etr_data->buffer_size = drvdata->etr_buf->size;
 
-	qmi_data->command = CS_QMI_ASSIGN_ETR_TO_APSS;
-	qmi_data->etr_data = etr_data;
-	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, CS_MODE_SYSFS, qmi_data);
+	if (qmi)
+		return coresight_qmi_etr_assign(qmi, etr_data);
 	return 0;
 }
 
 static int secure_etr_reenable_remote_source(struct secure_etr_drvdata *drvdata)
 {
 	struct coresight_device *qmi = secure_etr_get_qmi_device(drvdata);
-	struct cs_qmi_data *qmi_data;
 
-	qmi_data = kzalloc(sizeof(*qmi_data), GFP_KERNEL);
-	if (!qmi_data)
-		return -ENOMEM;
-
-	qmi_data->command = CS_QMI_ENABLE_REMOTE_ETM;
-	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, CS_MODE_SYSFS, qmi_data);
+	if (qmi)
+		return coresight_qmi_remote_etm_enable(qmi);
 	return 0;
 }
 

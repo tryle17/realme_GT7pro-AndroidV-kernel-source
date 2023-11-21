@@ -57,10 +57,9 @@ dummy_source_get_qmi_device(struct dummy_drvdata *drvdata)
  * Returns : 0 on success
  */
 
-static int qmi_assign_dummy_source_atid(struct dummy_drvdata *drvdata, enum cs_mode mode)
+static int qmi_assign_dummy_source_atid(struct dummy_drvdata *drvdata)
 {
 	struct coresight_device *qmi = dummy_source_get_qmi_device(drvdata);
-	struct cs_qmi_data qmi_data;
 	struct  coresight_atid_assign_req_msg_v01 *atid_data;
 	const char *trace_name = dev_name(drvdata->dev);
 
@@ -73,11 +72,9 @@ static int qmi_assign_dummy_source_atid(struct dummy_drvdata *drvdata, enum cs_m
 
 	atid_data->atids[0] = drvdata->traceid;
 	atid_data->num_atids = 1;
-	qmi_data.command = CS_QMI_ASSIGN_ATID;
-	qmi_data.atid_data = atid_data;
 
-	if (qmi && helper_ops(qmi)->enable)
-		return helper_ops(qmi)->enable(qmi, mode, &qmi_data);
+	if (qmi)
+		return coresight_qmi_assign_atid(qmi, atid_data);
 	return 0;
 }
 
@@ -90,7 +87,7 @@ static int dummy_source_enable(struct coresight_device *csdev,
 
 	coresight_csr_set_etr_atid(csdev, drvdata->traceid, true);
 	if (!drvdata->static_atid) {
-		ret = qmi_assign_dummy_source_atid(drvdata, mode);
+		ret = qmi_assign_dummy_source_atid(drvdata);
 		if (ret) {
 			dev_err(drvdata->dev, "Assign dummy source atid fail\n");
 			return ret;

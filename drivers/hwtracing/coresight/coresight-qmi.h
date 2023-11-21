@@ -308,4 +308,23 @@ static inline bool coresight_is_qmi_device(struct coresight_device *csdev)
 	return true;
 }
 
+#if IS_ENABLED(CONFIG_CORESIGHT_QMI)
+extern int coresight_qmi_remote_etm_enable(struct coresight_device *csdev);
+extern void coresight_qmi_remote_etm_disable(struct coresight_device *csdev);
+extern int coresight_qmi_etr_assign(struct coresight_device *csdev,
+		struct coresight_etr_assign_req_msg_v01 *req);
+extern int coresight_qmi_assign_atid(struct coresight_device *csdev,
+		struct coresight_atid_assign_req_msg_v01 *req);
+#else
+
+static inline int coresight_qmi_remote_etm_enable(
+	struct coresight_device *csdev) {return -EINVAL; }
+static inline int coresight_qmi_etr_assign(struct coresight_device *csdev,
+		struct coresight_etr_assign_req_msg_v01 *req) {return -EINVAL; }
+static inline int coresight_qmi_assign_atid(struct coresight_device *csdev,
+		struct coresight_atid_assign_req_msg_v01 *req) {return -EINVAL; }
+static inline void coresight_qmi_remote_etm_disable(
+		struct coresight_device *csdev) {}
+#endif
+
 #endif
