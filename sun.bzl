@@ -68,6 +68,7 @@ def define_sun():
         "drivers/iio/adc/qcom-vadc-common.ko",
         "drivers/iio/adc/qti-glink-adc.ko",
         "drivers/input/misc/pm8941-pwrkey.ko",
+        "drivers/input/misc/qcom-hv-haptics.ko",
         "drivers/interconnect/qcom/icc-bcm-voter.ko",
         "drivers/interconnect/qcom/icc-debug.ko",
         "drivers/interconnect/qcom/icc-rpmh.ko",
