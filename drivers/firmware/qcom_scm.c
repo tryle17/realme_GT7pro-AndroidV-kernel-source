@@ -7,7 +7,6 @@
 
 #include <linux/platform_device.h>
 #include <linux/init.h>
-#include <linux/interrupt.h>
 #include <linux/completion.h>
 #include <linux/cpumask.h>
 #include <linux/export.h>
@@ -17,6 +16,7 @@
 #include <linux/types.h>
 #include <linux/firmware/qcom/qcom_scm.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
@@ -26,6 +26,10 @@
 #include <linux/arm-smccc.h>
 #include <soc/qcom/qseecom_scm.h>
 #include <linux/delay.h>
+#include <linux/idr.h>
+#include <linux/interrupt.h>
+#include <linux/spinlock.h>
+#include <linux/ktime.h>
 
 #include "qcom_scm.h"
 #include "qtee_shmbridge_internal.h"
@@ -40,6 +44,15 @@ module_param(pas_shutdown_retry_delay_ms, uint, 0644);
 #define SCM_HAS_IFACE_CLK	BIT(1)
 #define SCM_HAS_BUS_CLK		BIT(2)
 
+struct qcom_scm_waitq {
+	struct idr idr;
+	spinlock_t idr_lock;
+	struct work_struct scm_irq_work;
+	u64 call_ctx_cnt;
+	u64 irq;
+	enum qcom_scm_wq_feature wq_feature;
+};
+
 struct qcom_scm {
 	struct device *dev;
 	struct clk *core_clk;
@@ -49,6 +62,7 @@ struct qcom_scm {
 	struct completion waitq_comp;
 	struct reset_controller_dev reset;
 	struct notifier_block restart_nb;
+	struct qcom_scm_waitq waitq;
 
 	/* control access to the interconnect path */
 	struct mutex scm_bw_lock;
@@ -57,6 +71,8 @@ struct qcom_scm {
 	u64 dload_mode_addr;
 };
 
+DEFINE_SEMAPHORE(qcom_scm_sem_lock, 1);
+
 /* Each bit configures cold/warm boot address for one of the 4 CPUs */
 static const u8 qcom_scm_cpu_cold_bits[QCOM_SCM_BOOT_MAX_CPUS] = {
 	0, BIT(0), BIT(3), BIT(5)
@@ -64,6 +80,17 @@ static const u8 qcom_scm_cpu_cold_bits[QCOM_SCM_BOOT_MAX_CPUS] = {
 static const u8 qcom_scm_cpu_warm_bits[QCOM_SCM_BOOT_MAX_CPUS] = {
 	BIT(2), BIT(1), BIT(4), BIT(6)
 };
+
+
+#define QCOM_SCM_FLAG_COLDBOOT_CPU0	0x00
+#define QCOM_SCM_FLAG_COLDBOOT_CPU1	0x01
+#define QCOM_SCM_FLAG_COLDBOOT_CPU2	0x08
+#define QCOM_SCM_FLAG_COLDBOOT_CPU3	0x20
+
+#define QCOM_SCM_FLAG_WARMBOOT_CPU0	0x04
+#define QCOM_SCM_FLAG_WARMBOOT_CPU1	0x02
+#define QCOM_SCM_FLAG_WARMBOOT_CPU2	0x10
+#define QCOM_SCM_FLAG_WARMBOOT_CPU3	0x40
 
 #define QCOM_SMC_WAITQ_FLAG_WAKE_ONE	BIT(0)
 #define QCOM_SMC_WAITQ_FLAG_WAKE_ALL	BIT(1)
@@ -2138,6 +2165,7 @@ int qcom_scm_invoke_smc_legacy(phys_addr_t in_buf, size_t in_buf_size,
 		.args[3] = out_buf_size,
 		.arginfo = QCOM_SCM_ARGS(4, QCOM_SCM_RW, QCOM_SCM_VAL,
 			QCOM_SCM_RW, QCOM_SCM_VAL),
+		.multicall_allowed = true,
 	};
 
 	struct qcom_scm_res res;
@@ -2172,6 +2200,7 @@ int qcom_scm_invoke_smc(phys_addr_t in_buf, size_t in_buf_size,
 		.args[3] = out_buf_size,
 		.arginfo = QCOM_SCM_ARGS(4, QCOM_SCM_RW, QCOM_SCM_VAL,
 					QCOM_SCM_RW, QCOM_SCM_VAL),
+		.multicall_allowed = true,
 	};
 	struct qcom_scm_res res;
 
@@ -2202,6 +2231,7 @@ int qcom_scm_invoke_callback_response(phys_addr_t out_buf,
 		.args[0] = out_buf,
 		.args[1] = out_buf_size,
 		.arginfo = QCOM_SCM_ARGS(2, QCOM_SCM_RW, QCOM_SCM_VAL),
+		.multicall_allowed = true,
 	};
 	struct qcom_scm_res res;
 
@@ -2302,6 +2332,163 @@ static int qcom_scm_do_restart(struct notifier_block *this, unsigned long event,
 	return NOTIFY_OK;
 }
 
+static int qcom_scm_query_wq_queue_info(struct qcom_scm *scm)
+{
+	int ret;
+	struct qcom_scm_desc desc = {
+		.svc = QCOM_SCM_SVC_WAITQ,
+		.cmd = QCOM_SCM_GET_WQ_QUEUE_INFO,
+		.owner = ARM_SMCCC_OWNER_SIP
+	};
+	struct qcom_scm_res res;
+
+	scm->waitq.wq_feature = QCOM_SCM_SINGLE_SMC_ALLOW;
+	ret = qcom_scm_call_atomic(__scm->dev, &desc, &res);
+	if (ret) {
+		pr_err("%s: Failed to get wq queue info: %d\n", __func__, ret);
+		return ret;
+	}
+
+	scm->waitq.call_ctx_cnt = res.result[0] & 0xFF;
+	scm->waitq.irq = res.result[1] & 0xFFFF;
+	scm->waitq.wq_feature = QCOM_SCM_MULTI_SMC_WHITE_LIST_ALLOW;
+
+	pr_info("WQ Info, feature: %d call_ctx_cnt: %llu irq: %llu\n",
+		scm->waitq.wq_feature, scm->waitq.call_ctx_cnt, scm->waitq.irq);
+
+	return ret;
+}
+
+bool qcom_scm_multi_call_allow(struct device *dev, bool multicall_allowed)
+{
+	struct qcom_scm *scm;
+
+	scm = dev_get_drvdata(dev);
+	if (multicall_allowed &&
+		scm->waitq.wq_feature == QCOM_SCM_MULTI_SMC_WHITE_LIST_ALLOW)
+		return true;
+
+	return false;
+};
+
+struct completion *qcom_scm_lookup_wq(struct qcom_scm *scm, u32 wq_ctx)
+{
+	struct completion *wq = NULL;
+	unsigned long flags;
+	int err;
+
+	spin_lock_irqsave(&scm->waitq.idr_lock, flags);
+	wq = idr_find(&scm->waitq.idr, wq_ctx);
+	if (wq)
+		goto out;
+
+	wq = devm_kzalloc(scm->dev, sizeof(*wq), GFP_ATOMIC);
+	if (!wq) {
+		wq = ERR_PTR(-ENOMEM);
+		goto out;
+	}
+
+	init_completion(wq);
+
+	err = idr_alloc_u32(&scm->waitq.idr, wq, &wq_ctx, wq_ctx, GFP_ATOMIC);
+	if (err < 0) {
+		devm_kfree(scm->dev, wq);
+		wq = ERR_PTR(err);
+	}
+
+out:
+	spin_unlock_irqrestore(&scm->waitq.idr_lock, flags);
+	return wq;
+}
+
+void scm_waitq_flag_handler(struct completion *wq, u32 flags)
+{
+	switch (flags) {
+	case QCOM_SMC_WAITQ_FLAG_WAKE_ONE:
+		complete(wq);
+		break;
+	case QCOM_SMC_WAITQ_FLAG_WAKE_ALL:
+		complete_all(wq);
+		reinit_completion(wq);
+		break;
+	default:
+		pr_err("invalid flags: %u\n", flags);
+	}
+}
+
+static void scm_irq_work(struct work_struct *work)
+{
+	int ret;
+	u32 wq_ctx, flags, more_pending = 0;
+	struct completion *wq_to_wake;
+	struct qcom_scm_waitq *w = container_of(work, struct qcom_scm_waitq, scm_irq_work);
+	struct qcom_scm *scm = container_of(w, struct qcom_scm, waitq);
+
+	if (qcom_scm_convention != SMC_CONVENTION_ARM_64) {
+		/* Unsupported */
+		return;
+	}
+
+	do {
+		ret = scm_get_wq_ctx(&wq_ctx, &flags, &more_pending);
+		if (ret) {
+			pr_err("GET_WQ_CTX SMC call failed: %d\n", ret);
+			return;
+		}
+
+		wq_to_wake = qcom_scm_lookup_wq(scm, wq_ctx);
+		if (IS_ERR_OR_NULL(wq_to_wake)) {
+			pr_err("No waitqueue found for wq_ctx %d: %ld\n",
+					wq_ctx, PTR_ERR(wq_to_wake));
+			return;
+		}
+
+		scm_waitq_flag_handler(wq_to_wake, flags);
+	} while (more_pending);
+}
+
+static irqreturn_t qcom_scm_irq_handler(int irq, void *p)
+{
+	struct qcom_scm *scm = p;
+
+	schedule_work(&scm->waitq.scm_irq_work);
+
+	return IRQ_HANDLED;
+}
+
+static int __qcom_multi_smc_init(struct qcom_scm *__scm,
+						struct platform_device *pdev)
+{
+	int ret = 0, irq;
+
+	spin_lock_init(&__scm->waitq.idr_lock);
+	idr_init(&__scm->waitq.idr);
+	if (of_device_is_compatible(__scm->dev->of_node, "qcom,scm-v1.1")) {
+		INIT_WORK(&__scm->waitq.scm_irq_work, scm_irq_work);
+
+		irq = platform_get_irq(pdev, 0);
+		if (irq < 0) {
+			dev_err(__scm->dev, "WQ IRQ is not specified: %d\n", irq);
+			return irq;
+		}
+
+		ret = devm_request_threaded_irq(__scm->dev, irq, NULL,
+			qcom_scm_irq_handler, IRQF_ONESHOT, "qcom-scm", __scm);
+		if (ret < 0) {
+			dev_err(__scm->dev, "Failed to request qcom-scm irq: %d\n", ret);
+			return ret;
+		}
+
+		/* Detect Multi SMC support present or not */
+		ret = qcom_scm_query_wq_queue_info(__scm);
+		if (!ret)
+			sema_init(&qcom_scm_sem_lock,
+					(int)__scm->waitq.call_ctx_cnt);
+	}
+
+	return ret;
+}
+
 /**
  * scm_mem_protection_init_do() - Makes core kernel bootup milestone call
  *                                to Kernel Protect (KP) in Hypervisor
@@ -2366,79 +2553,11 @@ int  scm_mem_protection_init_do(void)
 	return resp;
 }
 
-static int qcom_scm_assert_valid_wq_ctx(u32 wq_ctx)
-{
-	/* FW currently only supports a single wq_ctx (zero).
-	 * TODO: Update this logic to include dynamic allocation and lookup of
-	 * completion structs when FW supports more wq_ctx values.
-	 */
-	if (wq_ctx != 0) {
-		dev_err(__scm->dev, "Firmware unexpectedly passed non-zero wq_ctx\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-int qcom_scm_wait_for_wq_completion(u32 wq_ctx)
-{
-	int ret;
-
-	ret = qcom_scm_assert_valid_wq_ctx(wq_ctx);
-	if (ret)
-		return ret;
-
-	wait_for_completion(&__scm->waitq_comp);
-
-	return 0;
-}
-
-static int qcom_scm_waitq_wakeup(struct qcom_scm *scm, unsigned int wq_ctx)
-{
-	int ret;
-
-	ret = qcom_scm_assert_valid_wq_ctx(wq_ctx);
-	if (ret)
-		return ret;
-
-	complete(&__scm->waitq_comp);
-
-	return 0;
-}
-
-static irqreturn_t qcom_scm_irq_handler(int irq, void *data)
-{
-	int ret;
-	struct qcom_scm *scm = data;
-	u32 wq_ctx, flags, more_pending = 0;
-
-	do {
-		ret = scm_get_wq_ctx(&wq_ctx, &flags, &more_pending);
-		if (ret) {
-			dev_err(scm->dev, "GET_WQ_CTX SMC call failed: %d\n", ret);
-			goto out;
-		}
-
-		if (flags != QCOM_SMC_WAITQ_FLAG_WAKE_ONE &&
-		    flags != QCOM_SMC_WAITQ_FLAG_WAKE_ALL) {
-			dev_err(scm->dev, "Invalid flags found for wq_ctx: %u\n", flags);
-			goto out;
-		}
-
-		ret = qcom_scm_waitq_wakeup(scm, wq_ctx);
-		if (ret)
-			goto out;
-	} while (more_pending);
-
-out:
-	return IRQ_HANDLED;
-}
-
 static int qcom_scm_probe(struct platform_device *pdev)
 {
 	struct qcom_scm *scm;
 	unsigned long clks;
-	int irq, ret;
+	int ret;
 
 	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
 	if (!scm)
@@ -2519,18 +2638,10 @@ static int qcom_scm_probe(struct platform_device *pdev)
 
 	init_completion(&__scm->waitq_comp);
 
-	irq = platform_get_irq_optional(pdev, 0);
-	if (irq < 0) {
-		if (irq != -ENXIO)
-			return irq;
-	} else {
-		ret = devm_request_threaded_irq(__scm->dev, irq, NULL, qcom_scm_irq_handler,
-						IRQF_ONESHOT, "qcom-scm", __scm);
-		if (ret < 0)
-			return dev_err_probe(scm->dev, ret, "Failed to request qcom-scm irq\n");
-	}
-
 	__get_convention();
+	ret  = __qcom_multi_smc_init(scm, pdev);
+	if (ret)
+		return ret;
 
 	scm->restart_nb.notifier_call = qcom_scm_do_restart;
 	scm->restart_nb.priority = 130;
@@ -2549,10 +2660,12 @@ static int qcom_scm_probe(struct platform_device *pdev)
 
 static void qcom_scm_shutdown(struct platform_device *pdev)
 {
+	idr_destroy(&__scm->waitq.idr);
 	qcom_scm_disable_sdi();
 	qcom_scm_halt_spmi_pmic_arbiter();
 	/* Clean shutdown, disable download mode to allow normal restart */
-	qcom_scm_set_download_mode(QCOM_DOWNLOAD_NODUMP, 0);
+	if (download_mode)
+		qcom_scm_set_download_mode(QCOM_DOWNLOAD_NODUMP, 0);
 }
 
 static const struct of_device_id qcom_scm_dt_match[] = {
@@ -2589,6 +2702,7 @@ static const struct of_device_id qcom_scm_dt_match[] = {
 	{ .compatible = "qcom,scm-msm8996" },
 	{ .compatible = "qcom,scm-sm6375", .data = (void *)SCM_HAS_CORE_CLK },
 	{ .compatible = "qcom,scm" },
+	{ .compatible = "qcom,scm-v1.1" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, qcom_scm_dt_match);
