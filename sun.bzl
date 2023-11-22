@@ -143,6 +143,7 @@ def define_sun():
         "drivers/soc/qcom/debug_symbol.ko",
         "drivers/soc/qcom/dmesg_dumper.ko",
         "drivers/soc/qcom/eud.ko",
+        "drivers/soc/qcom/gh_tlmm_vm_mem_access.ko",
         "drivers/soc/qcom/gic_intr_routing.ko",
         "drivers/soc/qcom/health_monitor.ko",
         "drivers/soc/qcom/llcc-qcom.ko",
