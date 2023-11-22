@@ -871,7 +871,7 @@ static int uetm_probe(struct platform_device *pdev)
 	desc.type = CORESIGHT_DEV_TYPE_SOURCE;
 	desc.subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE;
 	drvdata->csdev = coresight_register(&desc);
-	ret = PTR_ERR_OR_ZERO(drvdata->csdev)
+	ret = PTR_ERR_OR_ZERO(drvdata->csdev);
 	if (ret)
 		return ret;
 
