@@ -25,6 +25,7 @@ secure_buffer.ko
 arm_smmu.ko
 pinctrl-msm.ko
 pinctrl-pineapple.ko
+sched-walt.ko
 clk-qcom.ko
 clk-dummy.ko
 clk-rpmh.ko
