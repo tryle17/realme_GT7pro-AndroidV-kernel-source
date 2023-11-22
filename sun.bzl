@@ -142,6 +142,7 @@ def define_sun():
         "drivers/soc/qcom/dcvs/qcom_scmi_client.ko",
         "drivers/soc/qcom/dmesg_dumper.ko",
         "drivers/soc/qcom/eud.ko",
+        "drivers/soc/qcom/gic_intr_routing.ko",
         "drivers/soc/qcom/health_monitor.ko",
         "drivers/soc/qcom/llcc-qcom.ko",
         "drivers/soc/qcom/llcc_perfmon.ko",
