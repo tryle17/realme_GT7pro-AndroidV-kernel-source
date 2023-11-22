@@ -144,8 +144,8 @@ static struct clk_alpha_pll disp_cc_pll1 = {
 };
 
 static const struct alpha_pll_config disp_cc_pll2_config = {
-	.l = 0x2,
-	.cal_l = 0x2,
+	.l = 0x493,
+	.cal_l = 0x493,
 	.alpha = 0x0,
 	.config_ctl_val = 0x60000f6a,
 	.config_ctl_hi_val = 0x0001c808,
@@ -157,7 +157,8 @@ static const struct alpha_pll_config disp_cc_pll2_config = {
 	.test_ctl_hi2_val = 0x441001bc,
 	.test_ctl_hi3_val = 0x002003d8,
 	.user_ctl_val = 0x00000400,
-	.user_ctl_hi_val = 0x00250302,
+	.user_ctl_hi_val = 0x00e50302,
+
 };
 
 static struct clk_alpha_pll disp_cc_pll2 = {
@@ -169,8 +170,8 @@ static struct clk_alpha_pll disp_cc_pll2 = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "disp_cc_pll2",
 			.parent_data = &(const struct clk_parent_data) {
-				.fw_name = "bi_tcxo",
-				.name = "bi_tcxo",
+				.fw_name = "sleep_clk",
+				.name = "sleep_clk",
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_pongo_elu_ops,
