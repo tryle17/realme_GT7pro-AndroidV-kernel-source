@@ -31,7 +31,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/property.h>
-
+#include <linux/of.h>
 #include <asm/barrier.h>
 #include <asm/sections.h>
 #include <asm/sysreg.h>
@@ -2007,7 +2007,8 @@ static int etm4_add_coresight_dev(struct etm4_init_arg *init_arg)
 		type_name = "etm";
 	}
 
-	desc.name = devm_kasprintf(dev, GFP_KERNEL,
+	if (of_property_read_string(dev->of_node, "coresight-name", &desc.name))
+		desc.name = devm_kasprintf(dev, GFP_KERNEL,
 				   "%s%d", type_name, drvdata->cpu);
 	if (!desc.name)
 		return -ENOMEM;
