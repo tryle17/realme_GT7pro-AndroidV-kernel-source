@@ -247,12 +247,9 @@ def define_sun():
                 kernel_vendor_cmdline_extras = [
                     # do not sort
                     "console=ttyMSM0,115200n8",
-                    "nowatchdog",  # disable wdog for now
                     "qcom_geni_serial.con_enabled=1",
                     "bootconfig",
                     "printk.devkmsg=on",
-                    "loglevel=8",
-                    "nokaslr",
                     "androidboot.first_stage_console=1",
                 ],
             ),
