@@ -11,6 +11,8 @@ mem_buf_dev.ko
 mem_buf_msgq.ko
 msm_dma_iommu_mapping.ko
 qcom-pdc.ko
+debug_symbol.ko
+minidump.ko
 qcom-dload-mode.ko
 pinctrl-msm.ko
 pinctrl-sun.ko
