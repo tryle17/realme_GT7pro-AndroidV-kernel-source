@@ -223,6 +223,7 @@ def define_sun():
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [
         # keep sorted
+        "drivers/hwtracing/coresight/coresight-etm4x.ko",
         "drivers/misc/lkdtm/lkdtm.ko",
         "kernel/locking/locktorture.ko",
         "kernel/rcu/rcutorture.ko",
