@@ -54,7 +54,7 @@ static struct qmi_ops server_ops = {
 	.del_server = service_coresight_qmi_del_server,
 };
 
-static int coresight_qmi_remote_etm_enable(struct coresight_device *csdev)
+int coresight_qmi_remote_etm_enable(struct coresight_device *csdev)
 {
 	struct qmi_drvdata *drvdata =
 		dev_get_drvdata(csdev->dev.parent);
@@ -125,8 +125,9 @@ err:
 	mutex_unlock(&drvdata->mutex);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(coresight_qmi_remote_etm_enable);
 
-static void coresight_qmi_remote_etm_disable(struct coresight_device *csdev)
+void coresight_qmi_remote_etm_disable(struct coresight_device *csdev)
 {
 	struct qmi_drvdata *drvdata =
 		 dev_get_drvdata(csdev->dev.parent);
@@ -184,12 +185,13 @@ static void coresight_qmi_remote_etm_disable(struct coresight_device *csdev)
 err:
 	mutex_unlock(&drvdata->mutex);
 }
+EXPORT_SYMBOL_GPL(coresight_qmi_remote_etm_disable);
 
 /*
  * remote_etm_etr_assign - reassign the ownership of an ETR instance to specified
  * subsystem.
  */
-static int coresight_qmi_etr_assign(struct coresight_device *csdev,
+int coresight_qmi_etr_assign(struct coresight_device *csdev,
 		struct coresight_etr_assign_req_msg_v01 *req)
 {
 	struct qmi_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
@@ -255,8 +257,9 @@ err:
 	mutex_unlock(&drvdata->mutex);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(coresight_qmi_etr_assign);
 
-static int coresight_qmi_assign_atid(struct coresight_device *csdev,
+int coresight_qmi_assign_atid(struct coresight_device *csdev,
 		struct coresight_atid_assign_req_msg_v01 *req)
 {
 	struct qmi_drvdata *drvdata =
@@ -324,58 +327,17 @@ err:
 	mutex_unlock(&drvdata->mutex);
 	return ret;
 }
-
-static int coresight_qmi_enable(struct coresight_device *csdev, enum cs_mode mode,
-				void *data)
-{
-	struct cs_qmi_data *qmi_data = data;
-
-	int ret;
-
-	switch (qmi_data->command) {
-	case CS_QMI_ENABLE_REMOTE_ETM:
-		ret = coresight_qmi_remote_etm_enable(csdev);
-		break;
-	case CS_QMI_ASSIGN_ETR_TO_MPSS:
-		ret = coresight_qmi_etr_assign(csdev, qmi_data->etr_data);
-		break;
-	case CS_QMI_ASSIGN_ATID:
-		ret = coresight_qmi_assign_atid(csdev, qmi_data->atid_data);
-		break;
-	case CS_QMI_ASSIGN_ETR_TO_APSS:
-		ret = coresight_qmi_etr_assign(csdev, qmi_data->etr_data);
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-	return ret;
-}
-
-static int coresight_qmi_disable(struct coresight_device *csdev, void *data)
-{
-	struct cs_qmi_data *qmi_data = data;
-	int ret = 0;
-
-	switch (qmi_data->command) {
-	case CS_QMI_DISABLE_REMOTE_ETM:
-		coresight_qmi_remote_etm_disable(csdev);
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-	return ret;
-}
+EXPORT_SYMBOL_GPL(coresight_qmi_assign_atid);
 
 static const struct coresight_ops_helper qmi_helper_ops = {
-	.enable = coresight_qmi_enable,
-	.disable = coresight_qmi_disable,
+	.enable = NULL,
+	.disable = NULL,
 };
 
 static const struct coresight_ops qmi_ops = {
 	.helper_ops = &qmi_helper_ops,
 };
+
 
 static int coresight_qmi_probe(struct platform_device *pdev)
 {
@@ -421,9 +383,9 @@ static int coresight_qmi_probe(struct platform_device *pdev)
 			drvdata->inst_id);
 
 	desc.type = CORESIGHT_DEV_TYPE_HELPER;
-	desc.ops = &qmi_ops;
 	desc.pdata = pdev->dev.platform_data;
 	desc.dev = &pdev->dev;
+	desc.ops = &qmi_ops;
 	drvdata->csdev = coresight_register(&desc);
 	if (IS_ERR(drvdata->csdev)) {
 		ret = PTR_ERR(drvdata->csdev);
