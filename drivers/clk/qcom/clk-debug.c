@@ -457,7 +457,8 @@ static int clk_debug_measure_get(void *data, u64 *val)
 
 	ret = clk_find_and_set_parent(measure, hw);
 	if (ret) {
-		pr_err("Failed to set the debug mux's parent.\n");
+		pr_err("Failed to set the debug mux's parent for %s\n",
+		       qcom_clk_hw_get_name(hw));
 		goto exit;
 	}
 
