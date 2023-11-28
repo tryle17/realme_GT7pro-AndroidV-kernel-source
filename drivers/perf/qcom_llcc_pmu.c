@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/ktime.h>
+#include <linux/cpu_phys_log_map.h>
 #include <soc/qcom/qcom_llcc_pmu.h>
 static uint32_t phys_cpu[NR_CPUS];
 
@@ -261,18 +262,15 @@ static void qcom_llcc_event_del(struct perf_event *event, int flags)
 	raw_spin_unlock(&users_lock);
 }
 
-static void get_mpidr_cpu(void *cpu)
-{
-	u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
-
-	*((uint32_t *)cpu) = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-}
-
 static int qcom_llcc_pmu_probe(struct platform_device *pdev)
 {
 	struct resource *res;
-	int ret;
-	uint32_t cpu, pcpu;
+	int pcpu, ret;
+	uint32_t cpu;
+
+	ret = cpu_logical_to_phys(0);
+	if (ret == -EPROBE_DEFER)
+		return ret;
 
 	if (llccpmu) {
 		dev_err(&pdev->dev, "Only one LLCC PMU allowed!\n");
@@ -316,8 +314,9 @@ static int qcom_llcc_pmu_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to register LLCC PMU (%d)\n", ret);
 
 	for_each_possible_cpu(cpu) {
-		smp_call_function_single(cpu, get_mpidr_cpu,
-							 &pcpu, true);
+		pcpu = cpu_logical_to_phys(cpu);
+		if (pcpu < 0)
+			pcpu = cpu;
 		phys_cpu[cpu] = pcpu;
 	}
 
