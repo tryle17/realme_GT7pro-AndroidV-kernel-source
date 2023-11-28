@@ -23,3 +23,4 @@ obj-$(CONFIG_QTI_DDR_COOLING_DEVICE) += ddr_cdev.o
 obj-$(CONFIG_QTI_CPUFREQ_CDEV) += qti_cpufreq_cdev.o
 obj-${CONFIG_QTI_SDPM_CLOCK_MONITOR} += sdpm_clk.o
 obj-$(CONFIG_QTI_CPU_PAUSE_COOLING_DEVICE) += thermal_pause.o
+obj-$(CONFIG_QTI_DEVFREQ_CDEV) += qti_devfreq_cdev.o
