@@ -598,6 +598,8 @@ drivers/android/binder_alloc.h
 drivers/android/binder_internal.h
 drivers/android/binder_trace.h
 drivers/android/binderfs.c
+drivers/android/debug_kinfo.c
+drivers/android/debug_kinfo.h
 drivers/android/memhealth.c
 drivers/android/vendor_hooks.c
 drivers/base/arch_topology.c
