@@ -322,6 +322,10 @@ EXPORT_SYMBOL_GPL(clk_alpha_pll_regs);
 #define LUCID_EVO_PLL_L_VAL_MASK        GENMASK(15, 0)
 #define LUCID_EVO_PLL_CAL_L_VAL_SHIFT	16
 #define LUCID_OLE_PLL_PROCESS_CAL_L_VAL_SHIFT	24
+#define LUCID_EVO_STATUS_EN		BIT(8)
+#define LUCID_EVO_STATUS_SEL_SHIFT	10
+#define LUCID_EVO_STATUS_SEL_MASK	GENMASK(14, 10)
+#define LUCID_EVO_STATUS_MAX		32
 
 /* PONGO ELU PLL specific setting and offsets */
 #define PONGO_PLL_OUT_MASK		0x3
@@ -2895,8 +2899,35 @@ static int clk_lucid_evo_pll_postdiv_set_rate(struct clk_hw *hw, unsigned long r
 	return __clk_lucid_pll_postdiv_set_rate(hw, rate, parent_rate, LUCID_EVO_ENABLE_VOTE_RUN);
 }
 
-static void lucid_evo_pll_list_registers(struct seq_file *f,
-		struct clk_hw *hw)
+static void lucid_evo_pll_list_status(struct seq_file *f, struct clk_hw *hw)
+{
+	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
+	int i, val, test_ctl_val, test_ctl_reg, status_reg;
+	struct regmap *regmap = pll->clkr.regmap;
+
+	/* Reading the STATUS registers is only possible if the PLL is out of reset. */
+	regmap_read(regmap, PLL_MODE(pll), &val);
+	if (!(val & PLL_RESET_N))
+		return;
+
+	test_ctl_reg = pll->offset + pll->regs[PLL_OFF_TEST_CTL];
+	status_reg = pll->offset + pll->regs[PLL_OFF_STATUS];
+
+	regmap_read(regmap, test_ctl_reg, &test_ctl_val);
+	regmap_update_bits(regmap, test_ctl_reg, LUCID_EVO_STATUS_EN, LUCID_EVO_STATUS_EN);
+
+	for (i = 0; i < LUCID_EVO_STATUS_MAX; i++) {
+		regmap_update_bits(regmap, test_ctl_reg, LUCID_EVO_STATUS_SEL_MASK,
+				   i << LUCID_EVO_STATUS_SEL_SHIFT);
+		regmap_read(regmap, status_reg, &val);
+		clock_debug_output(f, "       PLL_STATUS_%02d: 0x%.8x\n", i, val);
+	}
+
+	/* Restore original TEST_CTL value so we don't keep the STATUS bus enabled. */
+	regmap_write(regmap, test_ctl_reg, test_ctl_val);
+}
+
+static void _lucid_evo_pll_list_registers(struct seq_file *f, struct clk_hw *hw, bool read_only)
 {
 	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
 	int size, i, val;
@@ -2904,7 +2935,7 @@ static void lucid_evo_pll_list_registers(struct seq_file *f,
 	static struct clk_register_data data[] = {
 		{"PLL_MODE", PLL_OFF_MODE},
 		{"PLL_OPMODE", PLL_OFF_OPMODE},
-		{"PLL_STATUS", PLL_OFF_STATUS},
+		{"PLL_STATE", PLL_OFF_STATE},
 		{"PLL_L_VAL", PLL_OFF_L_VAL},
 		{"PLL_ALPHA_VAL", PLL_OFF_ALPHA_VAL},
 		{"PLL_USER_CTL", PLL_OFF_USER_CTL},
@@ -2939,6 +2970,19 @@ static void lucid_evo_pll_list_registers(struct seq_file *f,
 					data1[0].offset, &val);
 		clock_debug_output(f, "%20s: 0x%.8x\n", data1[0].name, val);
 	}
+
+	/*
+	 * Dumping the status banks requires poking the TEST_CTL register,
+	 * which we can't do for votable PLLs for which we only have write
+	 * access to the HLOS vote register and not to the main PLL registers.
+	 */
+	if (!read_only)
+		lucid_evo_pll_list_status(f, hw);
+}
+
+static void lucid_evo_pll_list_registers(struct seq_file *f, struct clk_hw *hw)
+{
+	_lucid_evo_pll_list_registers(f, hw, false);
 }
 
 static struct clk_regmap_ops clk_lucid_evo_pll_regmap_ops = {
@@ -2955,6 +2999,25 @@ static int clk_lucid_evo_pll_init(struct clk_hw *hw)
 	return 0;
 }
 
+static void fixed_lucid_evo_pll_list_registers(struct seq_file *f, struct clk_hw *hw)
+{
+	_lucid_evo_pll_list_registers(f, hw, true);
+}
+
+static struct clk_regmap_ops clk_fixed_lucid_evo_pll_regmap_ops = {
+	.list_registers = &fixed_lucid_evo_pll_list_registers,
+};
+
+static int clk_fixed_lucid_evo_pll_init(struct clk_hw *hw)
+{
+	struct clk_regmap *rclk = to_clk_regmap(hw);
+
+	if (!rclk->ops)
+		rclk->ops = &clk_fixed_lucid_evo_pll_regmap_ops;
+
+	return 0;
+}
+
 const struct clk_ops clk_alpha_pll_fixed_lucid_evo_ops = {
 	.prepare = clk_prepare_regmap,
 	.unprepare = clk_unprepare_regmap,
@@ -2965,7 +3028,7 @@ const struct clk_ops clk_alpha_pll_fixed_lucid_evo_ops = {
 	.is_enabled = clk_trion_pll_is_enabled,
 	.recalc_rate = alpha_pll_lucid_evo_recalc_rate,
 	.round_rate = clk_alpha_pll_round_rate,
-	.init = clk_lucid_evo_pll_init,
+	.init = clk_fixed_lucid_evo_pll_init,
 	.debug_init = clk_common_debug_init,
 };
 EXPORT_SYMBOL_GPL(clk_alpha_pll_fixed_lucid_evo_ops);
