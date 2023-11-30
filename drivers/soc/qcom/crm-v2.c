@@ -1494,6 +1494,7 @@ struct crm_desc pcie_crm_desc_v2 = {
 		[IRQ_STATUS]			 = 0x10,
 		[IRQ_CLEAR]			 = 0x14,
 		[IRQ_ENABLE]			 = 0x18,
+		[CRMB_PT_TRIGGER]		 = 0x270,
 	},
 	.sw_drv_bw_vote_vcd_regs = {
 		[DRV_BASE]			 = 0x3B0,
@@ -1563,6 +1564,7 @@ struct crm_desc cam_crm_desc_v2 = {
 		[IRQ_STATUS]			 = 0x10,
 		[IRQ_CLEAR]			 = 0x14,
 		[IRQ_ENABLE]			 = 0x18,
+		[CRMB_PT_TRIGGER]		 = 0x150,
 	},
 	.sw_drv_bw_vote_vcd_regs = {
 		[DRV_BASE]			 = 0x11C,
@@ -1575,6 +1577,7 @@ struct crm_desc cam_crm_desc_v2 = {
 		[IRQ_STATUS]			 = 0x130,
 		[IRQ_CLEAR]			 = 0x134,
 		[IRQ_ENABLE]			 = 0x138,
+		[CRMB_PT_TRIGGER]		 = 0x150,
 	},
 };
 
