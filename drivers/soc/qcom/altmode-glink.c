@@ -568,6 +568,9 @@ static int altmode_callback(void *priv, void *data, size_t len)
 					port_index));
 		mutex_unlock(&amdev->client_lock);
 
+		altmode_dbg("Payload: %*ph\n", NOTIFY_PAYLOAD_SIZE,
+				notify_msg->payload);
+
 		if (!amclient) {
 			altmode_dbg("No client associated with SVID %#x port %u\n",
 					svid, port_index);
@@ -576,9 +579,6 @@ static int altmode_callback(void *priv, void *data, size_t len)
 					msecs_to_jiffies(20));
 			return 0;
 		}
-
-		altmode_dbg("Payload: %*ph\n", NOTIFY_PAYLOAD_SIZE,
-				notify_msg->payload);
 
 		cancel_work_sync(&amclient->client_cb_work);
 		memcpy(&amclient->msg, notify_msg->payload,
