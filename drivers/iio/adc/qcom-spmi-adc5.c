@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/bitops.h>
@@ -1125,6 +1126,7 @@ static const struct adc5_data adc5_data_pmic = {
 	.name = "pm-adc5",
 	.full_scale_code_volt = 0x70e4,
 	.full_scale_code_cur = 0x2710,
+	.full_scale_code_raw = 0x4000,
 	.adc_chans = adc5_chans_pmic,
 	.info = &adc5_info,
 	.decimation = (unsigned int [ADC5_DECIMATION_SAMPLES_MAX])
@@ -1140,6 +1142,7 @@ static const struct adc5_data adc5_data_pmic = {
 static const struct adc5_data adc7_data_pmic = {
 	.name = "pm-adc7",
 	.full_scale_code_volt = 0x70e4,
+	.full_scale_code_raw = 0x4000,
 	.adc_chans = adc7_chans_pmic,
 	.info = &adc7_info,
 	.decimation = (unsigned int [ADC5_DECIMATION_SAMPLES_MAX])
@@ -1153,6 +1156,7 @@ static const struct adc5_data adc7_data_pmic = {
 static const struct adc5_data adc7_sw_calib_data_pmic = {
 	.name = "pm-adc7",
 	.full_scale_code_volt = 0x70e4,
+	.full_scale_code_raw = 0x4000,
 	.adc_chans = adc7_chans_pmic,
 	.info = &adc7_sw_calib_info,
 	.decimation = (unsigned int [ADC5_DECIMATION_SAMPLES_MAX])
@@ -1168,6 +1172,7 @@ static const struct adc5_data adc5_data_pmic5_lite = {
 	.full_scale_code_volt = 0x70e4,
 	/* On PMI632, IBAT LSB = 5A/32767 */
 	.full_scale_code_cur = 5000,
+	.full_scale_code_raw = 0x4000,
 	.adc_chans = adc5_chans_pmic,
 	.info = &adc5_info,
 	.decimation = (unsigned int []) {250, 420, 840},
@@ -1179,6 +1184,7 @@ static const struct adc5_data adc5_data_pmic_rev2 = {
 	.name = "pm-adc4-rev2",
 	.full_scale_code_volt = 0x4000,
 	.full_scale_code_cur = 0x1800,
+	.full_scale_code_raw = 0x4000,
 	.adc_chans = adc5_chans_rev2,
 	.info = &adc5_info,
 	.decimation = (unsigned int [ADC5_DECIMATION_SAMPLES_MAX])
