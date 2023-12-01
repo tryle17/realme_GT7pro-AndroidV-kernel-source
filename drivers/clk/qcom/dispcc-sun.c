@@ -36,6 +36,19 @@ static struct clk_vdd_class *disp_cc_sun_regulators[] = {
 	&vdd_mx,
 };
 
+static struct clk_crm disp_crm = {
+	.name = "disp_crm",
+	.regs = {
+		.cfg_rcgr = 0xd8,
+		.l_val = 0xdc,
+		.curr_perf = 0x18,
+	},
+	.offsets = {
+		.vcd = 0x268,
+		.level = 0x28,
+	},
+};
+
 enum {
 	P_BI_TCXO,
 	P_DISP_CC_PLL0_OUT_MAIN,
@@ -89,7 +102,7 @@ static struct clk_alpha_pll disp_cc_pll0 = {
 				.name = "bi_tcxo",
 			},
 			.num_parents = 1,
-			.ops = &clk_alpha_pll_taycan_elu_ops,
+			.ops = &clk_alpha_pll_crm_taycan_elu_ops,
 		},
 		.vdd_data = {
 			.vdd_class = &vdd_mm,
@@ -896,12 +909,17 @@ static struct clk_rcg2 disp_cc_mdss_mdp_clk_src = {
 	.freq_tbl = ftbl_disp_cc_mdss_mdp_clk_src,
 	.enable_safe_config = true,
 	.flags = HW_CLK_CTRL_MODE,
+	.clkr = {
+		.crm = &disp_crm,
+		.crm_vcd = 1,
+		.crm_num_node = 1,
+	},
 	.clkr.hw.init = &(const struct clk_init_data) {
 		.name = "disp_cc_mdss_mdp_clk_src",
 		.parent_data = disp_cc_parent_data_9,
 		.num_parents = ARRAY_SIZE(disp_cc_parent_data_9),
-		.flags = CLK_SET_RATE_PARENT,
-		.ops = &clk_rcg2_ops,
+		.flags = CLK_GET_RATE_NOCACHE | CLK_SET_RATE_PARENT,
+		.ops = &clk_rcg2_crmb_ops,
 	},
 	.clkr.vdd_data = {
 		.vdd_classes = disp_cc_sun_regulators,
@@ -1955,44 +1973,6 @@ static struct clk_branch disp_cc_mdss_pclk2_clk = {
 	},
 };
 
-static struct clk_branch disp_cc_mdss_rscc_ahb_clk = {
-	.halt_reg = 0xc00c,
-	.halt_check = BRANCH_HALT,
-	.clkr = {
-		.enable_reg = 0xc00c,
-		.enable_mask = BIT(0),
-		.flags = QCOM_CLK_BOOT_CRITICAL,
-		.hw.init = &(const struct clk_init_data) {
-			.name = "disp_cc_mdss_rscc_ahb_clk",
-			.parent_hws = (const struct clk_hw*[]) {
-				&disp_cc_mdss_ahb_clk_src.clkr.hw,
-			},
-			.num_parents = 1,
-			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
-static struct clk_branch disp_cc_mdss_rscc_vsync_clk = {
-	.halt_reg = 0xc008,
-	.halt_check = BRANCH_HALT,
-	.clkr = {
-		.enable_reg = 0xc008,
-		.enable_mask = BIT(0),
-		.flags = QCOM_CLK_BOOT_CRITICAL,
-		.hw.init = &(const struct clk_init_data) {
-			.name = "disp_cc_mdss_rscc_vsync_clk",
-			.parent_hws = (const struct clk_hw*[]) {
-				&disp_cc_mdss_vsync_clk_src.clkr.hw,
-			},
-			.num_parents = 1,
-			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
 static struct clk_branch disp_cc_mdss_vsync1_clk = {
 	.halt_reg = 0xa024,
 	.halt_check = BRANCH_HALT,
@@ -2126,8 +2106,6 @@ static struct clk_regmap *disp_cc_sun_clocks[] = {
 	[DISP_CC_MDSS_PCLK1_CLK_SRC] = &disp_cc_mdss_pclk1_clk_src.clkr,
 	[DISP_CC_MDSS_PCLK2_CLK] = &disp_cc_mdss_pclk2_clk.clkr,
 	[DISP_CC_MDSS_PCLK2_CLK_SRC] = &disp_cc_mdss_pclk2_clk_src.clkr,
-	[DISP_CC_MDSS_RSCC_AHB_CLK] = &disp_cc_mdss_rscc_ahb_clk.clkr,
-	[DISP_CC_MDSS_RSCC_VSYNC_CLK] = &disp_cc_mdss_rscc_vsync_clk.clkr,
 	[DISP_CC_MDSS_VSYNC1_CLK] = &disp_cc_mdss_vsync1_clk.clkr,
 	[DISP_CC_MDSS_VSYNC_CLK] = &disp_cc_mdss_vsync_clk.clkr,
 	[DISP_CC_MDSS_VSYNC_CLK_SRC] = &disp_cc_mdss_vsync_clk_src.clkr,
@@ -2198,9 +2176,13 @@ static int disp_cc_sun_probe(struct platform_device *pdev)
 	 * Keep clocks always enabled:
 	 *	disp_cc_sleep_clk
 	 *	disp_cc_xo_clk
+	 *	disp_cc_mdss_rscc_ahb_clk
+	 *	disp_cc_mdss_rscc_vsync_clk
 	 */
 	regmap_update_bits(regmap, 0xe07c, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0xe05c, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0xc00c, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0xc008, BIT(0), BIT(0));
 
 	ret = qcom_cc_really_probe(pdev, &disp_cc_sun_desc, regmap);
 	if (ret) {
