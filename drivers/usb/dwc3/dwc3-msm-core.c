@@ -604,7 +604,7 @@ struct dwc3_msm {
 	void            *dwc_dma_ipc_log_ctxt;
 
 	struct dwc3_hw_ep	hw_eps[DWC3_ENDPOINTS_NUM];
-	phys_addr_t		ebc_desc_addr;
+	struct dwc3_trb		*ebc_desc_addr;
 	bool			dis_sending_cm_l1_quirk;
 	bool			use_eusb2_phy;
 	bool			force_gen1;
@@ -2633,22 +2633,6 @@ static int dbm_ep_config(struct dwc3_msm *mdwc, u8 usb_ep, u8 bam_pipe,
 	return dbm_ep;
 }
 
-static int msm_ep_clear_ebc_trbs(struct usb_ep *ep)
-{
-	struct dwc3_ep *dep = to_dwc3_ep(ep);
-	struct dwc3 *dwc = dep->dwc;
-	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
-	struct dwc3_hw_ep *edep;
-
-	edep = &mdwc->hw_eps[dep->number];
-	if (edep->ebc_trb_pool) {
-		memunmap(edep->ebc_trb_pool);
-		edep->ebc_trb_pool = NULL;
-	}
-
-	return 0;
-}
-
 static int msm_ep_setup_ebc_trbs(struct usb_ep *ep, struct usb_request *req)
 {
 	struct dwc3_ep *dep = to_dwc3_ep(ep);
@@ -2656,7 +2640,7 @@ static int msm_ep_setup_ebc_trbs(struct usb_ep *ep, struct usb_request *req)
 	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
 	struct dwc3_hw_ep *edep;
 	struct dwc3_trb *trb;
-	u32 desc_offset = 0, scan_offset = 0x4000, phys_base;
+	u32 desc_offset = 0, scan_offset = 0x4000;
 	int i, num_trbs;
 
 	if (!mdwc->ebc_desc_addr) {
@@ -2670,14 +2654,9 @@ static int msm_ep_setup_ebc_trbs(struct usb_ep *ep, struct usb_request *req)
 	}
 
 	edep = &mdwc->hw_eps[dep->number];
-	phys_base = mdwc->ebc_desc_addr + desc_offset;
+	edep->ebc_trb_pool = mdwc->ebc_desc_addr + desc_offset;
 	num_trbs = req->length / EBC_TRB_SIZE;
 	mdwc->hw_eps[dep->number].num_trbs = num_trbs;
-	edep->ebc_trb_pool = memremap(phys_base,
-				      num_trbs * sizeof(struct dwc3_trb),
-				      MEMREMAP_WT);
-	if (!edep->ebc_trb_pool)
-		return -ENOMEM;
 
 	for (i = 0; i < num_trbs; i++) {
 		struct dwc3_trb tmp;
@@ -2857,7 +2836,6 @@ int msm_ep_unconfig(struct usb_ep *ep)
 		reg &= ~LPC_BUS_CLK_EN;
 
 		dwc3_msm_write_reg(mdwc->base, LPC_REG, reg);
-		msm_ep_clear_ebc_trbs(ep);
 	} else {
 		if (dep->trb_dequeue == dep->trb_enqueue &&
 		    list_empty(&dep->pending_list) &&
@@ -6081,7 +6059,8 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ebc_desc");
 	if (res)
-		mdwc->ebc_desc_addr = res->start;
+		mdwc->ebc_desc_addr = devm_ioremap(&pdev->dev,
+					res->start, resource_size(res));
 
 	dwc3_init_dbm(mdwc);
 
