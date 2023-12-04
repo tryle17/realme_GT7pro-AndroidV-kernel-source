@@ -235,11 +235,32 @@ def define_sun():
         "lib/test_user_copy.ko",
     ]
 
+    kernel_vendor_cmdline_extras = ["bootconfig"]
+
     for variant in la_variants:
+        board_kernel_cmdline_extras = []
+        board_bootconfig_extras = []
+
         if variant == "consolidate":
             mod_list = _sun_consolidate_in_tree_modules
+            board_bootconfig_extras += ["androidboot.serialconsole=1"]
+            board_kernel_cmdline_extras += [
+                # do not sort
+                "console=ttyMSM0,115200n8",
+                "qcom_geni_serial.con_enabled=1",
+                "earlycon",
+            ]
+            kernel_vendor_cmdline_extras += [
+                # do not sort
+                "console=ttyMSM0,115200n8",
+                "qcom_geni_serial.con_enabled=1",
+                "earlycon",
+            ]
         else:
             mod_list = _sun_in_tree_modules
+            board_kernel_cmdline_extras += ["nosoftlockup console=ttynull qcom_geni_serial.con_enabled=0"]
+            kernel_vendor_cmdline_extras += ["nosoftlockup console=ttynull qcom_geni_serial.con_enabled=0"]
+            board_bootconfig_extras += ["androidboot.serialconsole=0"]
 
         define_msm_la(
             msm_target = target_name,
@@ -247,13 +268,8 @@ def define_sun():
             in_tree_module_list = mod_list,
             boot_image_opts = boot_image_opts(
                 earlycon_addr = "qcom_geni,0x00a9c000",
-                kernel_vendor_cmdline_extras = [
-                    # do not sort
-                    "console=ttyMSM0,115200n8",
-                    "qcom_geni_serial.con_enabled=1",
-                    "bootconfig",
-                    "printk.devkmsg=on",
-                    "androidboot.first_stage_console=1",
-                ],
+                kernel_vendor_cmdline_extras = kernel_vendor_cmdline_extras,
+                board_kernel_cmdline_extras = board_kernel_cmdline_extras,
+                board_bootconfig_extras = board_bootconfig_extras,
             ),
         )
