@@ -1529,6 +1529,8 @@ static int __dwc3_msm_ebc_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req
 	int ret = 0;
 
 	req->status = DWC3_REQUEST_STATUS_STARTED;
+	req->num_trbs++;
+	dep->trb_enqueue++;
 	list_add_tail(&req->list, &dep->started_list);
 	if (dep->direction)
 		param1 = 0x0;
