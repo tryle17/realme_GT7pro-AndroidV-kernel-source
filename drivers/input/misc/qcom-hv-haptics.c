@@ -2622,7 +2622,7 @@ static u32 get_play_length_effect_us(struct haptics_effect *effect)
 	if ((effect->src == PATTERN1 || effect->src == PATTERN2)
 			&& effect->pattern)
 		length_us += effect->pattern->play_length_us;
-	else if (effect->src == FIFO && effect->fifo)
+	else if ((effect->src == FIFO || effect->src == PATTERN_MEM) && effect->fifo)
 		length_us += effect->fifo->play_length_us;
 
 	return length_us;
