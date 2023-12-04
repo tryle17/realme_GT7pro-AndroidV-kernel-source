@@ -31,7 +31,7 @@ qnoc-sm8450-objs			:= sm8450.o
 qnoc-sun-objs                        	:= sun.o
 qnoc-pineapple-objs                     := pineapple.o
 qnoc-sm8550-objs			:= sm8550.o
-icc-smd-rpm-objs			:= smd-rpm.o icc-rpm.o
+icc-smd-rpm-objs			:= smd-rpm.o icc-rpm.o icc-rpm-clocks.o
 qnoc-qos-obj				:= qnoc-qos.o
 
 obj-$(CONFIG_INTERCONNECT_QCOM_BCM_VOTER) += icc-bcm-voter.o
