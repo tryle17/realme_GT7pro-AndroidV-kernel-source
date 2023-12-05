@@ -564,9 +564,6 @@ struct ufs_qcom_host {
 	void __iomem *dev_ref_clk_ctrl_mmio;
 	bool is_dev_ref_clk_enabled;
 	struct ufs_hw_version hw_ver;
-#if IS_ENABLED(CONFIG_QTI_HW_KEY_MANAGER)
-	void __iomem *ice_hwkm_mmio;
-#endif
 
 	bool reset_in_progress;
 	u32 dev_ref_clk_en_mask;
