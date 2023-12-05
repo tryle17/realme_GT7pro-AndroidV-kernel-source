@@ -2716,10 +2716,6 @@ void clk_lucid_evo_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 
 	/* Disable PLL output */
 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_OUTCTRL, 0);
-
-	/* Set operation mode to STANDBY and de-assert the reset */
-	regmap_write(regmap, PLL_OPMODE(pll), PLL_STANDBY);
-	regmap_update_bits(regmap, PLL_MODE(pll), PLL_RESET_N, PLL_RESET_N);
 }
 EXPORT_SYMBOL_GPL(clk_lucid_evo_pll_configure);
 
