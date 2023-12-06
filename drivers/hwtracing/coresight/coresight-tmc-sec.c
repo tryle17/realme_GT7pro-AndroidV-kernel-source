@@ -441,7 +441,7 @@ static void sec_etr_sram_dev_deregister(struct secure_etr_drvdata *drvdata)
 }
 
 static int enable_secure_etr_sink(struct coresight_device *csdev,
-			       u32 mode, void *data)
+			       enum cs_mode mode, void *data)
 {
 	struct secure_etr_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	int ret = 0;

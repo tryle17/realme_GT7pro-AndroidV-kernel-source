@@ -752,7 +752,7 @@ static void uetm_store_config(struct uetm_drvdata *drvdata)
 	mb();
 }
 static int uetm_enable(struct coresight_device *csdev,
-			struct perf_event *event, u32 mode)
+			struct perf_event *event, enum cs_mode mode)
 {
 	struct uetm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	struct uetm_reg_config *config = drvdata->config;
