@@ -2631,7 +2631,7 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	if (download_mode)
 		qcom_scm_set_download_mode(QCOM_DOWNLOAD_FULLDUMP, 0);
 
-	return 0;
+	return qtee_shmbridge_driver_init();
 }
 
 static void qcom_scm_shutdown(struct platform_device *pdev)
@@ -2671,21 +2671,15 @@ static struct platform_driver qcom_scm_driver = {
 
 static int __init qcom_scm_init(void)
 {
-	int ret;
-
-	ret = platform_driver_register(&qcom_scm_driver);
-	if (ret)
-		return ret;
-
-	return qtee_shmbridge_driver_init();
+	return platform_driver_register(&qcom_scm_driver);
 }
 subsys_initcall(qcom_scm_init);
 
 #if IS_MODULE(CONFIG_QCOM_SCM)
 static void __exit qcom_scm_exit(void)
 {
-	platform_driver_unregister(&qcom_scm_driver);
 	qtee_shmbridge_driver_exit();
+	platform_driver_unregister(&qcom_scm_driver);
 }
 module_exit(qcom_scm_exit);
 #endif
