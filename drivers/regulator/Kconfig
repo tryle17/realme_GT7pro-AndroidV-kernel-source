@@ -1083,6 +1083,15 @@ config REGULATOR_QCOM_USB_VBUS
 	  Say M here if you want to include support for enabling the VBUS output
 	  as a module. The module will be named "qcom_usb_vbus_regulator".
 
+config REGULATOR_QCOM_AMOLED
+	tristate "Qualcomm Technologies, Inc. AMOLED support"
+	depends on SPMI
+	help
+	  Supports the OLEDB/AB/IBB module in the Qualcomm Technologies, Inc.
+	  PMICs. Exposes regulators to control the triple power supply
+	  positive, negative and bias for the AMOLED display panel. It also
+	  allows configurability for the various bias-voltage parameters.
+
 config REGULATOR_RAA215300
 	tristate "Renesas RAA215300 driver"
 	select REGMAP_I2C
