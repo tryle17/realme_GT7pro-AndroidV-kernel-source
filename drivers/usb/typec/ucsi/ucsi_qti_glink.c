@@ -7,6 +7,7 @@
 #define pr_fmt(fmt)	"UCSI: %s: " fmt, __func__
 
 #include <clocksource/arm_arch_timer.h>
+#include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/ipc_logging.h>
 #include <linux/module.h>
@@ -79,6 +80,7 @@ struct ucsi_dev {
 	struct device			*dev;
 	struct ucsi			*ucsi;
 	struct pmic_glink_client	*client;
+	struct dentry			*debugfs_dir;
 	struct completion		read_ack;
 	struct completion		write_ack;
 	struct completion		sync_write_ack;
@@ -95,6 +97,7 @@ struct ucsi_dev {
 	struct work_struct		setup_work;
 	struct work_struct		unregister_work;
 	atomic_t			state;
+	bool				remoteproc_timestamp_en;
 };
 
 struct remoteproc_ts {
@@ -160,22 +163,25 @@ static void get_remoteproc_timestamp(struct remoteproc_ts *ts)
 	ts->ss = (u32)(ss - (ts->hh * 3600 + ts->mm * 60));
 }
 
-static void ucsi_log(const char *prefix, unsigned int offset, u8 *buf,
-				size_t len)
+static void ucsi_log(struct ucsi_dev *udev, const char *prefix,
+			unsigned int offset, u8 *buf, size_t len)
 {
 	char str[UCSI_LOG_BUF_SIZE] = { 0 };
 	u32 i, pos = 0;
 	struct remoteproc_ts ts;
-
-	get_remoteproc_timestamp(&ts);
 
 	for (i = 0; i < len && pos < sizeof(str) - 1; i++)
 		pos += scnprintf(str + pos, sizeof(str) - pos, "%02x ", buf[i]);
 
 	str[pos] = '\0';
 
-	ucsi_dbg("%s %s %s (%02u:%02u:%02u.%06u)\n", prefix, offset_to_name(offset),
-			str, ts.hh, ts.mm, ts.ss, ts.dec);
+	if (udev->remoteproc_timestamp_en) {
+		get_remoteproc_timestamp(&ts);
+		ucsi_dbg("%s %s %s (%02u:%02u:%02u.%06u)\n", prefix, offset_to_name(offset),
+				str, ts.hh, ts.mm, ts.ss, ts.dec);
+	} else {
+		ucsi_dbg("%s %s %s\n", prefix, offset_to_name(offset), str);
+	}
 }
 
 static int handle_ucsi_read_ack(struct ucsi_dev *udev, void *data, size_t len)
@@ -250,7 +256,7 @@ static int handle_ucsi_notify(struct ucsi_dev *udev, void *data, size_t len)
 
 	msg_ptr = data;
 	cci = msg_ptr->notification;
-	ucsi_log("notify:", UCSI_CCI, (u8 *)&cci, sizeof(cci));
+	ucsi_log(udev, "notify:", UCSI_CCI, (u8 *)&cci, sizeof(cci));
 
 	if (test_bit(CMD_PENDING, &udev->flags) &&
 		cci & (UCSI_CCI_ACK_COMPLETE | UCSI_CCI_COMMAND_COMPLETE)) {
@@ -279,10 +285,15 @@ static int ucsi_callback(void *priv, void *data, size_t len)
 	struct ucsi_dev *udev = priv;
 	struct remoteproc_ts ts;
 
-	get_remoteproc_timestamp(&ts);
-
-	ucsi_dbg("owner: %u type: %u opcode: %u len:%zu (%02u:%02u:%02u.%06u)\n", hdr->owner,
-		hdr->type, hdr->opcode, len, ts.hh, ts.mm, ts.ss, ts.dec);
+	if (udev->remoteproc_timestamp_en) {
+		get_remoteproc_timestamp(&ts);
+		ucsi_dbg("owner: %u type: %u opcode: %u len:%zu (%02u:%02u:%02u.%06u)\n",
+			hdr->owner, hdr->type, hdr->opcode, len, ts.hh, ts.mm,
+			ts.ss, ts.dec);
+	} else {
+		ucsi_dbg("owner: %u type: %u opcode: %u len:%zu\n", hdr->owner,
+			hdr->type, hdr->opcode, len);
+	}
 
 	if (hdr->opcode == UC_UCSI_READ_BUF_REQ)
 		handle_ucsi_read_ack(udev, data, len);
@@ -319,7 +330,7 @@ static int ucsi_qti_glink_write(struct ucsi_dev *udev, unsigned int offset,
 	if (!validate_ucsi_msg(offset, val_len))
 		return -EINVAL;
 
-	ucsi_log(sync ? "sync_write:" : "async_write:", offset,
+	ucsi_log(udev, sync ? "sync_write:" : "async_write:", offset,
 			(u8 *)val, val_len);
 
 	if (atomic_read(&udev->state) == PMIC_GLINK_STATE_DOWN)
@@ -520,7 +531,7 @@ static int ucsi_qti_read(struct ucsi *ucsi, unsigned int offset,
 
 	memcpy((u8 *)val, &udev->rx_buf.buf[offset], val_len);
 	atomic_set(&udev->rx_valid, 0);
-	ucsi_log("read:", offset, (u8 *)val, val_len);
+	ucsi_log(udev, "read:", offset, (u8 *)val, val_len);
 	ucsi_qti_notify(udev, offset, val, val_len);
 
 out:
@@ -666,8 +677,20 @@ static int ucsi_probe(struct platform_device *pdev)
 	if (!ucsi_ipc_log)
 		dev_warn(dev, "Error in creating ipc_log_context\n");
 
+	udev->debugfs_dir = debugfs_create_dir("ucsi_glink", NULL);
+	if (IS_ERR(udev->debugfs_dir)) {
+		dev_err(dev, "Failed to create ucsi_glink directory: %ld\n",
+			PTR_ERR(udev->debugfs_dir));
+		udev->debugfs_dir = NULL;
+	} else {
+		debugfs_create_bool("remoteproc_timestamp_en", 0600,
+				udev->debugfs_dir,
+				&udev->remoteproc_timestamp_en);
+	}
+
 	rc = ucsi_setup(udev);
 	if (rc) {
+		debugfs_remove_recursive(udev->debugfs_dir);
 		ipc_log_context_destroy(ucsi_ipc_log);
 		ucsi_ipc_log = NULL;
 		pmic_glink_unregister_client(udev->client);
@@ -682,6 +705,7 @@ static int ucsi_remove(struct platform_device *pdev)
 	struct ucsi_dev *udev = dev_get_drvdata(dev);
 	int rc;
 
+	debugfs_remove_recursive(udev->debugfs_dir);
 	cancel_work_sync(&udev->notify_work);
 	cancel_work_sync(&udev->setup_work);
 	if (!cancel_work_sync(&udev->unregister_work)) {
