@@ -3234,7 +3234,7 @@ static void geni_i3c_get_ver_info(struct geni_i3c_dev *gi3c)
 		"%s hw_ver: 0x%x Major:%d Minor:%d step:%d\n",
 		__func__, hw_ver, major, minor, step);
 
-	gi3c->ver_info.hw_major_ver = major;
+	gi3c->ver_info.hw_major_ver = 3;
 	gi3c->ver_info.hw_minor_ver = minor;
 	gi3c->ver_info.hw_step_ver = step;
 	gi3c->ver_info.m_fw_ver = geni_se_common_get_m_fw(gi3c->se.base);
