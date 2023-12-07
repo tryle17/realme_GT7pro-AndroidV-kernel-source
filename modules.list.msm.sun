@@ -24,6 +24,7 @@ clk-dummy.ko
 cmd-db.ko
 qcom_rpmh.ko
 clk-qcom.ko
+qcom_cpu_vendor_hooks.ko
 debug-regulator.ko
 proxy-consumer.ko
 rpmh-regulator.ko
