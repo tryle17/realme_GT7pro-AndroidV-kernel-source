@@ -530,7 +530,7 @@ error_area:
 #ifdef CONFIG_SWIOTLB_NONLINEAR
 static int swiotlb_late_init_with_tbl(char *tlb, unsigned long nslabs)
 {
-	struct io_tlb_mem *mem = &io_tlb_default_mem;
+	struct io_tlb_pool *mem = &io_tlb_default_mem.defpool;
 	unsigned long bytes = nslabs << IO_TLB_SHIFT;
 	unsigned int area_order;
 
@@ -554,7 +554,8 @@ static int swiotlb_late_init_with_tbl(char *tlb, unsigned long nslabs)
 		goto error_slots;
 
 	set_memory_decrypted((unsigned long)tlb, bytes >> PAGE_SHIFT);
-	swiotlb_init_io_tlb_mem(mem, io_tlb_start, nslabs, 0, true, default_nareas);
+	swiotlb_init_io_tlb_pool(mem, io_tlb_start, nslabs, true, default_nareas);
+	add_mem_pool(&io_tlb_default_mem, mem);
 
 	swiotlb_print_info();
 	return 0;
