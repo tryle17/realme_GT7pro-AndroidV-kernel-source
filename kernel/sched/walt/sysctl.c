@@ -4,6 +4,7 @@
  * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
+#include <linux/kmemleak.h>
 #include <trace/hooks/sched.h>
 
 #include "walt.h"
@@ -781,7 +782,7 @@ unlock_mutex:
 }
 #endif /* CONFIG_PROC_SYSCTL */
 
-struct ctl_table input_boost_sysctls[] = {
+static struct ctl_table input_boost_sysctls[] = {
 	{
 		.procname	= "input_boost_ms",
 		.data		= &sysctl_input_boost_ms,
@@ -812,7 +813,7 @@ struct ctl_table input_boost_sysctls[] = {
 	{ }
 };
 
-struct ctl_table walt_table[] = {
+static struct ctl_table walt_table[] = {
 	{
 		.procname	= "sched_user_hint",
 		.data		= &sysctl_sched_user_hint,
@@ -1362,4 +1363,15 @@ struct ctl_table walt_table[] = {
 	},
 	{ }
 };
+
+void walt_register_sysctl(void)
+{
+	struct ctl_table_header *hdr, *hdr2;
+
+	hdr = register_sysctl("walt", walt_table);
+	hdr2 = register_sysctl("walt/input_boost", input_boost_sysctls);
+
+	kmemleak_not_leak(hdr);
+	kmemleak_not_leak(hdr2);
+}
 

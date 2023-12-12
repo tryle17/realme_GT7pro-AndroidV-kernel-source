@@ -10,7 +10,6 @@
 #include <linux/jiffies.h>
 #include <linux/sched/stat.h>
 #include <linux/module.h>
-#include <linux/kmemleak.h>
 #include <linux/cpumask.h>
 #include <linux/arch_topology.h>
 #include <linux/cpu.h>
@@ -5364,7 +5363,6 @@ static void walt_init_tg_pointers(void)
 
 static void walt_init(struct work_struct *work)
 {
-	struct ctl_table_header *hdr, *hdr2;
 	static atomic_t already_inited = ATOMIC_INIT(0);
 	struct root_domain *rd = cpu_rq(cpumask_first(cpu_active_mask))->rd;
 	int i;
@@ -5415,11 +5413,7 @@ static void walt_init(struct work_struct *work)
 			 "root domain's perf-domain values not initialized rd->pd=%p.",
 			 rd->pd);
 
-	hdr = register_sysctl("walt", walt_table);
-	hdr2 = register_sysctl("walt/input_boost", input_boost_sysctls);
-
-	kmemleak_not_leak(hdr);
-	kmemleak_not_leak(hdr2);
+	walt_register_sysctl();
 
 	input_boost_init();
 	core_ctl_init();
