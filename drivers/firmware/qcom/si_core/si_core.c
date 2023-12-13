@@ -12,6 +12,7 @@
 #include <linux/xarray.h>
 
 #include "si_core.h"
+#include "si_core_adci.h"
 
 /* Static 'Primordial Object' operations. */
 
@@ -1193,6 +1194,8 @@ static int __init si_core_init(void)
 		destroy_si_core_wq();
 	}
 
+	adci_start();
+
 	return ret;
 }
 
@@ -1200,6 +1203,7 @@ static void __exit si_core_exit(void)
 {
 	/* TODO. Prevent unloading if 'xa_si_objects' is not empty. */
 
+	adci_shutdown();
 	sysfs_remove_group(si_core_kobj, &attr_group);
 
 	kobject_put(si_core_kobj);
