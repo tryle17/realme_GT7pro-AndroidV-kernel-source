@@ -3304,6 +3304,15 @@
   snd_soc_unregister_card
   snd_soc_unregister_component
   snd_timer_interrupt
+  snd_usb_autoresume
+  snd_usb_autosuspend
+  snd_usb_endpoint_prepare
+  snd_usb_hw_free
+  snd_usb_hw_params
+  snd_usb_lock_shutdown
+  snd_usb_register_platform_ops
+  snd_usb_unlock_shutdown
+  snd_usb_unregister_platform_ops
   snprintf
   soc_device_register
   soc_device_unregister
@@ -3984,6 +3993,7 @@
   usb_get_from_anchor
   usb_get_intf
   usb_get_urb
+  usb_hcd_is_primary_hcd
   usb_ifnum_to_if
   usb_interface_id
   usb_kill_urb
@@ -4249,7 +4259,20 @@
   xdp_rxq_info_unreg_mem_model
   xdp_warn
   xfrm_lookup
+  xhci_create_secondary_interrupter
   xhci_get_endpoint_index
+  xhci_initialize_ring_info
+  xhci_remove_secondary_interrupter
+  xhci_sideband_add_endpoint
+  xhci_sideband_create_interrupter
+  xhci_sideband_get_endpoint_buffer
+  xhci_sideband_get_event_buffer
+  xhci_sideband_register
+  xhci_sideband_remove_endpoint
+  xhci_sideband_remove_interrupter
+  xhci_sideband_stop_endpoint
+  xhci_sideband_unregister
+  xhci_stop_endpoint_sync
   xp_alloc
   xp_dma_map
   xp_dma_sync_for_cpu_slow
