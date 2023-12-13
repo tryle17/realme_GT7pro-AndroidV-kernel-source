@@ -194,19 +194,31 @@ static inline void get_sleep_stat_name(u32 type, char *stat_type)
 	strim(stat_type);
 }
 
-bool has_system_slept(void)
+bool has_system_slept(bool *debug_aoss)
 {
 	int i;
 	bool sleep_flag = true;
 	char stat_type[sizeof(u32) + 1] = {0};
+	bool aosd_entered = false, cxsd_entered = false;
 
 	for (i = 0; i < drv->config->num_records; i++) {
+		get_sleep_stat_name(b_system_stats[i].stat_type, stat_type);
 		if (b_system_stats[i].count == a_system_stats[i].count) {
-			get_sleep_stat_name(b_system_stats[i].stat_type, stat_type);
 			pr_warn("System %s has not entered sleep\n", stat_type);
 			sleep_flag = false;
+			continue;
 		}
+
+		if (!strcmp(stat_type, "cxsd"))
+			cxsd_entered = true;
+
+		if (!strcmp(stat_type, "aosd"))
+			aosd_entered = true;
+
 	}
+
+	if (cxsd_entered && !aosd_entered)
+		*debug_aoss = true;
 
 	return sleep_flag;
 }
