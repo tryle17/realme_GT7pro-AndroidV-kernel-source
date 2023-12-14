@@ -66,7 +66,7 @@ struct uetm_reg_config {
 	u64     tmask_cfg[UETM_MAX_STATE][UETM_MAX_CFG];
 	u64     dmatch_cfg[UETM_MAX_STATE][UETM_MAX_CFG];
 	u64     tmatch_cfg[UETM_MAX_STATE][UETM_MAX_CFG];
-	u64     st_cfg[UETM_MAX_STATE][UETM_MAX_CFG];
+	u64     st_cfg[UETM_MAX_STATE];
 	u64     cntr_cfg[UETM_MAX_STATE][UETM_MAX_CFG];
 	u64     ocla_cfg2;
 	u64     ocla_cfg;
@@ -225,7 +225,7 @@ static ssize_t diff_dmask_cfg_show(struct device *dev,
 	unsigned long val;
 	int lane_idx;
 
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	val = config->diff_dmask_cfg[lane_idx];
 
 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
@@ -243,7 +243,7 @@ static ssize_t diff_dmask_cfg_store(struct device *dev,
 	if (kstrtoul(buf, 16, &val))
 		return -EINVAL;
 	spin_lock(&drvdata->spinlock);
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	config->diff_dmask_cfg[lane_idx] = (u64)val;
 	spin_unlock(&drvdata->spinlock);
 
@@ -320,8 +320,8 @@ static ssize_t cntr_cfg_show(struct device *dev,
 	unsigned long val;
 	int lane_idx;
 
-	lane_idx = LANE_IDX(drvdata->lane);
-	val = config->st_cfg[drvdata->state_idx][lane_idx];
+	lane_idx = LANE_IDX(drvdata->lane_idx);
+	val = config->cntr_cfg[drvdata->state_idx][lane_idx];
 
 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
 }
@@ -338,7 +338,7 @@ static ssize_t cntr_cfg_store(struct device *dev,
 	if (kstrtoul(buf, 16, &val))
 		return -EINVAL;
 	spin_lock(&drvdata->spinlock);
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	config->cntr_cfg[drvdata->state_idx][lane_idx] = (u64)val;
 	spin_unlock(&drvdata->spinlock);
 
@@ -352,10 +352,8 @@ static ssize_t st_cfg_show(struct device *dev,
 	struct uetm_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct uetm_reg_config *config = drvdata->config;
 	unsigned long val;
-	int lane_idx;
 
-	lane_idx = LANE_IDX(drvdata->lane);
-	val = config->st_cfg[drvdata->state_idx][lane_idx];
+	val = config->st_cfg[drvdata->state_idx];
 
 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
 }
@@ -367,14 +365,12 @@ static ssize_t st_cfg_store(struct device *dev,
 	struct uetm_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct uetm_reg_config *config = drvdata->config;
 	unsigned long val;
-	int lane_idx;
 
 	if (kstrtoul(buf, 16, &val))
 		return -EINVAL;
 
 	spin_lock(&drvdata->spinlock);
-	lane_idx = LANE_IDX(drvdata->lane);
-	config->st_cfg[drvdata->state_idx][lane_idx] = (u64)val;
+	config->st_cfg[drvdata->state_idx] = (u64)val;
 	spin_unlock(&drvdata->spinlock);
 
 	return size;
@@ -389,7 +385,7 @@ static ssize_t tmatch_cfg_show(struct device *dev,
 	unsigned long val;
 	int lane_idx;
 
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	val = config->tmatch_cfg[drvdata->state_idx][lane_idx];
 
 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
@@ -408,7 +404,7 @@ static ssize_t tmatch_cfg_store(struct device *dev,
 		return -EINVAL;
 
 	spin_lock(&drvdata->spinlock);
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	config->tmatch_cfg[drvdata->state_idx][lane_idx] = (u64)val;
 	spin_unlock(&drvdata->spinlock);
 
@@ -424,7 +420,7 @@ static ssize_t dmatch_cfg_show(struct device *dev,
 	unsigned long val;
 	int lane_idx;
 
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	val = config->dmatch_cfg[drvdata->state_idx][lane_idx];
 
 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
@@ -443,7 +439,7 @@ static ssize_t dmatch_cfg_store(struct device *dev,
 		return -EINVAL;
 
 	spin_lock(&drvdata->spinlock);
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	config->dmatch_cfg[drvdata->state_idx][lane_idx] = (u64)val;
 	spin_unlock(&drvdata->spinlock);
 
@@ -459,7 +455,7 @@ static ssize_t tmask_cfg_show(struct device *dev,
 	unsigned long val;
 	int lane_idx;
 
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	val = config->tmask_cfg[drvdata->state_idx][lane_idx];
 
 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
@@ -478,7 +474,7 @@ static ssize_t tmask_cfg_store(struct device *dev,
 		return -EINVAL;
 
 	spin_lock(&drvdata->spinlock);
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	config->tmask_cfg[drvdata->state_idx][lane_idx] = (u64)val;
 	spin_unlock(&drvdata->spinlock);
 
@@ -494,7 +490,7 @@ static ssize_t dmask_cfg_show(struct device *dev,
 	unsigned long val;
 	int lane_idx;
 
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	val = config->dmask_cfg[drvdata->state_idx][lane_idx];
 
 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
@@ -513,7 +509,7 @@ static ssize_t dmask_cfg_store(struct device *dev,
 		return -EINVAL;
 
 	spin_lock(&drvdata->spinlock);
-	lane_idx = LANE_IDX(drvdata->lane);
+	lane_idx = LANE_IDX(drvdata->lane_idx);
 	config->dmask_cfg[drvdata->state_idx][lane_idx] = (u64)val;
 	spin_unlock(&drvdata->spinlock);
 
@@ -736,8 +732,7 @@ static void uetm_store_config(struct uetm_drvdata *drvdata)
 			*base++ = config->tmatch_cfg[i][j];
 
 	for (i = 0; i < UETM_MAX_STATE; i++)
-		for (j = 0; j < cfg_num; j++)
-			*base++ = config->st_cfg[i][j];
+		*base++ = config->st_cfg[i];
 
 	for (i = 0; i < UETM_MAX_STATE; i++)
 		for (j = 0; j < cfg_num; j++)
