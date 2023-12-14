@@ -21,6 +21,7 @@
 #include <linux/remoteproc/qcom_spss.h>
 #include <linux/rpmsg/qcom_glink.h>
 #include <linux/soc/qcom/mdt_loader.h>
+#include <linux/soc/qcom/qcom_aoss.h>
 
 #include "qcom_common.h"
 #include "remoteproc_internal.h"
@@ -29,6 +30,7 @@
 #define PBL_DONE	1
 #define SPSS_WDOG_ERR	0x44554d50
 #define SPSS_TIMEOUT	5000
+#define QMP_MSG_LEN	64
 
 /* err_status definitions                       */
 #define PBL_LOG_VALUE                 (0xef000000)
@@ -56,6 +58,7 @@ struct spss_data {
 	int pas_id;
 	const char *ssr_name;
 	bool auto_boot;
+	const char *qmp_name;
 };
 
 struct qcom_rproc_glink_spss {
@@ -89,6 +92,9 @@ struct qcom_spss {
 	size_t mem_size;
 	int generic_irq;
 
+	const char *qmp_name;
+	struct qmp *qmp;
+
 	struct qcom_rproc_glink_spss glink_subdev;
 	struct qcom_rproc_ssr ssr_subdev;
 	struct qcom_sysmon *sysmon_subdev;
@@ -102,6 +108,16 @@ struct qcom_spss {
 };
 
 static void read_sp2cl_debug_registers(struct qcom_spss *spss);
+
+int qcom_rproc_toggle_load_state(struct qmp *qmp, const char *name, bool enable)
+{
+	char buf[QMP_MSG_LEN] = {};
+
+	snprintf(buf, sizeof(buf),
+		 "{class: image, res: load_state, name: %s, val: %s}",
+		 name, enable ? "on" : "off");
+	return qmp_send(qmp, buf, sizeof(buf));
+}
 
 static void read_sp2cl_debug_registers(struct qcom_spss *spss)
 {
@@ -435,6 +451,8 @@ static int spss_stop(struct rproc *rproc)
 		panic("Panicking, remoteproc %s failed to shutdown.\n", rproc->name);
 
 	mask_scsr_irqs(spss);
+	if (spss->qmp)
+		qcom_rproc_toggle_load_state(spss->qmp, spss->qmp_name, false);
 
 	/* Set state as OFFLINE */
 	rproc->state = RPROC_OFFLINE;
@@ -454,6 +472,17 @@ static int spss_attach(struct rproc *rproc)
 		spss_stop(rproc);
 		return ret;
 	}
+
+	/* signal AOP about spss status.*/
+	if (spss->qmp) {
+		ret = qcom_rproc_toggle_load_state(spss->qmp, spss->qmp_name, true);
+		if (ret) {
+			dev_err(spss->dev, "Failed to signal AOP about spss status [%d]\n", ret);
+			spss_stop(rproc);
+			return ret;
+		}
+	}
+
 	/* If booted successfully then wait for init_done*/
 
 	unmask_scsr_irqs(spss);
@@ -468,6 +497,10 @@ static int spss_attach(struct rproc *rproc)
 	}
 
 	ret = ret ? 0 : -ETIMEDOUT;
+
+	/* if attach fails, signal AOP about spss status.*/
+	if (ret && spss->qmp)
+		qcom_rproc_toggle_load_state(spss->qmp, spss->qmp_name, false);
 
 	return ret;
 }
@@ -489,6 +522,7 @@ static inline int enable_regulator(struct reg_info *regulator)
 static int spss_start(struct rproc *rproc)
 {
 	struct qcom_spss *spss = (struct qcom_spss *)rproc->priv;
+	int status = 0;
 	int ret = 0;
 
 	ret = clk_prepare_enable(spss->xo);
@@ -498,6 +532,16 @@ static int spss_start(struct rproc *rproc)
 	ret = enable_regulator(&spss->cx);
 	if (ret)
 		goto disable_xo_clk;
+
+	/* Signal AOP about spss status. */
+	if (spss->qmp) {
+		status = qcom_rproc_toggle_load_state(spss->qmp, spss->qmp_name, true);
+		if (status) {
+			dev_err(spss->dev,
+			"Failed to signal AOP about spss status [%d]\n", status);
+			goto disable_xo_clk;
+		}
+	}
 
 	ret = qcom_scm_pas_auth_and_reset(spss->pas_id);
 	if (ret)
@@ -512,6 +556,14 @@ static int spss_start(struct rproc *rproc)
 	else if (!ret)
 		dev_err(spss->dev, "start timed out\n");
 	ret = ret ? 0 : -ETIMEDOUT;
+
+	/* if SPSS fails to start, signal AOP about spss status. */
+	if (ret && spss->qmp) {
+		status = qcom_rproc_toggle_load_state(spss->qmp, spss->qmp_name, false);
+		if (status)
+			dev_err(spss->dev,
+			"Failed to signal AOP about spss status [%d]\n", status);
+	}
 
 	disable_regulator(&spss->cx);
 disable_xo_clk:
@@ -681,6 +733,7 @@ static int qcom_spss_probe(struct platform_device *pdev)
 	struct qcom_spss *spss;
 	struct rproc *rproc;
 	const char *fw_name;
+	bool signal_aop;
 	int ret;
 
 	desc = of_device_get_match_data(&pdev->dev);
@@ -704,6 +757,7 @@ static int qcom_spss_probe(struct platform_device *pdev)
 	init_completion(&spss->start_done);
 	platform_set_drvdata(pdev, spss);
 	rproc->auto_boot = desc->auto_boot;
+	spss->qmp_name = desc->qmp_name;
 	rproc->recovery_disabled = true;
 	rproc_coredump_set_elf_info(rproc, ELFCLASS32, EM_NONE);
 
@@ -731,6 +785,15 @@ static int qcom_spss_probe(struct platform_device *pdev)
 	ret = init_regulator(spss->dev, &spss->cx, "cx");
 	if (ret)
 		goto deinit_wakeup_source;
+
+	signal_aop = of_property_read_bool(pdev->dev.of_node,
+			"qcom,signal-aop");
+
+	if (signal_aop) {
+		spss->qmp = qmp_get(spss->dev);
+		if (IS_ERR_OR_NULL(spss->qmp))
+			goto deinit_wakeup_source;
+	}
 
 	qcom_add_glink_spss_subdev(rproc, &spss->glink_subdev, "spss");
 	qcom_add_ssr_subdev(rproc, &spss->ssr_subdev, desc->ssr_name);
@@ -784,6 +847,7 @@ static const struct spss_data spss_resource_init = {
 		.pas_id = 14,
 		.ssr_name = "spss",
 		.auto_boot = false,
+		.qmp_name = "spss",
 };
 
 static const struct of_device_id spss_of_match[] = {
