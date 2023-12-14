@@ -604,7 +604,7 @@ struct dwc3_msm {
 	void            *dwc_dma_ipc_log_ctxt;
 
 	struct dwc3_hw_ep	hw_eps[DWC3_ENDPOINTS_NUM];
-	phys_addr_t		ebc_desc_addr;
+	struct dwc3_trb		*ebc_desc_addr;
 	bool			dis_sending_cm_l1_quirk;
 	bool			use_eusb2_phy;
 	bool			force_gen1;
@@ -1222,9 +1222,13 @@ static int dwc3_core_send_gadget_ep_cmd(struct dwc3_ep *dep, unsigned int cmd,
 	}
 
 	if (DWC3_DEPCMD_CMD(cmd) == DWC3_DEPCMD_STARTTRANSFER) {
-		if (ret == 0)
-			mdwc->hw_eps[dep->number].flags |=
-						DWC3_MSM_HW_EP_TRANSFER_STARTED;
+		if (ret == 0) {
+			if (mdwc->hw_eps[dep->number].mode == USB_EP_GSI)
+				mdwc->hw_eps[dep->number].flags |=
+					DWC3_MSM_HW_EP_TRANSFER_STARTED;
+			else
+				dep->flags |= DWC3_EP_TRANSFER_STARTED;
+		}
 
 		if (ret != -ETIMEDOUT) {
 			u32 res_id;
@@ -1527,6 +1531,8 @@ static int __dwc3_msm_ebc_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req
 	int ret = 0;
 
 	req->status = DWC3_REQUEST_STATUS_STARTED;
+	req->num_trbs++;
+	dep->trb_enqueue++;
 	list_add_tail(&req->list, &dep->started_list);
 	if (dep->direction)
 		param1 = 0x0;
@@ -2631,22 +2637,6 @@ static int dbm_ep_config(struct dwc3_msm *mdwc, u8 usb_ep, u8 bam_pipe,
 	return dbm_ep;
 }
 
-static int msm_ep_clear_ebc_trbs(struct usb_ep *ep)
-{
-	struct dwc3_ep *dep = to_dwc3_ep(ep);
-	struct dwc3 *dwc = dep->dwc;
-	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
-	struct dwc3_hw_ep *edep;
-
-	edep = &mdwc->hw_eps[dep->number];
-	if (edep->ebc_trb_pool) {
-		memunmap(edep->ebc_trb_pool);
-		edep->ebc_trb_pool = NULL;
-	}
-
-	return 0;
-}
-
 static int msm_ep_setup_ebc_trbs(struct usb_ep *ep, struct usb_request *req)
 {
 	struct dwc3_ep *dep = to_dwc3_ep(ep);
@@ -2654,7 +2644,7 @@ static int msm_ep_setup_ebc_trbs(struct usb_ep *ep, struct usb_request *req)
 	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
 	struct dwc3_hw_ep *edep;
 	struct dwc3_trb *trb;
-	u32 desc_offset = 0, scan_offset = 0x4000, phys_base;
+	u32 desc_offset = 0, scan_offset = 0x4000;
 	int i, num_trbs;
 
 	if (!mdwc->ebc_desc_addr) {
@@ -2668,31 +2658,29 @@ static int msm_ep_setup_ebc_trbs(struct usb_ep *ep, struct usb_request *req)
 	}
 
 	edep = &mdwc->hw_eps[dep->number];
-	phys_base = mdwc->ebc_desc_addr + desc_offset;
+	edep->ebc_trb_pool = mdwc->ebc_desc_addr + desc_offset;
 	num_trbs = req->length / EBC_TRB_SIZE;
 	mdwc->hw_eps[dep->number].num_trbs = num_trbs;
-	edep->ebc_trb_pool = memremap(phys_base,
-				      num_trbs * sizeof(struct dwc3_trb),
-				      MEMREMAP_WT);
-	if (!edep->ebc_trb_pool)
-		return -ENOMEM;
 
 	for (i = 0; i < num_trbs; i++) {
+		struct dwc3_trb tmp;
+
 		trb = &edep->ebc_trb_pool[i];
 		memset(trb, 0, sizeof(*trb));
 
 		/* Setup n TRBs pointing to valid buffers */
-		trb->bpl = scan_offset;
-		trb->bph = 0x8000;
-		trb->size = EBC_TRB_SIZE;
-		trb->ctrl = DWC3_TRBCTL_NORMAL | DWC3_TRB_CTRL_CHN |
+		tmp.bpl = scan_offset;
+		tmp.bph = 0x8000;
+		tmp.size = EBC_TRB_SIZE;
+		tmp.ctrl = DWC3_TRBCTL_NORMAL | DWC3_TRB_CTRL_CHN |
 				DWC3_TRB_CTRL_HWO;
 		if (i == (num_trbs-1)) {
-			trb->bpl = desc_offset;
-			trb->bph = 0x8000;
-			trb->size = 0;
-			trb->ctrl = DWC3_TRBCTL_LINK_TRB | DWC3_TRB_CTRL_HWO;
+			tmp.bpl = desc_offset;
+			tmp.bph = 0x8000;
+			tmp.size = 0;
+			tmp.ctrl = DWC3_TRBCTL_LINK_TRB | DWC3_TRB_CTRL_HWO;
 		}
+		memcpy(trb, &tmp, sizeof(*trb));
 		scan_offset += trb->size;
 	}
 
@@ -2852,7 +2840,6 @@ int msm_ep_unconfig(struct usb_ep *ep)
 		reg &= ~LPC_BUS_CLK_EN;
 
 		dwc3_msm_write_reg(mdwc->base, LPC_REG, reg);
-		msm_ep_clear_ebc_trbs(ep);
 	} else {
 		if (dep->trb_dequeue == dep->trb_enqueue &&
 		    list_empty(&dep->pending_list) &&
@@ -6079,7 +6066,8 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ebc_desc");
 	if (res)
-		mdwc->ebc_desc_addr = res->start;
+		mdwc->ebc_desc_addr = devm_ioremap(&pdev->dev,
+					res->start, resource_size(res));
 
 	dwc3_init_dbm(mdwc);
 
