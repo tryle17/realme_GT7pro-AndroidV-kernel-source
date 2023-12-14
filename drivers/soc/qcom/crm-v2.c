@@ -1796,9 +1796,9 @@ struct crm_desc disp_crm_desc_v2 = {
 		[PWR_ST1]			 = 0x4,
 		[PWR_ST2]			 = 0x8,
 		[PWR_ST_CHN_DISTANCE]		 = 0x0,
-		[IRQ_STATUS]			 = 0xF0,
-		[IRQ_CLEAR]			 = 0xF4,
-		[IRQ_ENABLE]			 = 0xF8,
+		[IRQ_STATUS]			 = 0x10,
+		[IRQ_CLEAR]			 = 0x14,
+		[IRQ_ENABLE]			 = 0x18,
 	},
 	.sw_drv_bw_vote_vcd_regs = {
 		[DRV_BASE]			 = 0xE0,
