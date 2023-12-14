@@ -1077,6 +1077,32 @@ int crm_write_bw_vote(const struct device *dev, enum crm_drv_type drv_type,
 EXPORT_SYMBOL(crm_write_bw_vote);
 
 /**
+ * crm_write_bw_pt_vote() - Write a bw vote for a resource
+ * @dev:       The CRM device
+ * @drv_type:  The CRM DRV type, either SW or HW DRV.
+ * @drv_id:    DRV ID for which the votes are sent
+ * @cmd:       The CRM CMD
+ *
+ * Caches the votes for HW DRV and immediately returns.
+ * The votes are written to unused channel with a call to
+ * crm_write_pwr_states().
+ *
+ * Caches the votes for logging and immediately sents the votes for SW DRVs
+ * if the @cmd have .wait set and is for ACTIVE_VOTE then waits for completion
+ * IRQ before return. For SLEEP_VOTE and WAKE_VOTE no completion IRQ is sent
+ * and they are triggered within HW during idle/awake scenarios.
+ *
+ * Return:
+ * * 0			- Success
+ * * -Error             - Error code
+ */
+int crm_write_bw_pt_vote(const struct device *dev, enum crm_drv_type drv_type,
+		      u32 drv_id, const struct crm_cmd *cmd)
+{
+	return -EPERM;
+}
+
+/**
  * crm_get_device() - Returns a CRM device handle.
  * @name: The CRM device name for which handle is needed.
  *

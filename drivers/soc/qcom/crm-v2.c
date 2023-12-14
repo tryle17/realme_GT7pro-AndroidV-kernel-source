@@ -33,7 +33,13 @@
 
 #define PERF_OL_VCD			0
 #define BW_VOTE_VCD			1
-#define MAX_VCD_TYPE			2
+#define BW_PT_VOTE_VCD			2
+#define MAX_VCD_TYPE			3
+
+/* Capability flags  */
+#define PERF_OL_VOTING_FLAG	BIT(0)
+#define BW_VOTING_FLAG		BIT(1)
+#define BW_PT_VOTING_FLAG	BIT(2)
 
 #define VPAGE_SHIFT_BITS		0xFFF
 
@@ -60,6 +66,8 @@
 #define NUM_CH_SHIFT			4
 #define NUM_PWR_STATES_PER_CH_MASK	0xF
 #define NUM_PWR_STATES_PER_CH_SHIFT	0
+#define NUM_OF_NODES_PT_MASK	0x1F
+#define NUM_OF_NODES_PT_SHIFT	27
 
 #define CRM_CFG_PARAM_2			0x8
 /* Offsets for CRM_CFG_PARAM_2 Register */
@@ -73,7 +81,8 @@
 
 /* Applicable for HW & SW DRVs BW Registers */
 #define BW_VOTE_VALID			BIT(29)
-/* Applicable only for SW DRVs BW Registers */
+/* Applicable only for SW DRVs BW PT Registers */
+#define BW_PT_VOTE_VALID		BIT(29)
 #define BW_PT_VOTE_TRIGGER		BIT(0)
 /* Applicable only for SW DRVs BW Registers */
 #define BW_VOTE_RESP_REQ		BIT(31)
@@ -85,8 +94,9 @@
 /* Offsets for CURR_PERF_OL Register */
 #define CURR_PER_OL_MASK		0x7
 
-/* Set 1 to Enable CHN_BEHAVE for each HW DRV */
+/* Set 1 to Enable CHN_BEHAVE and CHANNEL_SWITCH_CTRL for each HW DRV */
 #define CHN_BEHAVE_BIT			BIT(0)
+#define CHN_SWITCH_CTRL		BIT(1)
 
 /* SW DRV has ACTIVE, SLEEP and WAKE PWR STATES */
 #define MAX_SW_DRV_PWR_STATES		3
@@ -185,13 +195,17 @@ enum channel_type {
 
 struct crm_desc {
 	bool set_chn_behave;
+	bool set_hw_chn_switch_ctrl;
+	u32 crm_capability;
 	u32 chn_regs[CHN_REG_MAX];
 	u32 crmb_regs[CRMB_REG_MAX];
 	u32 crmc_regs[CRMC_REG_MAX];
 	u32 hw_drv_perf_ol_vcd_regs[CRM_CLIENT_REG_MAX];
 	u32 hw_drv_bw_vote_vcd_regs[CRM_CLIENT_REG_MAX];
+	u32 hw_drv_bw_pt_vote_vcd_regs[CRM_CLIENT_REG_MAX];
 	u32 sw_drv_perf_ol_vcd_regs[CRM_CLIENT_REG_MAX];
 	u32 sw_drv_bw_vote_vcd_regs[CRM_CLIENT_REG_MAX];
+	u32 sw_drv_bw_pt_vote_vcd_regs[CRM_CLIENT_REG_MAX];
 };
 
 /**
@@ -264,6 +278,7 @@ struct crm_drv {
 	spinlock_t cache_lock;
 	int irq;
 	bool initialized;
+	bool set_hw_chn_switch_ctrl;
 	void *ipc_log_ctx;
 };
 
@@ -502,7 +517,11 @@ int crm_channel_switch_complete(const struct crm_drv *drv, u32 ch)
 int crm_switch_channel(const struct crm_drv *drv, u32 ch)
 {
 	write_crm_channel(drv, CHN_UPDATE, BIT(ch));
-	return crm_channel_switch_complete(drv, ch);
+
+	if (!drv->set_hw_chn_switch_ctrl)
+		return crm_channel_switch_complete(drv, ch);
+
+	return 0;
 }
 
 static u32 crm_get_pwr_state_reg(int pwr_state)
@@ -569,6 +588,7 @@ static void crm_flush_cache(struct crm_drv *drv, struct crm_vcd *vcd, u32 ch, u3
  */
 int crm_write_pwr_states(const struct device *dev, u32 drv_id)
 {
+	struct crm_drv_top *crm = dev_get_drvdata(dev);
 	struct crm_drv *drv = get_crm_drv(dev, CRM_HW_DRV, drv_id);
 	struct crm_vcd *vcd;
 	u32 ch;
@@ -585,6 +605,9 @@ int crm_write_pwr_states(const struct device *dev, u32 drv_id)
 		goto exit;
 
 	for (i = 0; i < MAX_VCD_TYPE; i++) {
+		if (!(crm->desc->crm_capability & BIT(i)))
+			continue;
+
 		vcd = &drv->vcd[i];
 		crm_flush_cache(drv, vcd, ch, i);
 	}
@@ -640,6 +663,9 @@ int crm_dump_drv_regs(const char *name, u32 drv_id)
 	}
 
 	for (m = 0; m < MAX_VCD_TYPE; m++) {
+		if (!(crm->desc->crm_capability & BIT(m)))
+			continue;
+
 		vcd = &drv->vcd[m];
 		for (k = 0; k < vcd->num_resources; k++) {
 			for (j = 0; j < vcd->num_pwr_states; j++) {
@@ -800,6 +826,8 @@ static irqreturn_t crm_vote_complete_irq(int irq, void *p)
 
 		spin_lock(&drv->lock);
 		for (j = 0; j < MAX_VCD_TYPE; j++) {
+			if (!(crm->desc->crm_capability & BIT(i)))
+				continue;
 			vcd = &drv->vcd[j];
 
 			for (k = 0; k < vcd->num_resources; k++) {
@@ -857,13 +885,13 @@ static u32 crm_get_pwr_state(struct crm_drv *drv, const struct crm_cmd *cmd)
 	return pwr_state;
 }
 
-static int crm_send_cmd(struct crm_drv *drv, u32 vcd_type, const struct crm_cmd *cmd)
+static int crm_send_cmd(struct crm_drv *drv, u32 vcd_type, const struct crm_cmd *cmd,
+			bool pt_trigger)
 {
 	struct crm_vcd *vcd = &drv->vcd[vcd_type];
 	u32 resource_idx = cmd->resource_idx;
 	u32 pwr_state = crm_get_pwr_state(drv, cmd);
 	u32 data = cmd->data;
-	u32 pt_data = 0;
 	bool wait = cmd->wait;
 	unsigned long flags;
 	struct completion *compl = NULL;
@@ -871,15 +899,10 @@ static int crm_send_cmd(struct crm_drv *drv, u32 vcd_type, const struct crm_cmd 
 
 	spin_lock_irqsave(&drv->lock, flags);
 
-	/* Set COMMIT to start aggregating votes */
-	if (vcd_type == BW_VOTE_VCD) {
-		pt_data |= BW_PT_VOTE_TRIGGER;
+	/* Note: Set BIT(31) for RESP_REQ */
+	if ((vcd_type == BW_VOTE_VCD) && wait)
+		data |= BW_VOTE_RESP_REQ;
 
-		if (wait)
-			data |= BW_VOTE_RESP_REQ;
-	}
-
-	/* Note: Set BIT(31) for RESP_REQ and BIT(30) for COMMIT */
 	switch (pwr_state) {
 	case CRM_ACTIVE_STATE:
 		/* Wait forever for a previous request to complete */
@@ -892,20 +915,21 @@ static int crm_send_cmd(struct crm_drv *drv, u32 vcd_type, const struct crm_cmd 
 		crm_fill_cmd(&vcd->sw_votes[resource_idx].cmd, cmd);
 		vcd->sw_votes[resource_idx].in_progress = true;
 		write_crm_reg(drv, PWR_ST0, 0, vcd_type, resource_idx, data);
-		write_crm_reg(drv, CRMB_PT_TRIGGER, 0, vcd_type, resource_idx, pt_data);
 		break;
 	case CRM_SLEEP_STATE:
 		write_crm_reg(drv, PWR_ST1, 0, vcd_type, resource_idx, data);
-		write_crm_reg(drv, CRMB_PT_TRIGGER, 0, vcd_type, resource_idx, pt_data);
 		break;
 	case CRM_WAKE_STATE:
 		write_crm_reg(drv, PWR_ST2, 0, vcd_type, resource_idx, data);
-		write_crm_reg(drv, CRMB_PT_TRIGGER, 0, vcd_type, resource_idx, pt_data);
 		break;
 	default:
 		WARN_ON(1);
 		break;
 	}
+
+	/* Set COMMIT to start aggregating votes */
+	if (pt_trigger)
+		write_crm_reg(drv, CRMB_PT_TRIGGER, 0, vcd_type, resource_idx, BW_PT_VOTE_TRIGGER);
 
 	spin_unlock_irqrestore(&drv->lock, flags);
 	trace_crm_write_vcd_votes(drv->name, vcd_type, resource_idx, pwr_state, data);
@@ -974,6 +998,8 @@ static bool crm_is_invalid_cmd(struct crm_drv *drv, u32 vcd_type, const struct c
 		ret = true;
 	else if (vcd_type == BW_VOTE_VCD && !(data & BW_VOTE_VALID))
 		ret = true;
+	else if (vcd_type == BW_PT_VOTE_VCD && !(data & BW_PT_VOTE_VALID))
+		ret = true;
 	else if (vcd_type == PERF_OL_VCD && (data & ~PERF_OL_VALUE_BITS))
 		ret = true;
 	else
@@ -1017,7 +1043,7 @@ int crm_write_perf_ol(const struct device *dev, enum crm_drv_type drv_type,
 
 	/* Send SW DRV votes immediately for ACTIVE/SLEEP/WAKE states */
 	if (drv_type == CRM_SW_DRV)
-		return crm_send_cmd(drv, PERF_OL_VCD, cmd);
+		return crm_send_cmd(drv, PERF_OL_VCD, cmd, false);
 
 	return 0;
 }
@@ -1046,8 +1072,12 @@ EXPORT_SYMBOL(crm_write_perf_ol);
 int crm_write_bw_vote(const struct device *dev, enum crm_drv_type drv_type,
 		      u32 drv_id, const struct crm_cmd *cmd)
 {
+	struct crm_drv_top *crm = dev_get_drvdata(dev);
 	struct crm_drv *drv = get_crm_drv(dev, drv_type, drv_id);
 	int ret;
+
+	if (!(crm->desc->crm_capability & BW_VOTING_FLAG))
+		return -EPERM;
 
 	ret = crm_is_invalid_cmd(drv, BW_VOTE_VCD, cmd);
 	if (ret)
@@ -1058,11 +1088,56 @@ int crm_write_bw_vote(const struct device *dev, enum crm_drv_type drv_type,
 
 	/* Send SW DRV votes immediately for ACTIVE/SLEEP/WAKE states */
 	if (drv_type == CRM_SW_DRV)
-		return crm_send_cmd(drv, BW_VOTE_VCD, cmd);
+		return crm_send_cmd(drv, BW_VOTE_VCD, cmd, false);
 
 	return 0;
 }
 EXPORT_SYMBOL(crm_write_bw_vote);
+
+/**
+ * crm_write_bw_pt_vote() - Write a bw vote for a resource
+ * @dev:       The CRM device
+ * @drv_type:  The CRM DRV type, either SW or HW DRV.
+ * @drv_id:    DRV ID for which the votes are sent
+ * @cmd:       The CRM CMD
+ *
+ * Caches the votes for HW DRV and immediately returns.
+ * The votes are written to unused channel with a call to
+ * crm_write_pwr_states().
+ *
+ * Caches the votes for logging and immediately sents the votes for SW DRVs
+ * if the @cmd have .wait set and is for ACTIVE_VOTE then waits for completion
+ * IRQ before return. For SLEEP_VOTE and WAKE_VOTE no completion IRQ is sent
+ * and they are triggered within HW during idle/awake scenarios.
+ *
+ * Return:
+ * * 0			- Success
+ * * -Error             - Error code
+ */
+int crm_write_bw_pt_vote(const struct device *dev, enum crm_drv_type drv_type,
+		      u32 drv_id, const struct crm_cmd *cmd)
+{
+	struct crm_drv_top *crm = dev_get_drvdata(dev);
+	struct crm_drv *drv = get_crm_drv(dev, drv_type, drv_id);
+	int ret;
+
+	if (!(crm->desc->crm_capability & BW_PT_VOTING_FLAG))
+		return -EPERM;
+
+	ret = crm_is_invalid_cmd(drv, BW_PT_VOTE_VCD, cmd);
+	if (ret)
+		return -EINVAL;
+
+	/* Cache the votes first */
+	crm_cache_vcd_votes(drv, BW_PT_VOTE_VCD, cmd);
+
+	/* Send SW DRV votes immediately for ACTIVE/SLEEP/WAKE states */
+	if (drv_type == CRM_SW_DRV)
+		return crm_send_cmd(drv, BW_PT_VOTE_VCD, cmd, true);
+
+	return 0;
+}
+EXPORT_SYMBOL(crm_write_bw_pt_vote);
 
 /**
  * crm_get_device() - Returns a CRM device handle.
@@ -1100,6 +1175,17 @@ static void crm_set_chn_behave(struct crm_drv_top *crm)
 		write_crm_channel(&crm->hw_drvs[i], CHN_BEHAVE, CHN_BEHAVE_BIT);
 }
 
+static void crm_set_hw_chn_switch_ctrl(struct crm_drv_top *crm)
+{
+	int i;
+
+	if (!crm->desc->set_hw_chn_switch_ctrl)
+		return;
+
+	for (i = 0; i < crm->num_hw_drvs; i++)
+		write_crm_channel(&crm->hw_drvs[i], CHN_BEHAVE, CHN_SWITCH_CTRL);
+}
+
 static int crm_probe_get_irqs(struct crm_drv_top *crm)
 {
 	struct crm_drv *drvs = crm->sw_drvs;
@@ -1131,6 +1217,9 @@ static int crm_probe_get_irqs(struct crm_drv_top *crm)
 
 		/* Additionally allocate memory for sw_votes */
 		for (j = 0; j < MAX_VCD_TYPE; j++) {
+			if (!(crm->desc->crm_capability & BIT(j)))
+				continue;
+
 			vcd = &drvs[i].vcd[j];
 			vcd->sw_votes = devm_kcalloc(crm->dev, vcd->num_resources,
 						     sizeof(struct crm_sw_votes),
@@ -1173,7 +1262,7 @@ static int crm_probe_set_vcd_caches(struct crm_drv_top *crm, u32 crm_cfg, u32 cr
 	struct crm_vcd *vcd;
 	struct crm_drv *drv;
 	u32 num_perf_ol_vcds, num_nds, num_pwr_states;
-	u32 num_bw_vote_vcds;
+	u32 num_bw_vote_vcds, num_nds_pt;
 	int i, j, ret;
 
 	num_perf_ol_vcds = crm_cfg & (NUM_VCD_VOTED_BY_PERF_OL_MASK <<
@@ -1188,6 +1277,10 @@ static int crm_probe_set_vcd_caches(struct crm_drv_top *crm, u32 crm_cfg, u32 cr
 				    NUM_PWR_STATES_PER_CH_SHIFT);
 	num_pwr_states >>= NUM_PWR_STATES_PER_CH_SHIFT;
 
+	num_nds_pt = crm_cfg & (NUM_OF_NODES_PT_MASK <<
+					NUM_OF_NODES_PT_SHIFT);
+	num_nds_pt >>= NUM_OF_NODES_PT_SHIFT;
+
 	num_nds = crm_cfg_2 & (NUM_OF_NODES_MASK << NUM_OF_NODES_SHIFT);
 	num_nds >>= NUM_OF_NODES_SHIFT;
 
@@ -1199,6 +1292,8 @@ static int crm_probe_set_vcd_caches(struct crm_drv_top *crm, u32 crm_cfg, u32 cr
 
 		drv->drv_type = CRM_HW_DRV;
 		for (j = 0; j < MAX_VCD_TYPE; j++) {
+			if (!(crm->desc->crm_capability & BIT(i)))
+				continue;
 			vcd = &drv->vcd[j];
 
 			if (j == PERF_OL_VCD) {
@@ -1208,6 +1303,9 @@ static int crm_probe_set_vcd_caches(struct crm_drv_top *crm, u32 crm_cfg, u32 cr
 				vcd->offsets = (u32 *)&crm->desc->hw_drv_bw_vote_vcd_regs;
 				/* BW_VOTE_VCD can have multiple NDs with which BW can be voted */
 				vcd->num_resources = num_nds;
+			} else if (j == BW_PT_VOTE_VCD) {
+				vcd->offsets = (u32 *)&crm->desc->hw_drv_bw_pt_vote_vcd_regs;
+				vcd->num_resources = num_nds_pt;
 			} else {
 				continue;
 			}
@@ -1226,6 +1324,8 @@ static int crm_probe_set_vcd_caches(struct crm_drv_top *crm, u32 crm_cfg, u32 cr
 
 		drv->drv_type = CRM_SW_DRV;
 		for (j = 0; j < MAX_VCD_TYPE; j++) {
+			if (!(crm->desc->crm_capability & BIT(i)))
+				continue;
 			vcd = &drv->vcd[j];
 
 			if (j == PERF_OL_VCD) {
@@ -1235,6 +1335,9 @@ static int crm_probe_set_vcd_caches(struct crm_drv_top *crm, u32 crm_cfg, u32 cr
 				vcd->offsets = (u32 *)&crm->desc->sw_drv_bw_vote_vcd_regs;
 				/* BW_VOTE_VCD can have multiple NDs with which BW can be voted */
 				vcd->num_resources = num_nds;
+			} else if (j == BW_PT_VOTE_VCD) {
+				vcd->offsets = (u32 *)&crm->desc->sw_drv_bw_pt_vote_vcd_regs;
+				vcd->num_resources = num_nds_pt;
 			} else {
 				continue;
 			}
@@ -1298,6 +1401,7 @@ static struct crm_drv *crm_probe_get_drvs(struct crm_drv_top *crm, int num_drvs,
 		drvs[i].offsets = (u32 *)&crm->desc->chn_regs;
 		drvs[i].num_channels = crm->num_channels;
 		drvs[i].initialized = true;
+		drvs[i].set_hw_chn_switch_ctrl = crm->desc->set_hw_chn_switch_ctrl;
 	}
 
 	kfree(drv_ids);
@@ -1427,6 +1531,7 @@ static int crm_probe(struct platform_device *pdev)
 		return ret;
 
 	crm_set_chn_behave(crm);
+	crm_set_hw_chn_switch_ctrl(crm);
 
 	INIT_LIST_HEAD(&crm->list);
 	list_add_tail(&crm->list, &crm_dev_list);
@@ -1437,6 +1542,8 @@ static int crm_probe(struct platform_device *pdev)
 
 struct crm_desc pcie_crm_desc_v2 = {
 	.set_chn_behave = false,
+	.set_hw_chn_switch_ctrl = false,
+	.crm_capability = PERF_OL_VOTING_FLAG | BW_PT_VOTING_FLAG,
 	.chn_regs = {
 		[CHN_BUSY]			 = 0x370,
 		[CHN_UPDATE]			 = 0x374,
@@ -1475,6 +1582,18 @@ struct crm_desc pcie_crm_desc_v2 = {
 		[DRV_BASE]			 = 0x0,
 		[DRV_DISTANCE]			 = 0x1000,
 		[DRV_RESOURCE_DISTANCE]		 = 0x2C,
+		[PWR_ST0]			 = 0x58,
+		[PWR_ST1]			 = 0x5C,
+		[PWR_ST2]			 = 0x60,
+		[PWR_ST3]			 = 0x64,
+		[PWR_ST4]			 = 0x68,
+		[PWR_ST_CHN_DISTANCE]		 = 0x14,
+		[PWR_IDX_STATUS]		 = 0x37C,
+	},
+	.hw_drv_bw_pt_vote_vcd_regs = {
+		[DRV_BASE]			 = 0x0,
+		[DRV_DISTANCE]			 = 0x1000,
+		[DRV_RESOURCE_DISTANCE]		 = 0x2C,
 		[PWR_ST0_PT]			 = 0xB0,
 		[PWR_ST1_PT]			 = 0xB4,
 		[PWR_ST2_PT]			 = 0xB8,
@@ -1499,6 +1618,18 @@ struct crm_desc pcie_crm_desc_v2 = {
 		[DRV_BASE]			 = 0x3B0,
 		[DRV_DISTANCE]			 = 0x1000,
 		[DRV_RESOURCE_DISTANCE]		 = 0x10,
+		[PWR_ST0]			 = 0x40,
+		[PWR_ST1]			 = 0x44,
+		[PWR_ST2]			 = 0x48,
+		[PWR_ST_CHN_DISTANCE]		 = 0x0,
+		[IRQ_STATUS]			 = 0x160,
+		[IRQ_CLEAR]			 = 0x164,
+		[IRQ_ENABLE]			 = 0x168,
+	},
+	.sw_drv_bw_pt_vote_vcd_regs = {
+		[DRV_BASE]			 = 0x3B0,
+		[DRV_DISTANCE]			 = 0x1000,
+		[DRV_RESOURCE_DISTANCE]		 = 0x10,
 		[PWR_ST0_PT]			 = 0x60,
 		[PWR_ST1_PT]			 = 0x64,
 		[PWR_ST2_PT]			 = 0x68,
@@ -1512,6 +1643,8 @@ struct crm_desc pcie_crm_desc_v2 = {
 
 struct crm_desc cam_crm_desc_v2 = {
 	.set_chn_behave = true,
+	.set_hw_chn_switch_ctrl = false,
+	.crm_capability = PERF_OL_VOTING_FLAG | BW_VOTING_FLAG,
 	.chn_regs = {
 		[CHN_BUSY]			 = 0xDC,
 		[CHN_UPDATE]			 = 0xE0,
@@ -1552,6 +1685,15 @@ struct crm_desc cam_crm_desc_v2 = {
 		[PWR_ST_CHN_DISTANCE]		 = 0x8,
 		[PWR_IDX_STATUS]		 = 0xE8,
 	},
+	.hw_drv_bw_pt_vote_vcd_regs = {
+		[DRV_BASE]			 = 0x0,
+		[DRV_DISTANCE]			 = 0x29C,
+		[DRV_RESOURCE_DISTANCE]		 = 0x14,
+		[PWR_ST0_PT]			 = 0xC8,
+		[PWR_ST1_PT]			 = 0xCC,
+		[PWR_ST_CHN_DISTANCE]		 = 0x8,
+		[PWR_IDX_STATUS]		 = 0xE8,
+	},
 	.sw_drv_perf_ol_vcd_regs = {
 		[DRV_BASE]			 = 0x11C,
 		[DRV_DISTANCE]			 = 0x29C,
@@ -1576,10 +1718,25 @@ struct crm_desc cam_crm_desc_v2 = {
 		[IRQ_CLEAR]			 = 0x134,
 		[IRQ_ENABLE]			 = 0x138,
 	},
+	.sw_drv_bw_pt_vote_vcd_regs = {
+		[DRV_BASE]			 = 0x11C,
+		[DRV_DISTANCE]			 = 0x29C,
+		[DRV_RESOURCE_DISTANCE]		 = 0x10,
+		[PWR_ST0_PT]			 = 0x120,
+		[PWR_ST1_PT]			 = 0x124,
+		[PWR_ST2_PT]			 = 0x128,
+		[PWR_ST_CHN_DISTANCE]		 = 0x0,
+		[IRQ_STATUS]			 = 0x140,
+		[IRQ_CLEAR]			 = 0x144,
+		[IRQ_ENABLE]			 = 0x148,
+		[CRMB_PT_TRIGGER]		 = 0x150,
+	},
 };
 
 struct crm_desc disp_crm_desc_v2 = {
-	.set_chn_behave = true,
+	.set_chn_behave = false,
+	.set_hw_chn_switch_ctrl = false,
+	.crm_capability = PERF_OL_VOTING_FLAG | BW_VOTING_FLAG | BW_PT_VOTING_FLAG,
 	.chn_regs = {
 		[CHN_BUSY]			 = 0xA0,
 		[CHN_UPDATE]			 = 0xA4,
@@ -1622,6 +1779,15 @@ struct crm_desc disp_crm_desc_v2 = {
 		[PWR_ST_CHN_DISTANCE]		 = 0x8,
 		[PWR_IDX_STATUS]		 = 0xAC,
 	},
+	.hw_drv_bw_pt_vote_vcd_regs = {
+		[DRV_BASE]			 = 0x0,
+		[DRV_DISTANCE]			 = 0x1000,
+		[DRV_RESOURCE_DISTANCE]		 = 0x14,
+		[PWR_ST0_PT]			 = 0x28,
+		[PWR_ST1_PT]			 = 0x2C,
+		[PWR_ST_CHN_DISTANCE]		 = 0x8,
+		[PWR_IDX_STATUS]		 = 0xAC,
+	},
 	.sw_drv_perf_ol_vcd_regs = {
 		[DRV_BASE]			 = 0xE0,
 		[DRV_DISTANCE]			 = 0x1000,
@@ -1645,6 +1811,19 @@ struct crm_desc disp_crm_desc_v2 = {
 		[IRQ_STATUS]			 = 0x90,
 		[IRQ_CLEAR]			 = 0x94,
 		[IRQ_ENABLE]			 = 0x98,
+	},
+	.sw_drv_bw_pt_vote_vcd_regs = {
+		[DRV_BASE]			 = 0xE0,
+		[DRV_DISTANCE]			 = 0x1000,
+		[DRV_RESOURCE_DISTANCE]		 = 0x10,
+		[PWR_ST0_PT]			 = 0x30,
+		[PWR_ST1_PT]			 = 0x34,
+		[PWR_ST2_PT]			 = 0x38,
+		[PWR_ST_CHN_DISTANCE]		 = 0x0,
+		[IRQ_STATUS]			 = 0xA0,
+		[IRQ_CLEAR]			 = 0xA4,
+		[IRQ_ENABLE]			 = 0xA8,
+		[CRMB_PT_TRIGGER]		 = 0x100,
 	},
 };
 
