@@ -31,7 +31,7 @@ int qcom_stats_ddr_freqsync_msg(void);
 int ddr_stats_get_freq_count(void);
 int ddr_stats_get_residency(int freq_count, struct ddr_freq_residency *data);
 
-bool has_system_slept(void);
+bool has_system_slept(bool *aoss_debug);
 bool has_subsystem_slept(void);
 void subsystem_sleep_debug_enable(bool enable);
 

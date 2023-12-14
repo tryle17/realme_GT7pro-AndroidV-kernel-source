@@ -90,7 +90,7 @@ struct vx_platform_data {
 	bool debug_enable;
 	u32 detect_time_ms;
 	u32 timer_ms;
-	bool monitor_enable;
+	int monitor_status;
 	bool debug_dump_enable;
 };
 
@@ -99,6 +99,12 @@ static struct vx_platform_data *g_pd;
 enum {
 	CXPC_DRV_NAME,
 	AOSS_DRV_NAME,
+};
+
+enum {
+	DISABLE_MSG,
+	CXPC_MSG,
+	AOSS_SHUTDOWN_MSG,
 };
 
 static const char * const drv_names_kalama[][MAX_DRV_NAMES] = {
@@ -241,18 +247,29 @@ static void trigger_dump(struct vx_platform_data *pd)
 	mutex_unlock(&pd->lock);
 }
 
-static void sys_pm_vx_send_msg(struct vx_platform_data *pd, bool enable)
+static void sys_pm_vx_send_msg(struct vx_platform_data *pd)
 {
 	int ret = 0;
 	char buf[MAX_QMP_MSG_SIZE] = {};
 
 	mutex_lock(&pd->lock);
-	if (enable)
+	switch (pd->monitor_status) {
+	case AOSS_SHUTDOWN_MSG:
+		scnprintf(buf, sizeof(buf),
+			"{class: lpm_mon, type: rbsc, dur: 1000, flush: 5, ts_adj: 1}");
+		break;
+	case CXPC_MSG:
 		scnprintf(buf, sizeof(buf),
 			"{class: lpm_mon, type: cxpc, dur: 1000, flush: 5, ts_adj: 1}");
-	else
+		break;
+	case DISABLE_MSG:
 		scnprintf(buf, sizeof(buf),
 			"{class: lpm_mon, type: cxpc, dur: 1000, flush: 1, log_once: 1}");
+		break;
+	default:
+		mutex_unlock(&pd->lock);
+		return;
+	}
 
 	ret = qmp_send(pd->qmp, buf, sizeof(buf));
 	if (ret)
@@ -598,7 +615,7 @@ static int vx_probe(struct platform_device *pdev)
 	pd->detect_time_ms = DEFAULT_DEBUG_TIME;
 	pd->timer_ms = DEFAULT_TIMER;
 	pd->debug_enable = false;
-	pd->monitor_enable = false;
+	pd->monitor_status = DISABLE_MSG;
 	pd->debug_dump_enable = false;
 
 	platform_set_drvdata(pdev, pd);
@@ -638,8 +655,8 @@ static int vx_suspend(struct device *dev)
 		return 0;
 
 	pd->suspend_time = ktime_get_boottime();
-	if (pd->monitor_enable)
-		sys_pm_vx_send_msg(pd, pd->monitor_enable);
+	if (pd->monitor_status)
+		sys_pm_vx_send_msg(pd);
 
 	return 0;
 }
@@ -650,6 +667,7 @@ static int vx_resume(struct device *dev)
 	ktime_t time_delta_ms;
 	bool system_slept;
 	bool subsystem_slept;
+	bool aosd_enhancement;
 
 	if (!pd->debug_enable)
 		return 0;
@@ -659,26 +677,30 @@ static int vx_resume(struct device *dev)
 	if (time_delta_ms <= pd->detect_time_ms)
 		return 0;
 
-	system_slept = has_system_slept();
+	system_slept = has_system_slept(&aosd_enhancement);
 	if (system_slept)
 		goto exit;
+
+	if (aosd_enhancement)
+		pd->monitor_status = AOSS_SHUTDOWN_MSG;
 
 	subsystem_slept = has_subsystem_slept();
 	if (!subsystem_slept)
 		goto exit;
 
 	/* if monitor was set last time check DRVs blocking system sleep */
-	if (pd->monitor_enable)
+	if (pd->monitor_status)
 		vx_check_drv(pd);
 	else
-		pd->monitor_enable = true;
+		pd->monitor_status = CXPC_MSG;
 
 	return 0;
 
 exit:
-	if (pd->monitor_enable)
-		sys_pm_vx_send_msg(pd, false);
-	pd->monitor_enable = false;
+	if (pd->monitor_status) {
+		pd->monitor_status = DISABLE_MSG;
+		sys_pm_vx_send_msg(pd);
+	}
 
 	return 0;
 }
