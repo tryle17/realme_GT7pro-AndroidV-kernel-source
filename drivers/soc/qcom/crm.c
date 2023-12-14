@@ -1077,7 +1077,7 @@ int crm_write_bw_vote(const struct device *dev, enum crm_drv_type drv_type,
 EXPORT_SYMBOL(crm_write_bw_vote);
 
 /**
- * crm_write_bw_pt_vote() - Write a bw vote for a resource
+ * crm_write_bw_pt_vote() - Write a bw pt vote for a resource
  * @dev:       The CRM device
  * @drv_type:  The CRM DRV type, either SW or HW DRV.
  * @drv_id:    DRV ID for which the votes are sent
@@ -1099,7 +1099,7 @@ EXPORT_SYMBOL(crm_write_bw_vote);
 int crm_write_bw_pt_vote(const struct device *dev, enum crm_drv_type drv_type,
 		      u32 drv_id, const struct crm_cmd *cmd)
 {
-	return -EPERM;
+	return crm_write_bw_vote(dev, drv_type, drv_id, cmd);
 }
 
 /**
