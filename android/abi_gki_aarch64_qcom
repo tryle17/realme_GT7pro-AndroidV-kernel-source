@@ -1268,6 +1268,8 @@
   generic_file_llseek
   generic_handle_domain_irq
   generic_handle_irq
+  generic_hwtstamp_get_lower
+  generic_hwtstamp_set_lower
   geni_icc_disable
   geni_icc_enable
   geni_icc_get
@@ -2122,6 +2124,7 @@
   memchr_inv
   memcmp
   memcpy
+  memcpy_and_pad
   __memcpy_fromio
   __memcpy_toio
   mem_dump_obj
@@ -2426,6 +2429,7 @@
   open_candev
   out_of_line_wait_on_bit
   out_of_line_wait_on_bit_timeout
+  overflowgid
   overflowuid
   page_endio
   page_is_ram
@@ -2467,6 +2471,7 @@
   pci_disable_device
   pci_disable_msi
   pcie_capability_clear_and_set_word
+  pcie_capability_clear_and_set_word_unlocked
   pcie_capability_read_word
   pci_enable_device
   pci_enable_pcie_error_reporting
@@ -2582,6 +2587,7 @@
   pick_migrate_task
   pid_nr_ns
   pid_task
+  pid_vnr
   pinconf_generic_dt_node_to_map
   pinctrl_dev_get_drvdata
   pinctrl_enable
@@ -2861,6 +2867,7 @@
   register_netdevice_notifier
   register_netevent_notifier
   register_net_sysctl
+  register_net_sysctl_sz
   register_oom_notifier
   register_pernet_device
   register_pernet_subsys
@@ -2873,6 +2880,7 @@
   register_shrinker
   register_syscore_ops
   register_sysctl
+  register_sysctl_sz
   register_sysctl_table
   register_virtio_device
   register_virtio_driver
@@ -3098,6 +3106,8 @@
   sdio_unregister_driver
   sdio_writeb
   sdio_writesb
+  security_release_secctx
+  security_secid_to_secctx
   security_sk_classify_flow
   security_sk_clone
   security_sock_graft
@@ -3207,6 +3217,7 @@
   skb_put
   skb_queue_head
   skb_queue_purge
+  skb_queue_purge_reason
   skb_queue_tail
   skb_realloc_headroom
   skb_recv_datagram
@@ -3753,6 +3764,7 @@
   tty_hangup
   __tty_insert_flip_char
   tty_insert_flip_string_fixed_flag
+  __tty_insert_flip_string_flags
   tty_kref_put
   tty_ldisc_deref
   tty_ldisc_flush
@@ -3828,6 +3840,7 @@
   ufshcd_get_local_unipro_ver
   ufshcd_hba_stop
   ufshcd_hold
+  ufshcd_is_hba_active
   ufshcd_mcq_config_esi
   ufshcd_mcq_enable_esi
   ufshcd_mcq_poll_cqe_lock
@@ -4047,6 +4060,7 @@
   vb2_request_validate
   vb2_streamoff
   vb2_streamon
+  vcalloc
   vchan_dma_desc_free_list
   vchan_find_desc
   vchan_init

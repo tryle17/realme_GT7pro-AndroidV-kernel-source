@@ -1708,7 +1708,7 @@ static struct i2c_driver wcd_usbss_i2c_driver = {
 #endif
 	},
 	.id_table = wcd_usbss_id_i2c,
-	.probe_new = wcd_usbss_probe,
+	.probe = wcd_usbss_probe,
 	.remove = wcd_usbss_remove,
 };
 module_i2c_driver(wcd_usbss_i2c_driver);

@@ -4898,7 +4898,7 @@ static void sdhci_msm_remove(struct platform_device *pdev)
 
 	if (of_property_read_bool(np, "non-removable") && is_bootdevice_sdhci) {
 		dev_err(&pdev->dev, "SDHCI is not boot dev.\n");
-		return 0;
+		return;
 	}
 
 	host = platform_get_drvdata(pdev);
