@@ -96,11 +96,11 @@ config QCOM_DMABUF_HEAPS_UBWCP_MOVABLE
 	   in tandem with the UBWC-P driver.
 	   If in doubt, say N here.
 
-config QCOM_DMABUF_HEAPS_TUI_CARVEOUT
-	bool "QCOM DMA-BUF TUI Carveout Heap"
+config QCOM_DMABUF_HEAPS_TVM_CARVEOUT
+	bool "QCOM DMA-BUF TVM Carveout Heap"
 	depends on QCOM_DMABUF_HEAPS
 	help
-	  Choose this option to build the QCOM Trusted UI carvout heap.
+	  Choose this option to build the QCOM Trusted VM carvout heap.
 	  This heap is controlled from an ioctl, and memory is transferred
 	  to it from the Primary VM. Not GKI-Compatible as it cannot
 	  be built as a module.

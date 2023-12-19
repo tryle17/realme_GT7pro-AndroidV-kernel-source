@@ -3,7 +3,7 @@
  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#define pr_fmt(fmt) "tui_heap: %s"  fmt, __func__
+#define pr_fmt(fmt) "tvm_heap: %s"  fmt, __func__
 
 #include <linux/genalloc.h>
 #include <linux/dma-heap.h>
@@ -11,14 +11,14 @@
 #include <linux/mem-buf.h>
 #include <linux/anon_inodes.h>
 #include <linux/kref.h>
-#include <linux/qcom_tui_heap.h>
+#include <linux/qcom_tvm_heap.h>
 #include <linux/memremap.h>
 #include "qcom_dt_parser.h"
 #include "qcom_sg_ops.h"
 
-struct tui_heap;
-struct tui_pool {
-	struct tui_heap *heap;
+struct tvm_heap;
+struct tvm_pool {
+	struct tvm_heap *heap;
 	void *membuf;
 	struct dev_pagemap pgmap;
 	struct kref kref;
@@ -26,22 +26,22 @@ struct tui_pool {
 	struct file *filp;
 };
 
-struct tui_heap_obj {
+struct tvm_heap_obj {
 	struct qcom_sg_buffer buffer;
-	struct tui_pool *pool;
+	struct tvm_pool *pool;
 };
 
-struct tui_heap {
+struct tvm_heap {
 	struct dma_heap *heap;
 	/* Protects the pool pointer, not the pool itself */
 	struct rw_semaphore pool_sem;
-	struct tui_pool *pool;
+	struct tvm_pool *pool;
 };
 #define CARVEOUT_ALLOCATE_FAIL -1
 
-static struct tui_pool *tui_pool_create(struct mem_buf_allocation_data *alloc_data)
+static struct tvm_pool *tvm_pool_create(struct mem_buf_allocation_data *alloc_data)
 {
-	struct tui_pool *pool;
+	struct tvm_pool *pool;
 	struct gh_sgl_desc *sgl_desc;
 	struct dev_pagemap *pgmap;
 	phys_addr_t base;
@@ -110,12 +110,12 @@ err_mem_buf_alloc:
 	return ERR_PTR(ret);
 }
 
-static void tui_pool_release(struct kref *kref)
+static void tvm_pool_release(struct kref *kref)
 {
-	struct tui_pool *pool;
+	struct tvm_pool *pool;
 	struct gh_sgl_desc *sgl_desc;
 
-	pool = container_of(kref, struct tui_pool, kref);
+	pool = container_of(kref, struct tvm_pool, kref);
 
 	gen_pool_destroy(pool->pool);
 	sgl_desc = mem_buf_get_sgl(pool->membuf);
@@ -125,23 +125,23 @@ static void tui_pool_release(struct kref *kref)
 }
 
 /* Prevent new allocations from this pool, and drop our refcount */
-static void qcom_tui_heap_remove_pool(void *handle)
+static void qcom_tvm_heap_remove_pool(void *handle)
 {
-	struct tui_pool *pool = handle;
-	struct tui_heap *heap = pool->heap;
+	struct tvm_pool *pool = handle;
+	struct tvm_heap *heap = pool->heap;
 
 	down_write(&heap->pool_sem);
 	heap->pool = NULL;
 	pool->heap = NULL;
-	kref_put(&pool->kref, tui_pool_release);
+	kref_put(&pool->kref, tvm_pool_release);
 	up_write(&heap->pool_sem);
 }
 
-static void *qcom_tui_heap_add_pool(struct mem_buf_allocation_data *alloc_data)
+static void *qcom_tvm_heap_add_pool(struct mem_buf_allocation_data *alloc_data)
 {
 	struct dma_heap *dma_heap;
-	struct tui_heap *heap;
-	struct tui_pool *pool;
+	struct tvm_heap *heap;
+	struct tvm_pool *pool;
 	char *heap_name;
 
 	if (alloc_data->dst_mem_type != MEM_BUF_DMAHEAP_MEM_TYPE)
@@ -163,14 +163,14 @@ static void *qcom_tui_heap_add_pool(struct mem_buf_allocation_data *alloc_data)
 	alloc_data->size = ALIGN(alloc_data->size, 1UL << SUBSECTION_SHIFT);
 	alloc_data->trans_type = GH_RM_TRANS_TYPE_DONATE;
 	alloc_data->sgl_desc = NULL;
-	pool = tui_pool_create(alloc_data);
+	pool = tvm_pool_create(alloc_data);
 	if (IS_ERR(pool))
 		return ERR_CAST(pool);
 
 	down_write(&heap->pool_sem);
 	if (heap->pool) {
 		pr_err_ratelimited("%s already has a pool\n", heap_name);
-		kref_put(&pool->kref, tui_pool_release);
+		kref_put(&pool->kref, tvm_pool_release);
 		pool = ERR_PTR(-EBUSY);
 	} else {
 		pool->heap = heap;
@@ -181,34 +181,34 @@ static void *qcom_tui_heap_add_pool(struct mem_buf_allocation_data *alloc_data)
 	return pool;
 }
 
-static int tui_heap_file_release(struct inode *inode, struct file *filp)
+static int tvm_heap_file_release(struct inode *inode, struct file *filp)
 {
-	qcom_tui_heap_remove_pool(filp->private_data);
+	qcom_tvm_heap_remove_pool(filp->private_data);
 	return 0;
 }
 
-static const struct file_operations tui_heap_fops = {
-	.release = tui_heap_file_release,
+static const struct file_operations tvm_heap_fops = {
+	.release = tvm_heap_file_release,
 };
 
-int qcom_tui_heap_add_pool_fd(struct mem_buf_allocation_data *alloc_data)
+int qcom_tvm_heap_add_pool_fd(struct mem_buf_allocation_data *alloc_data)
 {
-	struct tui_pool *pool;
+	struct tvm_pool *pool;
 	int fd;
 
 	/*
 	 * Tui heap specific ioctl parsing should move here eventually.
 	 */
 
-	pool = qcom_tui_heap_add_pool(alloc_data);
+	pool = qcom_tvm_heap_add_pool(alloc_data);
 	if (IS_ERR(pool))
 		return PTR_ERR(pool);
 
-	pool->filp = anon_inode_getfile("tui_heap", &tui_heap_fops, pool, O_RDWR);
+	pool->filp = anon_inode_getfile("tvm_heap", &tvm_heap_fops, pool, O_RDWR);
 	if (IS_ERR(pool->filp)) {
 		int ret = PTR_ERR(pool->filp);
 
-		qcom_tui_heap_remove_pool(pool);
+		qcom_tvm_heap_remove_pool(pool);
 		return ret;
 	}
 
@@ -222,28 +222,28 @@ int qcom_tui_heap_add_pool_fd(struct mem_buf_allocation_data *alloc_data)
 	return fd;
 }
 
-static void tui_heap_obj_release(struct qcom_sg_buffer *buffer)
+static void tvm_heap_obj_release(struct qcom_sg_buffer *buffer)
 {
-	struct tui_heap_obj *obj = container_of(buffer, struct tui_heap_obj, buffer);
+	struct tvm_heap_obj *obj = container_of(buffer, struct tvm_heap_obj, buffer);
 	struct sg_table *table = &buffer->sg_table;
 
 	/* Prevent data from previous user from leaking to next user */
 	memset(sg_virt(table->sgl), 0, buffer->len);
 	gen_pool_free(obj->pool->pool, sg_phys(table->sgl), buffer->len);
-	kref_put(&obj->pool->kref, tui_pool_release);
+	kref_put(&obj->pool->kref, tvm_pool_release);
 	sg_free_table(table);
 	kfree(obj);
 }
 
-static struct dma_buf *tui_heap_allocate(struct dma_heap *dma_heap,
+static struct dma_buf *tvm_heap_allocate(struct dma_heap *dma_heap,
 						unsigned long len,
 						unsigned long fd_flags,
 						unsigned long heap_flags)
 {
-	struct tui_heap *heap = dma_heap_get_drvdata(dma_heap);
-	struct tui_pool *pool;
+	struct tvm_heap *heap = dma_heap_get_drvdata(dma_heap);
+	struct tvm_pool *pool;
 	struct sg_table *table;
-	struct tui_heap_obj *obj;
+	struct tvm_heap_obj *obj;
 	struct qcom_sg_buffer *buffer;
 	u64 paddr;
 	int ret;
@@ -273,7 +273,7 @@ static struct dma_buf *tui_heap_allocate(struct dma_heap *dma_heap,
 	paddr = gen_pool_alloc(pool->pool, len);
 	if (!paddr) {
 		ret = -ENOMEM;
-		goto err_tui_pool_alloc;
+		goto err_tvm_pool_alloc;
 	}
 
 	/* Initialize the buffer */
@@ -281,7 +281,7 @@ static struct dma_buf *tui_heap_allocate(struct dma_heap *dma_heap,
 	mutex_init(&buffer->lock);
 	buffer->heap = heap->heap;
 	buffer->len = len;
-	buffer->free = tui_heap_obj_release;
+	buffer->free = tvm_heap_obj_release;
 	buffer->uncached = false;
 
 	table = &buffer->sg_table;
@@ -316,22 +316,22 @@ err_vmperm_alloc:
 	sg_free_table(table);
 err_sg_alloc_table:
 	gen_pool_free(pool->pool, paddr, len);
-err_tui_pool_alloc:
-	kref_put(&pool->kref, tui_pool_release);
+err_tvm_pool_alloc:
+	kref_put(&pool->kref, tvm_pool_release);
 err_no_pool:
 	up_read(&heap->pool_sem);
 	kfree(obj);
 	return ERR_PTR(ret);
 }
 
-static const struct dma_heap_ops tui_heap_ops = {
-	.allocate = tui_heap_allocate,
+static const struct dma_heap_ops tvm_heap_ops = {
+	.allocate = tvm_heap_allocate,
 };
 
-int qcom_tui_carveout_heap_create(struct platform_heap *heap_data)
+int qcom_tvm_carveout_heap_create(struct platform_heap *heap_data)
 {
 	struct dma_heap_export_info exp_info;
-	struct tui_heap *heap;
+	struct tvm_heap *heap;
 	int ret;
 
 	heap = kzalloc(sizeof(*heap), GFP_KERNEL);
@@ -340,7 +340,7 @@ int qcom_tui_carveout_heap_create(struct platform_heap *heap_data)
 
 	init_rwsem(&heap->pool_sem);
 	exp_info.name = heap_data->name;
-	exp_info.ops = &tui_heap_ops;
+	exp_info.ops = &tvm_heap_ops;
 	exp_info.priv = heap;
 
 	heap->heap = dma_heap_add(&exp_info);
