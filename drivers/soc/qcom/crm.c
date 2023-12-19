@@ -1101,6 +1101,7 @@ int crm_write_bw_pt_vote(const struct device *dev, enum crm_drv_type drv_type,
 {
 	return crm_write_bw_vote(dev, drv_type, drv_id, cmd);
 }
+EXPORT_SYMBOL_GPL(crm_write_bw_pt_vote);
 
 /**
  * crm_get_device() - Returns a CRM device handle.
