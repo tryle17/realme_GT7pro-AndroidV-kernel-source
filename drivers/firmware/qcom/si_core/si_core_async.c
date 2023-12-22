@@ -24,12 +24,17 @@ struct async_msg {
 
 	union {
 		struct {
-			u32 count;
+			u32 count;	/* Number of objects that should be released. */
 			u32 obj[];
 		} op_release;
 
-		/* There are other structs but we do not care. */
-		/* struct { XXX }; */
+		/* This is a generic structure. */
+		struct {
+			u32 count;	/* SET to one; We create per-object 'owner' messages. */
+			u32 owner;
+			u32 out;
+			char user_data[];
+		} info;
 	};
 };
 
@@ -42,6 +47,8 @@ struct async_msg {
  * ASYNC_OP_x_SIZE: size of each entry in a message for the operation.
  * ASYNC_OP_x_MSG_SIZE: size of a message with n entries.
  */
+
+#define ASYNC_OP_USER_HDR_SIZE offsetof(struct async_msg, info.user_data)
 
 #define ASYNC_OP_RELEASE SI_OBJECT_OP_RELEASE	/* Added in minor version 0x0000. **/
 #define ASYNC_OP_RELEASE_HDR_SIZE offsetof(struct async_msg, op_release.obj)
@@ -96,6 +103,7 @@ static LIST_HEAD(release_ops_list);
 /* 'release_user_object' put object in release pending list.
  * 'async_release_provider' remove objects from release pending list and construct
  *  the async message.
+ * 'revive_async_queued_reqs' move object back to release pending list.
  * 'destroy_user_object' called to finish the job after QTEE acknowledged the release.
  */
 
@@ -151,12 +159,37 @@ static size_t async_release_provider(struct si_object_invoke_ctx *oic,
 	return (i) ? ASYNC_OP_RELEASE_MSG_SIZE(i) : 0;
 }
 
+static void revive_async_queued_reqs(struct si_object *object)
+{
+	if (!kref_read(&object->refcount)) {
+
+		/* Move it back to 'release_ops_list' and retry again. */
+
+		mutex_lock(&async_ops_mutex);
+		list_add(&object->node, &release_ops_list);
+		mutex_unlock(&async_ops_mutex);
+
+	} else {
+		/* Two Puts, one for a get in 'call_prepare' and */
+		put_si_object(object);
+
+		/* ... try to RELEASE the object. */
+		put_si_object(object);
+	}
+}
+
 static void destroy_user_object(struct si_object *object)
 {
-	kfree(object->name);
+	if (!kref_read(&object->refcount)) {
+		kfree(object->name);
 
-	/* QTEE release should be done! free the object. */
-	free_si_object(object);
+		/* QTEE release should be done! free the object. */
+		free_si_object(object);
+	} else {
+
+		/* Put object we got in 'call_prepare'. */
+		put_si_object(object);
+	}
 }
 
 ssize_t release_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
@@ -172,6 +205,130 @@ ssize_t release_show(struct kobject *kobj, struct kobj_attribute *attr, char *bu
 	return len;
 }
 
+#else /* CONFIG_QCOM_SI_CORE_WQ */
+static size_t async_release_provider(struct si_object_invoke_ctx *oic,
+	struct async_msg *async_msg, size_t size)
+{
+	return 0;
+}
+
+static void revive_async_queued_reqs(struct si_object *object)
+{
+	/* Two Puts, one for a get in 'call_prepare' and */
+	put_si_object(object);
+
+	/* ... try to RELEASE the object. */
+	put_si_object(object);
+}
+
+static void destroy_user_object(struct si_object *object)
+{
+	/* Put object we got in 'call_prepare'. */
+	put_si_object(object);
+}
+
+#endif /* CONFIG_QCOM_SI_CORE_WQ */
+
+/* Object prepare. */
+
+static void call_prepare(struct si_object_invoke_ctx *oic,
+	unsigned int object_id, struct si_buffer *async_buffer)
+{
+	struct async_msg *async_msg = async_buffer->addr;
+
+	switch (si_object_type(object_id)) {
+	case SI_OT_CB_OBJECT: {
+		struct si_object *object, *t_object;
+		struct si_arg args[3] = { 0 };
+
+		/* We are sure 'async_buffer' has enough space for a header. */
+
+		args[0].b.addr = async_buffer->addr + ASYNC_OP_USER_HDR_SIZE;
+		args[0].b.size = async_buffer->size - ASYNC_OP_USER_HDR_SIZE;
+		args[0].type = SI_AT_OB;
+		args[1].type = SI_AT_OO;
+
+		object = qtee_get_si_object(object_id);
+
+		/* We do not expect 'object' to be NULL_SI_OBJECT. */
+
+		if (object->ops->prepare) {
+			unsigned long op = object->ops->prepare(object, args);
+
+			if (op != SI_OBJECT_OP_NO_OP) {
+				t_object = args[1].o;
+
+				/* Object's provider has done some preparation on the object. */
+
+				async_msg->info.owner = object_id;
+				if (typeof_si_object(t_object) != SI_OT_NULL) {
+					if (get_object_id(t_object, &async_msg->info.out)) {
+						put_si_object(t_object);
+
+						break;
+					}
+
+					/* We temporarily keep si_object for ourselves; get one. */
+					get_si_object(t_object);
+
+					list_add_tail(&t_object->node, &oic->objects_head);
+				}
+
+				async_msg->info.count = 1;
+				async_msg->header.version = 0x00010002U;
+				async_msg->header.op = op;
+
+				/* Move forward. */
+
+				async_buffer->addr += align_offset(args[0].b.size +
+					ASYNC_OP_USER_HDR_SIZE);
+				async_buffer->size -= align_offset(args[0].b.size +
+					ASYNC_OP_USER_HDR_SIZE);
+			}
+		}
+
+		put_si_object(object);
+	}
+
+		break;
+	case SI_OT_USER:
+	case SI_OT_NULL:
+	default:
+
+		break;
+	}
+}
+
+void prepare_objects(struct si_object_invoke_ctx *oic, struct si_buffer async_buffer)
+{
+	int i;
+
+	if (!(oic->flags & OIC_FLAG_BUSY)) {
+		/* Use input message buffer in 'oic'; Process input objects. */
+
+		struct qtee_object_invoke *msg = (struct qtee_object_invoke *)oic->in.msg.addr;
+
+		for_each_input_object(i, msg->counts) {
+			if (async_buffer.size < ASYNC_OP_USER_HDR_SIZE)
+				break;
+
+			call_prepare(oic, msg->args[i].o, &async_buffer);
+		}
+
+	} else {
+		/* Use output message buffer in 'oic'; Process output objects. */
+
+		struct qtee_callback *msg = (struct qtee_callback *)oic->out.msg.addr;
+
+		for_each_output_object(i, msg->counts) {
+			if (async_buffer.size < ASYNC_OP_USER_HDR_SIZE)
+				break;
+
+			call_prepare(oic, msg->args[i].o, &async_buffer);
+		}
+	}
+}
+
 /* '__append__async_reqs',
  * '__revive__async_queued_reqs', and
  * '__release__async_queued_reqs'.
@@ -181,31 +338,38 @@ ssize_t release_show(struct kobject *kobj, struct kobj_attribute *attr, char *bu
 
 void __append__async_reqs(struct si_object_invoke_ctx *oic)
 {
+	size_t size;
+
 	struct si_buffer async_buffer = async_si_buffer(oic);
 
 	pr_debug("%u.\n", oic->context_id);
 
-	async_release_provider(oic, async_buffer.addr, async_buffer.size);
+	/* Processe RELEASE requests first. */
+	size = async_release_provider(oic, async_buffer.addr, async_buffer.size);
 
-	/* TODO. call providers for any input objects in oic. */
+	/* Let's use whatever buffer left for remaining of async messages. */
+
+	async_buffer.addr += align_offset(size);
+	async_buffer.size -= align_offset(size);
+
+	prepare_objects(oic, async_buffer);
 }
 
 void __revive__async_queued_reqs(struct si_object_invoke_ctx *oic)
 {
+	struct si_object *object, *t;
+
 	pr_debug("%u.\n", oic->context_id);
 
-	mutex_lock(&async_ops_mutex);
+	/* Something went wrong; QTEE did not recived the async messages. */
 
-	/* QTEE did not receive the object RELEASE requests.
-	 * Put them back in 'release_ops_list' to retry again.
-	 */
+	list_for_each_entry_safe(object, t, &oic->objects_head, node) {
+		list_del(&object->node);
 
-	/* TODO. Handle other requests. */
-
-	list_splice(&oic->objects_head, &release_ops_list);
+		revive_async_queued_reqs(object);
+	}
 
 	INIT_LIST_HEAD(&oic->objects_head);
-	mutex_unlock(&async_ops_mutex);
 }
 
 void __release__async_queued_reqs(struct si_object_invoke_ctx *oic)
@@ -215,19 +379,11 @@ void __release__async_queued_reqs(struct si_object_invoke_ctx *oic)
 	pr_debug("%u.\n", oic->context_id);
 
 	list_for_each_entry_safe(object, t, &oic->objects_head, node) {
-		list_del(&object->node);
+		list_del_init(&object->node);
 
 		destroy_user_object(object);
-
-		/* TODO. Handle other requests. */
 	}
 }
-
-#else
-void __append__async_reqs(struct si_object_invoke_ctx *oic) { }
-void __revive__async_queued_reqs(struct si_object_invoke_ctx *oic) { }
-void __release__async_queued_reqs(struct si_object_invoke_ctx *oic) { }
-#endif /* CONFIG_QCOM_SI_CORE_WQ */
 
 static size_t async_release_handler(struct si_object_invoke_ctx *oic,
 	struct async_msg *async_msg, size_t size)

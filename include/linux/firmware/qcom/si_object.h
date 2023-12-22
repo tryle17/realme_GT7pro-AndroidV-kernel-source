@@ -115,6 +115,7 @@ int si_object_do_invoke(struct si_object_invoke_ctx *oic,
 
 #define SI_OBJECT_OP_RELEASE		(SI_OBJECT_OP_METHOD_MASK - 0)
 #define SI_OBJECT_OP_RETAIN			(SI_OBJECT_OP_METHOD_MASK - 1)
+#define SI_OBJECT_OP_NO_OP			(SI_OBJECT_OP_METHOD_MASK - 2)
 
 struct si_object_operations {
 	void (*release)(struct si_object *object);
@@ -143,6 +144,17 @@ struct si_object_operations {
 	 * i.e. transport errors or success (status is zero).
 	 */
 	void (*notify)(unsigned int context_id,	struct si_object *object, int status);
+
+	/**
+	 * @prepare:
+	 *
+	 * Called on object of type AT_IO on direct call (or AT_OO on callback
+	 * response) to QTEE. The object provider can return (1) a buffer argument
+	 * and (2) an object. @args is { { .type == AT_OB }, { .type == AT_OO },
+	 * { .type == AT_END } }. On failour, returns SI_OBJECT_OP_NO_OP, otherwise
+	 * an operation that provider has done on @object.
+	 */
+	unsigned long (*prepare)(struct si_object *object, struct si_arg args[]);
 };
 
 struct si_object {

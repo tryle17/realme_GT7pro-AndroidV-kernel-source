@@ -157,7 +157,7 @@ static struct si_object *qtee__get_si_object(unsigned int object_id)
 	return object;
 }
 
-static struct si_object *qtee_get_si_object(unsigned int object_id)
+struct si_object *qtee_get_si_object(unsigned int object_id)
 {
 	switch (object_id) {
 	case SI_OBJECT_PRIMORDIAL:
@@ -230,7 +230,7 @@ static int __free_si_object(struct si_object *object)
 	return 0;
 }
 
-static inline enum si_object_type si_object_type(unsigned int object_id)
+enum si_object_type si_object_type(unsigned int object_id)
 {
 	if (object_id == QTEE_OBJ_NULL)
 		return SI_OT_NULL;
@@ -374,7 +374,7 @@ static int init_si_object(struct si_object **object, unsigned int object_id)
  * reference counter, i.e. the client should do that.
  */
 
-static int get_object_id(struct si_object *object, unsigned int *object_id)
+int get_object_id(struct si_object *object, unsigned int *object_id)
 {
 	int ret;
 
@@ -416,7 +416,7 @@ out:
 	return ret;
 }
 
-static void __put_object_id(unsigned int object_id)
+void __put_object_id(unsigned int object_id)
 {
 	/* Release 'idx' allocated in 'get_object_id'. **/
 

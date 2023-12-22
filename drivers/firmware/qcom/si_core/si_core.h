@@ -12,6 +12,18 @@
 #undef pr_fmt
 #define pr_fmt(fmt) "si-core: %s: " fmt, __func__
 
+/* QTEE object ID API. */
+
+enum si_object_type si_object_type(unsigned int object_id);
+
+/* 'get_object_id' allocates a QTEE handler for a si_object. */
+/* '__put_object_id' erases the QTEE handler. */
+/* 'qtee_get_si_object' returns si_object for a QTEE handler and increase the refcount. */
+
+int get_object_id(struct si_object *object, unsigned int *object_id);
+void __put_object_id(unsigned int object_id);
+struct si_object *qtee_get_si_object(unsigned int object_id);
+
 int si_object_invoke_ctx_invoke(struct si_object_invoke_ctx *oic, int *result,
 	u64 *response_type, unsigned int *data);
 
