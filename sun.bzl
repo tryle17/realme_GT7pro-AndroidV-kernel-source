@@ -78,6 +78,7 @@ def define_sun():
         "drivers/iommu/msm_dma_iommu_mapping.ko",
         "drivers/iommu/qcom_iommu_debug.ko",
         "drivers/iommu/qcom_iommu_util.ko",
+        "drivers/irqchip/msm_show_resume_irq.ko",
         "drivers/irqchip/qcom-pdc.ko",
         "drivers/leds/flash/leds-qcom-flash.ko",
         "drivers/leds/leds-qti-flash.ko",
