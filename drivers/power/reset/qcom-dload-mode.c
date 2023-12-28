@@ -362,19 +362,19 @@ static int qcom_dload_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id of_qcom_dload_match[] = {
-	{ .compatible = "qcom,dload-mode", },
+static const struct platform_device_id qcom_dload_id_match[] = {
+	{ .name = "qcom-dload-mode", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, of_qcom_dload_match);
+MODULE_DEVICE_TABLE(platform, qcom_dload_id_match);
 
 static struct platform_driver qcom_dload_driver = {
 	.probe = qcom_dload_probe,
 	.remove = qcom_dload_remove,
 	.driver = {
 		.name = "qcom-dload-mode",
-		.of_match_table = of_match_ptr(of_qcom_dload_match),
 	},
+	.id_table = qcom_dload_id_match,
 };
 
 static int __init qcom_dload_driver_init(void)
