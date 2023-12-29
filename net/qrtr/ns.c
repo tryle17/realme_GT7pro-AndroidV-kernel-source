@@ -95,7 +95,10 @@ static struct qrtr_node *node_get(unsigned int node_id)
 	node->id = node_id;
 	xa_init(&node->servers);
 
-	xa_store(&nodes, node_id, node, GFP_ATOMIC);
+	if (xa_store(&nodes, node_id, node, GFP_ATOMIC)) {
+		kfree(node);
+		return NULL;
+	}
 
 	return node;
 }
@@ -228,8 +231,8 @@ static int announce_servers(struct sockaddr_qrtr *sq)
 {
 	struct qrtr_server *srv;
 	struct qrtr_node *node;
-	unsigned long index;
 	unsigned long node_idx;
+	unsigned long index;
 	int ret;
 
 	/* Announce the list of servers registered in this node */

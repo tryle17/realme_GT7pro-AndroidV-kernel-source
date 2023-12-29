@@ -3,6 +3,7 @@ arch/arm64/crypto/aes-ce-core.S
 arch/arm64/crypto/aes-ce-glue.c
 arch/arm64/crypto/aes-ce-setkey.h
 arch/arm64/crypto/aes-ce.S
+arch/arm64/crypto/aes-glue-ce.c
 arch/arm64/crypto/aes-glue.c
 arch/arm64/crypto/aes-modes.S
 arch/arm64/crypto/chacha-neon-core.S
@@ -170,6 +171,7 @@ arch/arm64/include/asm/system_misc.h
 arch/arm64/include/asm/thread_info.h
 arch/arm64/include/asm/timex.h
 arch/arm64/include/asm/tlb.h
+arch/arm64/include/asm/tlbbatch.h
 arch/arm64/include/asm/tlbflush.h
 arch/arm64/include/asm/topology.h
 arch/arm64/include/asm/traps.h
@@ -764,6 +766,7 @@ drivers/cpuidle/dt_idle_genpd.h
 drivers/cpuidle/dt_idle_states.c
 drivers/cpuidle/dt_idle_states.h
 drivers/cpuidle/governor.c
+drivers/cpuidle/governors/gov.h
 drivers/cpuidle/governors/menu.c
 drivers/cpuidle/governors/teo.c
 drivers/cpuidle/sysfs.c
@@ -846,6 +849,7 @@ drivers/firmware/efi/libstub/fdt.c
 drivers/firmware/efi/libstub/file.c
 drivers/firmware/efi/libstub/gop.c
 drivers/firmware/efi/libstub/intrinsics.c
+drivers/firmware/efi/libstub/kaslr.c
 drivers/firmware/efi/libstub/mem.c
 drivers/firmware/efi/libstub/pci.c
 drivers/firmware/efi/libstub/printk.c
@@ -922,6 +926,7 @@ drivers/gpu/drm/drm_gem.c
 drivers/gpu/drm/drm_gem_atomic_helper.c
 drivers/gpu/drm/drm_gem_framebuffer_helper.c
 drivers/gpu/drm/drm_gem_shmem_helper.c
+drivers/gpu/drm/drm_gpuva_mgr.c
 drivers/gpu/drm/drm_internal.h
 drivers/gpu/drm/drm_ioc32.c
 drivers/gpu/drm/drm_ioctl.c
@@ -1074,6 +1079,7 @@ drivers/input/touchscreen.c
 drivers/input/vivaldi-fmap.c
 drivers/interconnect/bulk.c
 drivers/interconnect/core.c
+drivers/interconnect/debugfs-client.c
 drivers/interconnect/internal.h
 drivers/interconnect/qcom/icc-common.c
 drivers/interconnect/qcom/icc-common.h
@@ -1084,6 +1090,7 @@ drivers/iommu/io-pgtable-arm-v7s.c
 drivers/iommu/io-pgtable-arm.c
 drivers/iommu/io-pgtable-arm.h
 drivers/iommu/io-pgtable.c
+drivers/iommu/iommu-priv.h
 drivers/iommu/iommu-sva.h
 drivers/iommu/iommu-sysfs.c
 drivers/iommu/iommu-traces.c
@@ -1196,6 +1203,7 @@ drivers/media/usb/uvc/uvc_status.c
 drivers/media/usb/uvc/uvc_v4l2.c
 drivers/media/usb/uvc/uvc_video.c
 drivers/media/usb/uvc/uvcvideo.h
+drivers/media/v4l2-core/v4l2-async.c
 drivers/media/v4l2-core/v4l2-common.c
 drivers/media/v4l2-core/v4l2-compat-ioctl32.c
 drivers/media/v4l2-core/v4l2-ctrls-api.c
@@ -1208,6 +1216,7 @@ drivers/media/v4l2-core/v4l2-device.c
 drivers/media/v4l2-core/v4l2-dv-timings.c
 drivers/media/v4l2-core/v4l2-event.c
 drivers/media/v4l2-core/v4l2-fh.c
+drivers/media/v4l2-core/v4l2-fwnode.c
 drivers/media/v4l2-core/v4l2-i2c.c
 drivers/media/v4l2-core/v4l2-ioctl.c
 drivers/media/v4l2-core/v4l2-mc.c
@@ -1295,6 +1304,7 @@ drivers/net/phy/phy_device.c
 drivers/net/phy/phy_led_triggers.c
 drivers/net/phy/phylink.c
 drivers/net/phy/sfp.h
+drivers/net/phy/stubs.c
 drivers/net/phy/swphy.c
 drivers/net/phy/swphy.h
 drivers/net/ppp/bsd_comp.c
@@ -1634,7 +1644,6 @@ drivers/ufs/core/ufshcd-crypto.c
 drivers/ufs/core/ufshcd-crypto.h
 drivers/ufs/core/ufshcd-priv.h
 drivers/ufs/core/ufshcd.c
-drivers/ufs/core/ufshpb.h
 drivers/ufs/host/tc-dwc-g210-pltfrm.c
 drivers/ufs/host/tc-dwc-g210.c
 drivers/ufs/host/tc-dwc-g210.h
@@ -1833,6 +1842,7 @@ drivers/usb/typec/retimer.c
 drivers/usb/typec/retimer.h
 drivers/usb/typec/tcpm/tcpci.c
 drivers/usb/typec/tcpm/tcpm.c
+drivers/usb/typec/ucsi/debugfs.c
 drivers/usb/typec/ucsi/displayport.c
 drivers/usb/typec/ucsi/psy.c
 drivers/usb/typec/ucsi/trace.c
@@ -2232,7 +2242,9 @@ fs/sysfs/mount.c
 fs/sysfs/symlink.c
 fs/sysfs/sysfs.h
 fs/timerfd.c
+fs/tracefs/event_inode.c
 fs/tracefs/inode.c
+fs/tracefs/internal.h
 fs/unicode/utf8-core.c
 fs/unicode/utf8-norm.c
 fs/unicode/utf8n.h
@@ -2401,6 +2413,7 @@ include/crypto/internal/chacha.h
 include/crypto/internal/cipher.h
 include/crypto/internal/des.h
 include/crypto/internal/ecc.h
+include/crypto/internal/engine.h
 include/crypto/internal/geniv.h
 include/crypto/internal/hash.h
 include/crypto/internal/kpp.h
@@ -2470,6 +2483,7 @@ include/drm/drm_gem.h
 include/drm/drm_gem_atomic_helper.h
 include/drm/drm_gem_framebuffer_helper.h
 include/drm/drm_gem_shmem_helper.h
+include/drm/drm_gpuva_mgr.h
 include/drm/drm_ioctl.h
 include/drm/drm_lease.h
 include/drm/drm_legacy.h
@@ -2538,6 +2552,7 @@ include/keys/system_keyring.h
 include/keys/trusted-type.h
 include/keys/user-type.h
 include/kunit/assert.h
+include/kunit/attributes.h
 include/kunit/resource.h
 include/kunit/static_stub.h
 include/kunit/test-bug.h
@@ -2565,6 +2580,7 @@ include/linux/android_vendor.h
 include/linux/anon_inodes.h
 include/linux/aperture.h
 include/linux/arch_topology.h
+include/linux/args.h
 include/linux/arm-smccc.h
 include/linux/arm_ffa.h
 include/linux/arm_sdei.h
@@ -2623,6 +2639,7 @@ include/linux/bpf_lirc.h
 include/linux/bpf_local_storage.h
 include/linux/bpf_lsm.h
 include/linux/bpf_mem_alloc.h
+include/linux/bpf_mprog.h
 include/linux/bpf_trace.h
 include/linux/bpf_types.h
 include/linux/bpf_verifier.h
@@ -2834,7 +2851,6 @@ include/linux/fortify-string.h
 include/linux/fprobe.h
 include/linux/freelist.h
 include/linux/freezer.h
-include/linux/frontswap.h
 include/linux/fs.h
 include/linux/fs_api.h
 include/linux/fs_context.h
@@ -2954,6 +2970,7 @@ include/linux/input/vivaldi-fmap.h
 include/linux/instruction_pointer.h
 include/linux/instrumentation.h
 include/linux/instrumented.h
+include/linux/int_log.h
 include/linux/integrity.h
 include/linux/interconnect-provider.h
 include/linux/interconnect.h
@@ -2976,6 +2993,7 @@ include/linux/iommu.h
 include/linux/iopoll.h
 include/linux/ioport.h
 include/linux/ioprio.h
+include/linux/ioremap.h
 include/linux/iosys-map.h
 include/linux/iova.h
 include/linux/iova_bitmap.h
@@ -3178,7 +3196,6 @@ include/linux/namei.h
 include/linux/nd.h
 include/linux/ndctl.h
 include/linux/net.h
-include/linux/net_mm.h
 include/linux/net_tstamp.h
 include/linux/netdev_features.h
 include/linux/netdevice.h
@@ -3309,6 +3326,7 @@ include/linux/phy/phy-mipi-dphy.h
 include/linux/phy/phy.h
 include/linux/phy_fixed.h
 include/linux/phy_led_triggers.h
+include/linux/phylib_stubs.h
 include/linux/phylink.h
 include/linux/pid.h
 include/linux/pid_namespace.h
@@ -3551,6 +3569,7 @@ include/linux/spinlock_types.h
 include/linux/spinlock_types_raw.h
 include/linux/splice.h
 include/linux/spmi.h
+include/linux/sprintf.h
 include/linux/srcu.h
 include/linux/srcutree.h
 include/linux/stackdepot.h
@@ -3769,6 +3788,7 @@ include/linux/zsmalloc.h
 include/linux/zstd.h
 include/linux/zstd_errors.h
 include/linux/zstd_lib.h
+include/linux/zswap.h
 include/linux/zutil.h
 include/media/cec-notifier.h
 include/media/cec-pin.h
@@ -3911,6 +3931,7 @@ include/net/net_debug.h
 include/net/net_namespace.h
 include/net/net_ratelimit.h
 include/net/net_trackers.h
+include/net/netdev_rx_queue.h
 include/net/netevent.h
 include/net/netfilter/ipv4/nf_conntrack_ipv4.h
 include/net/netfilter/ipv4/nf_defrag_ipv4.h
@@ -3978,7 +3999,8 @@ include/net/nexthop.h
 include/net/nfc/nfc.h
 include/net/nl802154.h
 include/net/p8022.h
-include/net/page_pool.h
+include/net/page_pool/helpers.h
+include/net/page_pool/types.h
 include/net/phonet/phonet.h
 include/net/ping.h
 include/net/pkt_cls.h
@@ -4034,6 +4056,7 @@ include/net/tc_act/tc_vlan.h
 include/net/tc_wrapper.h
 include/net/tcp.h
 include/net/tcp_states.h
+include/net/tcx.h
 include/net/timewait_sock.h
 include/net/tipc.h
 include/net/tls.h
@@ -4854,6 +4877,7 @@ kernel/bpf/map_in_map.h
 kernel/bpf/map_iter.c
 kernel/bpf/memalloc.c
 kernel/bpf/mmap_unlock_work.h
+kernel/bpf/mprog.c
 kernel/bpf/net_namespace.c
 kernel/bpf/offload.c
 kernel/bpf/percpu_freelist.c
@@ -4867,6 +4891,7 @@ kernel/bpf/stackmap.c
 kernel/bpf/syscall.c
 kernel/bpf/sysfs_btf.c
 kernel/bpf/task_iter.c
+kernel/bpf/tcx.c
 kernel/bpf/tnum.c
 kernel/bpf/trampoline.c
 kernel/bpf/verifier.c
@@ -5112,6 +5137,8 @@ kernel/trace/ring_buffer.c
 kernel/trace/rpm-traces.c
 kernel/trace/trace.c
 kernel/trace/trace.h
+kernel/trace/trace_btf.c
+kernel/trace/trace_btf.h
 kernel/trace/trace_clock.c
 kernel/trace/trace_dynevent.c
 kernel/trace/trace_dynevent.h
@@ -5194,6 +5221,31 @@ lib/crypto/des.c
 lib/crypto/gf128mul.c
 lib/crypto/libchacha.c
 lib/crypto/memneq.c
+lib/crypto/mpi/ec.c
+lib/crypto/mpi/generic_mpih-add1.c
+lib/crypto/mpi/generic_mpih-lshift.c
+lib/crypto/mpi/generic_mpih-mul1.c
+lib/crypto/mpi/generic_mpih-mul2.c
+lib/crypto/mpi/generic_mpih-mul3.c
+lib/crypto/mpi/generic_mpih-rshift.c
+lib/crypto/mpi/generic_mpih-sub1.c
+lib/crypto/mpi/longlong.h
+lib/crypto/mpi/mpi-add.c
+lib/crypto/mpi/mpi-bit.c
+lib/crypto/mpi/mpi-cmp.c
+lib/crypto/mpi/mpi-div.c
+lib/crypto/mpi/mpi-inline.h
+lib/crypto/mpi/mpi-internal.h
+lib/crypto/mpi/mpi-inv.c
+lib/crypto/mpi/mpi-mod.c
+lib/crypto/mpi/mpi-mul.c
+lib/crypto/mpi/mpi-pow.c
+lib/crypto/mpi/mpi-sub-ui.c
+lib/crypto/mpi/mpicoder.c
+lib/crypto/mpi/mpih-cmp.c
+lib/crypto/mpi/mpih-div.c
+lib/crypto/mpi/mpih-mul.c
+lib/crypto/mpi/mpiutil.c
 lib/crypto/poly1305-donna64.c
 lib/crypto/poly1305.c
 lib/crypto/sha1.c
@@ -5248,6 +5300,7 @@ lib/kobject_uevent.c
 lib/kstrtox.c
 lib/kstrtox.h
 lib/kunit/assert.c
+lib/kunit/attributes.c
 lib/kunit/debugfs.c
 lib/kunit/debugfs.h
 lib/kunit/executor.c
@@ -5277,6 +5330,7 @@ lib/lzo/lzodefs.h
 lib/maple_tree.c
 lib/math/div64.c
 lib/math/gcd.c
+lib/math/int_log.c
 lib/math/int_pow.c
 lib/math/int_sqrt.c
 lib/math/lcm.c
@@ -5285,31 +5339,6 @@ lib/math/reciprocal_div.c
 lib/memcat_p.c
 lib/memregion.c
 lib/memweight.c
-lib/mpi/ec.c
-lib/mpi/generic_mpih-add1.c
-lib/mpi/generic_mpih-lshift.c
-lib/mpi/generic_mpih-mul1.c
-lib/mpi/generic_mpih-mul2.c
-lib/mpi/generic_mpih-mul3.c
-lib/mpi/generic_mpih-rshift.c
-lib/mpi/generic_mpih-sub1.c
-lib/mpi/longlong.h
-lib/mpi/mpi-add.c
-lib/mpi/mpi-bit.c
-lib/mpi/mpi-cmp.c
-lib/mpi/mpi-div.c
-lib/mpi/mpi-inline.h
-lib/mpi/mpi-internal.h
-lib/mpi/mpi-inv.c
-lib/mpi/mpi-mod.c
-lib/mpi/mpi-mul.c
-lib/mpi/mpi-pow.c
-lib/mpi/mpi-sub-ui.c
-lib/mpi/mpicoder.c
-lib/mpi/mpih-cmp.c
-lib/mpi/mpih-div.c
-lib/mpi/mpih-mul.c
-lib/mpi/mpiutil.c
 lib/net_utils.c
 lib/nlattr.c
 lib/nmi_backtrace.c

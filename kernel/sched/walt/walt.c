@@ -10,7 +10,6 @@
 #include <linux/jiffies.h>
 #include <linux/sched/stat.h>
 #include <linux/module.h>
-#include <linux/kmemleak.h>
 #include <linux/cpumask.h>
 #include <linux/arch_topology.h>
 #include <linux/cpu.h>
@@ -2061,7 +2060,8 @@ static void update_history(struct rq *rq, struct task_struct *p,
 	for (; samples > 0; samples--) {
 		hist[wts->cidx] = runtime;
 		hist_util[wts->cidx] = runtime_scaled;
-		wts->cidx = ++(wts->cidx) % RAVG_HIST_SIZE;
+		wts->cidx++;
+		wts->cidx = wts->cidx % RAVG_HIST_SIZE;
 	}
 
 	for (i = 0; i < RAVG_HIST_SIZE; i++) {
@@ -2890,7 +2890,8 @@ static void walt_update_cluster_topology(void)
 					     policy->related_cpus);
 			}
 			cpuinfo_max_freq_cached = (cpuinfo_max_freq_cached >
-			policy->cpuinfo.max_freq) ?: policy->cpuinfo.max_freq;
+			policy->cpuinfo.max_freq) ? cpuinfo_max_freq_cached
+				: policy->cpuinfo.max_freq;
 		}
 	}
 
@@ -5322,9 +5323,9 @@ static int walt_init_stop_handler(void *data)
 		level++;
 	}
 
-	do_each_thread(g, p) {
+	for_each_process_thread(g, p) {
 		init_new_task_load(p);
-	} while_each_thread(g, p);
+	}
 
 	for_each_possible_cpu(cpu) {
 		struct rq *rq = cpu_rq(cpu);
@@ -5364,7 +5365,6 @@ static void walt_init_tg_pointers(void)
 
 static void walt_init(struct work_struct *work)
 {
-	struct ctl_table_header *hdr, *hdr2;
 	static atomic_t already_inited = ATOMIC_INIT(0);
 	struct root_domain *rd = cpu_rq(cpumask_first(cpu_active_mask))->rd;
 	int i;
@@ -5415,11 +5415,7 @@ static void walt_init(struct work_struct *work)
 			 "root domain's perf-domain values not initialized rd->pd=%p.",
 			 rd->pd);
 
-	hdr = register_sysctl("walt", walt_table);
-	hdr2 = register_sysctl("walt/input_boost", input_boost_sysctls);
-
-	kmemleak_not_leak(hdr);
-	kmemleak_not_leak(hdr2);
+	walt_register_sysctl();
 
 	input_boost_init();
 	core_ctl_init();
