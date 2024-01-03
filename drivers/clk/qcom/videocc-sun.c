@@ -401,6 +401,7 @@ MODULE_DEVICE_TABLE(of, video_cc_sun_match_table);
 
 static int video_cc_sun_probe(struct platform_device *pdev)
 {
+	unsigned int dly_accu_mask = 0xf << 21;
 	struct regmap *regmap;
 	int ret;
 
@@ -417,6 +418,10 @@ static int video_cc_sun_probe(struct platform_device *pdev)
 		return ret;
 
 	clk_taycan_elu_pll_configure(&video_cc_pll0, regmap, &video_cc_pll0_config);
+
+	/* Change DLY_ACCU_RED_SHIFTER_DONE to 0xF for mvs0, mvs0c */
+	regmap_update_bits(regmap, 0x8074, dly_accu_mask, dly_accu_mask);
+	regmap_update_bits(regmap, 0x8040, dly_accu_mask, dly_accu_mask);
 
 	/*
 	 * Keep clocks always enabled:
