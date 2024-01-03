@@ -196,6 +196,8 @@ def define_sun():
         "drivers/thermal/qcom/qcom_tsens.ko",
         "drivers/thermal/qcom/qti_cpufreq_cdev.ko",
         "drivers/thermal/qcom/qti_devfreq_cdev.ko",
+        "drivers/thermal/qcom/qti_qmi_cdev.ko",
+        "drivers/thermal/qcom/qti_qmi_sensor_v2.ko",
         "drivers/tty/hvc/hvc_gunyah.ko",
         "drivers/tty/serial/msm_geni_serial.ko",
         "drivers/ufs/host/ufs-qcom.ko",
