@@ -51,7 +51,7 @@ static int set_download_mode(enum qcom_download_mode mode)
 			return -ENODEV;
 	}
 	current_download_mode = mode;
-	qcom_scm_set_download_mode(mode, 0);
+	qcom_scm_set_download_mode(mode);
 	return 0;
 }
 
@@ -62,7 +62,7 @@ static int set_dump_mode(enum qcom_download_mode mode)
 	if (enable_dump) {
 		ret = set_download_mode(mode);
 		if (likely(!ret))
-			dump_mode = qcom_scm_get_download_mode(&temp, 0) ? dump_mode : temp;
+			dump_mode = qcom_scm_get_download_mode(&temp) ? dump_mode : temp;
 	} else
 		dump_mode = mode;
 
@@ -328,7 +328,7 @@ static int qcom_dload_probe(struct platform_device *pdev)
 
 	poweroff->dload_dest_addr = map_prop_mem("qcom,msm-imem-dload-type");
 	msm_enable_dump_mode(enable_dump);
-	dump_mode = qcom_scm_get_download_mode(&temp, 0) ? dump_mode : temp;
+	dump_mode = qcom_scm_get_download_mode(&temp) ? dump_mode : temp;
 	pr_info("%s: Current dump mode: 0x%x\n", __func__, dump_mode);
 
 	if (!enable_dump)
