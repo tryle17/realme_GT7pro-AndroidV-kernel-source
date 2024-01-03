@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -373,6 +373,7 @@ static const struct qcom_reset_map video_cc_sun_resets[] = {
 	[VIDEO_CC_MVS0C_CLK_ARES] = { 0x804c, 2 },
 	[VIDEO_CC_MVS0C_BCR] = { 0x8030 },
 	[VIDEO_CC_MVS0C_FREERUN_CLK_ARES] = { 0x805c, 2 },
+	[VIDEO_CC_XO_CLK_ARES] = { 0x80d4, 2 },
 };
 
 static const struct regmap_config video_cc_sun_regmap_config = {
