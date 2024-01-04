@@ -712,8 +712,7 @@ skip_sync_ep:
 
 	/* event ring */
 	ret = xhci_sideband_create_interrupter(uadev[card_num].sb, uaudio_qdev->intr_num);
-	if (ret < 0) {
-		dev_err(uaudio_qdev->dev, "failed to fetch interrupter\n");
+	if (ret == -ENOMEM) {
 		ret = -ENODEV;
 		goto drop_sync_ep;
 	}
