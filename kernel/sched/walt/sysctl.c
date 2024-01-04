@@ -539,7 +539,7 @@ int sched_updown_migrate_handler(struct ctl_table *table, int write,
 	int val[MAX_MARGIN_LEVELS];
 	struct ctl_table tmp = {
 		.data	= &val,
-		.maxlen	= sizeof(int) * cap_margin_levels,
+		.maxlen	= sizeof(int) * MAX_MARGIN_LEVELS,
 		.mode	= table->mode,
 	};
 
@@ -549,7 +549,9 @@ int sched_updown_migrate_handler(struct ctl_table *table, int write,
 	mutex_lock(&mutex);
 
 	if (!write) {
-		ret = proc_dointvec(table, write, buffer, lenp, ppos);
+		tmp.maxlen = sizeof(int) * cap_margin_levels;
+		tmp.data = table->data;
+		ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
 		goto unlock_mutex;
 	}
 
@@ -629,7 +631,7 @@ int sched_updown_early_migrate_handler(struct ctl_table *table, int write,
 	int val[MAX_MARGIN_LEVELS];
 	struct ctl_table tmp = {
 		.data	= &val,
-		.maxlen	= sizeof(int) * cap_margin_levels,
+		.maxlen	= sizeof(int) * MAX_MARGIN_LEVELS,
 		.mode	= table->mode,
 	};
 
@@ -639,7 +641,9 @@ int sched_updown_early_migrate_handler(struct ctl_table *table, int write,
 	mutex_lock(&mutex);
 
 	if (!write) {
-		ret = proc_dointvec(table, write, buffer, lenp, ppos);
+		tmp.maxlen = sizeof(int) * cap_margin_levels;
+		tmp.data = table->data;
+		ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
 		goto unlock_mutex;
 	}
 
@@ -690,21 +694,22 @@ int sched_fmax_cap_handler(struct ctl_table *table, int write,
 	int ret, i;
 	unsigned int *data = (unsigned int *)table->data;
 	static DEFINE_MUTEX(mutex);
-	int cap_margin_levels = num_sched_clusters;
 	int val[MAX_CLUSTERS];
 	struct ctl_table tmp = {
 		.data	= &val,
-		.maxlen	= sizeof(int) * cap_margin_levels,
+		.maxlen	= sizeof(int) * MAX_CLUSTERS,
 		.mode	= table->mode,
 	};
 
-	if (cap_margin_levels <= 0)
+	if (num_sched_clusters <= 0)
 		return -EINVAL;
 
 	mutex_lock(&mutex);
 
 	if (!write) {
-		ret = proc_dointvec(table, write, buffer, lenp, ppos);
+		tmp.maxlen = sizeof(int) * num_sched_clusters;
+		tmp.data = table->data;
+		ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
 		goto unlock_mutex;
 	}
 
@@ -712,13 +717,14 @@ int sched_fmax_cap_handler(struct ctl_table *table, int write,
 	if (ret)
 		goto unlock_mutex;
 
-	for (i = 0; i < cap_margin_levels; i++) {
+	for (i = 0; i < num_sched_clusters; i++) {
 		if (val[i] < 0) {
 			ret = -EINVAL;
 			goto unlock_mutex;
 		}
 		data[i] = val[i];
 	}
+
 unlock_mutex:
 	mutex_unlock(&mutex);
 	return ret;
@@ -753,8 +759,24 @@ int sched_idle_enough_clust_handler(struct ctl_table *table, int write,
 				    loff_t *ppos)
 {
 	int ret;
+	int val[MAX_CLUSTERS];
+	struct ctl_table tmp = {
+		.data	= &val,
+		.maxlen	= sizeof(unsigned int) * MAX_CLUSTERS,
+		.mode	= table->mode,
+	};
+
+	if (num_sched_clusters <= 0)
+		return -EINVAL;
 
 	mutex_lock(&idle_enough_mutex);
+
+	if (!write) {
+		tmp.maxlen = sizeof(unsigned int) * num_sched_clusters;
+		tmp.data = table->data;
+		ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
+		goto unlock_mutex;
+	}
 
 	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
 	if (ret)
@@ -798,8 +820,24 @@ int sched_cluster_util_thres_pct_clust_handler(struct ctl_table *table, int writ
 					       loff_t *ppos)
 {
 	int ret;
+	int val[MAX_CLUSTERS];
+	struct ctl_table tmp = {
+		.data	= &val,
+		.maxlen	= sizeof(int) * MAX_CLUSTERS,
+		.mode	= table->mode,
+	};
+
+	if (num_sched_clusters <= 0)
+		return -EINVAL;
 
 	mutex_lock(&util_thres_mutex);
+
+	if (!write) {
+		tmp.maxlen = sizeof(int) * num_sched_clusters;
+		tmp.data = table->data;
+		ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
+		goto unlock_mutex;
+	}
 
 	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
 	if (ret)
