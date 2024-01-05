@@ -414,7 +414,13 @@ void qcom_glink_spss_unregister(struct qcom_glink_spss *spss)
 	if (!spss)
 		return;
 
+	disable_irq(spss->irq);
+
 	qcom_glink_native_remove(spss->glink);
+
+	mbox_free_channel(spss->mbox_chan);
+	device_unregister(&spss->dev);
+
 	glink_spss_reset(spss->tx_pipe);
 	glink_spss_reset(spss->rx_pipe);
 }
