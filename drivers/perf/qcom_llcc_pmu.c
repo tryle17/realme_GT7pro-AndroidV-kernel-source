@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -43,6 +43,7 @@ struct llcc_pmu {
 #define SCALING_FACTOR 0x3
 #define NUM_COUNTERS NR_CPUS
 #define VALUE_MASK 0xFFFFFF
+#define IDX_TBL_PROP "qcom,idx-tbl"
 
 static u64 llcc_stats[NUM_COUNTERS];
 static unsigned int users;
@@ -264,9 +265,11 @@ static void qcom_llcc_event_del(struct perf_event *event, int flags)
 
 static int qcom_llcc_pmu_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct resource *res;
-	int pcpu, ret;
+	int pcpu, ret, len;
 	uint32_t cpu;
+	u32 *idx_tbl = NULL;
 
 	ret = cpu_logical_to_phys(0);
 	if (ret == -EPROBE_DEFER)
@@ -313,17 +316,35 @@ static int qcom_llcc_pmu_probe(struct platform_device *pdev)
 	if (ret < 0)
 		dev_err(&pdev->dev, "Failed to register LLCC PMU (%d)\n", ret);
 
+	if (of_find_property(dev->of_node, IDX_TBL_PROP, &len)) {
+		len /= sizeof(*idx_tbl);
+		idx_tbl = kcalloc(len, sizeof(*idx_tbl), GFP_KERNEL);
+		if (!idx_tbl)
+			return -ENOMEM;
+		ret = of_property_read_u32_array(dev->of_node, IDX_TBL_PROP,
+							idx_tbl, len);
+		if (ret < 0) {
+			dev_err(dev, "error reading idx table: %d\n", ret);
+			goto out;
+		}
+	}
+
 	for_each_possible_cpu(cpu) {
 		pcpu = cpu_logical_to_phys(cpu);
 		if (pcpu < 0)
 			pcpu = cpu;
-		phys_cpu[cpu] = pcpu;
+		if (idx_tbl)
+			phys_cpu[cpu] = idx_tbl[pcpu];
+		else
+			phys_cpu[cpu] = pcpu;
 	}
 
 	dev_info(&pdev->dev, "Registered llcc_pmu, type: %d\n",
 		 llccpmu->pmu.type);
 
-	return 0;
+out:
+	kfree(idx_tbl);
+	return ((ret < 0) ? ret : 0);
 }
 
 static const struct of_device_id qcom_llcc_pmu_match_table[] = {
