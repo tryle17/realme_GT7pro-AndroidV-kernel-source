@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -51,7 +51,7 @@ static const struct alpha_pll_config cam_bist_mclk_cc_pll0_config = {
 	.config_ctl_val = 0x12000000,
 	.config_ctl_hi_val = 0x008b0263,
 	.config_ctl_hi1_val = 0x00000237,
-	.config_ctl_hi2_val = 0x00002000,
+	.config_ctl_hi2_val = 0x00000000,
 };
 
 static struct clk_alpha_pll cam_bist_mclk_cc_pll0 = {
@@ -59,6 +59,7 @@ static struct clk_alpha_pll cam_bist_mclk_cc_pll0 = {
 	.vco_table = rivian_elu_vco,
 	.num_vco = ARRAY_SIZE(rivian_elu_vco),
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_RIVIAN_ELU],
+	.flags = DISABLE_TO_OFF,
 	.clkr = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "cam_bist_mclk_cc_pll0",
