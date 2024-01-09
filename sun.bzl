@@ -194,6 +194,8 @@ def define_sun():
         "drivers/spi/spi-msm-geni.ko",
         "drivers/spmi/spmi-pmic-arb.ko",
         "drivers/spmi/spmi-pmic-arb-debug.ko",
+        "drivers/thermal/qcom/bcl_pmic5.ko",
+        "drivers/thermal/qcom/bcl_soc.ko",
         "drivers/thermal/qcom/cpu_hotplug.ko",
         "drivers/thermal/qcom/ddr_cdev.ko",
         "drivers/thermal/qcom/qcom-spmi-temp-alarm.ko",
