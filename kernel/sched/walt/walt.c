@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/syscore_ops.h>
@@ -3011,6 +3011,11 @@ static void _set_preferred_cluster(struct walt_related_thread_group *grp)
 	u64 wallclock;
 	bool prev_skip_min = grp->skip_min;
 	struct walt_task_struct *wts;
+
+	if (sched_group_upmigrate == 0) {
+		grp->skip_min = false;
+		goto out;
+	}
 
 	if (list_empty(&grp->tasks)) {
 		grp->skip_min = false;
