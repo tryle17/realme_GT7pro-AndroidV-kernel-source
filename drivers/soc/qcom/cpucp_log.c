@@ -15,6 +15,9 @@
 #include <linux/ipc_logging.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/scmi_protocol.h>
+#include <linux/qcom_scmi_vendor.h>
+#include <linux/debugfs.h>
 
 #define MAX_PRINT_SIZE		1024
 #define MAX_BUF_NUM		4
@@ -24,6 +27,16 @@
 
 #define CREATE_TRACE_POINTS
 #include "trace_cpucp.h"
+#if IS_ENABLED(CONFIG_QTI_SCMI_VENDOR_PROTOCOL)
+#define CPUCP_CTRL_ALGO_STR (0x435055435043544c) /* CPUCPCTL ASCII */
+static struct scmi_protocol_handle *ph;
+static const struct qcom_scmi_vendor_ops *ops;
+#endif
+
+enum cpucp_ctrl_param_ids {
+	LOGBUF_IDX = 1,
+	DDR_LOGBUF_FLUSH = 3,
+};
 
 struct remote_mem {
 	void __iomem *start;
@@ -58,6 +71,51 @@ static LIST_HEAD(full_buffers_list);
 static LIST_HEAD(free_buffers_list);
 static struct workqueue_struct *cpucp_wq;
 
+#if IS_ENABLED(CONFIG_QTI_SCMI_VENDOR_PROTOCOL)
+static int flush_cpucp_log(void *data, u64 val)
+{
+	int ret;
+
+	ret =  ops->set_param(ph, &val, CPUCP_CTRL_ALGO_STR,
+			DDR_LOGBUF_FLUSH, sizeof(val));
+	if (ret < 0) {
+		pr_err("failed to flush cpucp log, ret = %d\n", ret);
+		return ret;
+	}
+	return 0;
+}
+
+static int set_log_level(void *data, u64 val)
+{
+	int ret;
+
+	ret =  ops->set_param(ph, &val, CPUCP_CTRL_ALGO_STR,
+			LOGBUF_IDX, sizeof(val));
+	if (ret < 0) {
+		pr_err("failed to set log level, ret = %d\n", ret);
+		return ret;
+	}
+	return 0;
+}
+
+static int get_log_level(void *data, u64 *val)
+{
+	u64 log_level = 1;
+	int ret;
+
+	ret =  ops->get_param(ph, &log_level, CPUCP_CTRL_ALGO_STR,
+			LOGBUF_IDX, 0, sizeof(log_level));
+	if (ret < 0) {
+		pr_err("failed to get log level, ret = %d\n", ret);
+		return ret;
+	}
+	*val = log_level;
+	return 0;
+}
+DEFINE_DEBUGFS_ATTRIBUTE(log_level_ops, get_log_level, set_log_level, "%llu\n");
+DEFINE_DEBUGFS_ATTRIBUTE(flush_log_ops, NULL, flush_cpucp_log, "%llu\n");
+#endif
+
 static inline bool get_last_newline(char *buf, int size, int *cnt)
 {
 	int i;
@@ -73,6 +131,31 @@ static inline bool get_last_newline(char *buf, int size, int *cnt)
 	*cnt = size;
 	return false;
 }
+
+#if IS_ENABLED(CONFIG_QTI_SCMI_VENDOR_PROTOCOL)
+static int scmi_cpucp_log_create_fs_entries(struct device *dev)
+{
+	struct dentry *ret, *dir;
+
+	dir = debugfs_create_dir("cpucp", 0);
+	if (IS_ERR(dir)) {
+		dev_err(dev, "Debugfs directory creation failed\n");
+		return -ENOENT;
+	}
+
+	ret = debugfs_create_file("log_level", 0644, dir, NULL, &log_level_ops);
+	if (IS_ERR(ret)) {
+		dev_err(dev, "Debugfs directory creation failed\n");
+		return -ENOENT;
+	}
+	ret = debugfs_create_file("flush_log", 0200, dir, NULL, &flush_log_ops);
+	if (IS_ERR(ret)) {
+		dev_err(dev, "Debugfs directory creation failed\n");
+		return -ENOENT;
+	}
+	return 0;
+}
+#endif
 
 static void cpucp_log_work(struct work_struct *work)
 {
@@ -231,6 +314,26 @@ static int cpucp_log_probe(struct platform_device *pdev)
 	void __iomem *mem_base;
 	struct remote_mem *rmem;
 	int prev_size = 0;
+#if IS_ENABLED(CONFIG_QTI_SCMI_VENDOR_PROTOCOL)
+	struct scmi_device *sdev;
+
+	sdev = get_qcom_scmi_device();
+	if (IS_ERR(sdev)) {
+		ret = PTR_ERR(sdev);
+		return dev_err_probe(dev, ret, "Error getting scmi_dev ret=%d\n", ret);
+	}
+	ops = sdev->handle->devm_protocol_get(sdev, QCOM_SCMI_VENDOR_PROTOCOL, &ph);
+	if (IS_ERR(ops)) {
+		ret = PTR_ERR(ops);
+		ops = NULL;
+		dev_err(dev, "Error getting vendor protocol ops: %d\n", ret);
+	} else {
+		if (scmi_cpucp_log_create_fs_entries(dev)) {
+			dev_err(dev, "Failed to create debugfs entries\n");
+			return -ENOENT;
+		}
+	}
+#endif
 
 	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
 	if (!info)
