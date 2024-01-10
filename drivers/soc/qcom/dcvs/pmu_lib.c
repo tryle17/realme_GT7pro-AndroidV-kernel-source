@@ -26,6 +26,7 @@
 #include <linux/spinlock.h>
 #include <linux/perf_event.h>
 #include <linux/cpuidle.h>
+#include <linux/cpu_phys_log_map.h>
 #include <trace/events/power.h>
 #include <trace/hooks/cpuidle.h>
 #include <soc/qcom/pmu_lib.h>
@@ -910,17 +911,10 @@ static void load_pmu_counters(void)
 	pr_info("Enabled all perf counters\n");
 }
 
-static void get_mpidr_cpu(void *cpu)
-{
-	u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
-
-	*((uint32_t *)cpu) = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-}
-
 int cpucp_pmu_init(struct scmi_device *sdev)
 {
-	int ret = 0;
-	uint32_t cpu, pcpu;
+	int pcpu, ret = 0;
+	uint32_t cpu;
 
 	if (!sdev || !sdev->handle)
 		return -EINVAL;
@@ -937,8 +931,9 @@ int cpucp_pmu_init(struct scmi_device *sdev)
 	}
 
 	for_each_possible_cpu(cpu) {
-		smp_call_function_single(cpu, get_mpidr_cpu,
-							 &pcpu, true);
+		pcpu = cpu_logical_to_phys(cpu);
+		if (pcpu < 0)
+			pcpu = cpu;
 		phys_cpu[cpu] = pcpu;
 	}
 	/*
@@ -1173,6 +1168,10 @@ static int qcom_pmu_driver_probe(struct platform_device *pdev)
 		dev_err(dev, "Error getting scmi_dev ret = %d\n", ret);
 	}
 #endif
+	ret = cpu_logical_to_phys(0);
+	if (ret == -EPROBE_DEFER)
+		return ret;
+
 	if (!pmu_base) {
 		idx = of_property_match_string(dev->of_node, "reg-names", "pmu-base");
 		if (idx < 0) {
