@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2015, The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/bitops.h>
@@ -36,7 +37,7 @@ static struct tsens_features tsens_v2_feat = {
 	.srot_split	= 1,
 	.max_sensors	= 16,
 	.trip_min_temp	= -40000,
-	.trip_max_temp	= 120000,
+	.trip_max_temp	= 204000,
 };
 
 static struct tsens_features ipq8074_feat = {
