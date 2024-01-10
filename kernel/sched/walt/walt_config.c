@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "walt.h"
@@ -71,6 +71,12 @@ void walt_config(void)
 	soc_feat_set(SOC_ENABLE_CONSERVATIVE_BOOST_FG);
 	soc_feat_set(SOC_ENABLE_UCLAMP_BOOSTED);
 	soc_feat_set(SOC_ENABLE_PER_TASK_BOOST_ON_MID);
+
+	/* return if socinfo is not available */
+	if (!name)
+		return;
+
+	soc_feat_set(SOC_AVAILABLE);
 	if (!strcmp(name, "SUN")) {
 		sysctl_sched_suppress_region2		= 1;
 		soc_feat_unset(SOC_ENABLE_CONSERVATIVE_BOOST_TOPAPP);
