@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -2001,7 +2001,9 @@ static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, const struct i2c_
 			break;
 	}
 
-	geni_i3c_gsi_stop_on_bus(gi3c);
+	if (gi3c->se_mode == GENI_GPI_DMA)
+		geni_i3c_gsi_stop_on_bus(gi3c);
+
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "i2c: txn ret:%d\n", ret);
 	i3c_geni_runtime_put_mutex_unlock(gi3c);
 
