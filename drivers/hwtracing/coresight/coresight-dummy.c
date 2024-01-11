@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/coresight.h>
@@ -61,14 +61,19 @@ static int qmi_assign_dummy_source_atid(struct dummy_drvdata *drvdata)
 {
 	struct coresight_device *qmi = dummy_source_get_qmi_device(drvdata);
 	struct  coresight_atid_assign_req_msg_v01 *atid_data;
-	const char *trace_name = dev_name(drvdata->dev);
+	const char *trace_name;
+	int ret;
+
+	ret = of_property_read_string(drvdata->dev->of_node,
+			"trace-name", &trace_name);
+	if (ret)
+		return -EINVAL;
 
 	atid_data = kzalloc(sizeof(*atid_data), GFP_KERNEL);
 	if (!atid_data)
 		return -ENOMEM;
 
 	strscpy(atid_data->name, trace_name, CORESIGHT_QMI_TRACE_NAME_MAX_LEN);
-
 
 	atid_data->atids[0] = drvdata->traceid;
 	atid_data->num_atids = 1;
