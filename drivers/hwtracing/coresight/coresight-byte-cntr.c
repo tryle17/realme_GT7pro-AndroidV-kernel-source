@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/interrupt.h>
@@ -18,7 +18,7 @@
 
 #define CSR_BYTECNTVAL		(0x06C)
 
-static void tmc_etr_read_bytes(struct byte_cntr *byte_cntr_data, loff_t *ppos,
+static void tmc_etr_read_bytes(struct byte_cntr *byte_cntr_data, long offset,
 			       size_t bytes, size_t *len, char **bufp)
 {
 	struct tmc_drvdata *tmcdrvdata = byte_cntr_data->tmcdrvdata;
@@ -27,12 +27,12 @@ static void tmc_etr_read_bytes(struct byte_cntr *byte_cntr_data, loff_t *ppos,
 
 	if (*len >= bytes)
 		*len = bytes;
-	else if (((uint32_t)*ppos % bytes) + *len > bytes)
-		*len = bytes - ((uint32_t)*ppos % bytes);
+	else if (((uint32_t)offset % bytes) + *len > bytes)
+		*len = bytes - ((uint32_t)offset % bytes);
 
-	actual = tmc_etr_buf_get_data(etr_buf, *ppos, *len, bufp);
+	actual = tmc_etr_buf_get_data(etr_buf, offset, *len, bufp);
 	*len = actual;
-	if (actual == bytes || (actual + (uint32_t)*ppos) % bytes == 0)
+	if (actual == bytes || (actual + (uint32_t)offset) % bytes == 0)
 		atomic_dec(&byte_cntr_data->irq_cnt);
 }
 
@@ -54,18 +54,32 @@ static irqreturn_t etr_handler(int irq, void *data)
 }
 
 
-static long tmc_etr_flush_remaining_bytes(struct tmc_drvdata *tmcdrvdata, loff_t *ppos,
-			char **bufpp)
+static long tmc_etr_flush_remaining_bytes(struct tmc_drvdata *tmcdrvdata, long offset,
+			size_t len, char **bufpp)
 {
-	long rwp_offset, req_size, actual = 0;
-	struct etr_buf *etr_buf = tmcdrvdata->sysfs_buf;
+	long req_size, actual = 0;
+	struct etr_buf *etr_buf;
+	struct device *dev;
+	struct byte_cntr *byte_cntr_data;
 
-	rwp_offset = tmc_get_rwp_offset(tmcdrvdata);
-	req_size = ((rwp_offset < *ppos) ? tmcdrvdata->size : 0) +
-		rwp_offset - *ppos;
+	if (!tmcdrvdata)
+		return -EINVAL;
+
+	byte_cntr_data = tmcdrvdata->byte_cntr;
+	if (!byte_cntr_data)
+		return -EINVAL;
+
+	etr_buf = tmcdrvdata->sysfs_buf;
+	dev = &tmcdrvdata->csdev->dev;
+
+	req_size = ((byte_cntr_data->rwp_offset < offset) ? tmcdrvdata->size : 0) +
+		byte_cntr_data->rwp_offset - offset;
+
+	if (req_size > len)
+		req_size = len;
 
 	if (req_size > 0)
-		actual = tmc_etr_buf_get_data(etr_buf, *ppos, req_size, bufpp);
+		actual = tmc_etr_buf_get_data(etr_buf, offset, req_size, bufpp);
 
 	return actual;
 }
@@ -85,7 +99,8 @@ static ssize_t tmc_etr_byte_cntr_read(struct file *fp, char __user *data,
 
 	mutex_lock(&byte_cntr_data->byte_cntr_lock);
 	if (!byte_cntr_data->read_active) {
-		actual = tmc_etr_flush_remaining_bytes(tmcdrvdata, ppos, &bufp);
+		actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
+				byte_cntr_data->offset, len, &bufp);
 		if (actual > 0) {
 			len = actual;
 			goto copy;
@@ -104,7 +119,8 @@ static ssize_t tmc_etr_byte_cntr_read(struct file *fp, char __user *data,
 				return -ERESTARTSYS;
 			mutex_lock(&byte_cntr_data->byte_cntr_lock);
 			if (!byte_cntr_data->read_active) {
-				actual = tmc_etr_flush_remaining_bytes(tmcdrvdata, ppos, &bufp);
+				actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
+						byte_cntr_data->offset, len, &bufp);
 				if (actual > 0) {
 					len = actual;
 					goto copy;
@@ -115,11 +131,12 @@ static ssize_t tmc_etr_byte_cntr_read(struct file *fp, char __user *data,
 			}
 		}
 
-		tmc_etr_read_bytes(byte_cntr_data, ppos,
+		tmc_etr_read_bytes(byte_cntr_data, byte_cntr_data->offset,
 				   byte_cntr_data->block_size, &len, &bufp);
 
 	} else {
-		actual = tmc_etr_flush_remaining_bytes(tmcdrvdata, ppos, &bufp);
+		actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
+				byte_cntr_data->offset, len, &bufp);
 		if (actual > 0) {
 			len = actual;
 			goto copy;
@@ -137,10 +154,10 @@ copy:
 		return -EFAULT;
 	}
 
-	if (*ppos + len >= tmcdrvdata->size)
-		*ppos = 0;
+	if (byte_cntr_data->offset + len >= tmcdrvdata->size)
+		byte_cntr_data->offset = 0;
 	else
-		*ppos += len;
+		byte_cntr_data->offset += len;
 
 	goto out;
 
@@ -177,6 +194,8 @@ void tmc_etr_byte_cntr_stop(struct byte_cntr *byte_cntr_data)
 		return;
 
 	mutex_lock(&byte_cntr_data->byte_cntr_lock);
+	byte_cntr_data->rwp_offset =
+		tmc_get_rwp_offset(byte_cntr_data->tmcdrvdata);
 	byte_cntr_data->enable = false;
 	byte_cntr_data->read_active = false;
 	atomic_set(&byte_cntr_data->irq_cnt, 0);
@@ -239,6 +258,7 @@ static int tmc_etr_byte_cntr_open(struct inode *in, struct file *fp)
 	nonseekable_open(in, fp);
 	byte_cntr_data->enable = true;
 	byte_cntr_data->read_active = true;
+	byte_cntr_data->offset = tmc_get_rwp_offset(tmcdrvdata);
 	mutex_unlock(&byte_cntr_data->byte_cntr_lock);
 	return 0;
 }

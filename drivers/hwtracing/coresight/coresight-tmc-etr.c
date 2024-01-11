@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright(C) 2016 Linaro Limited. All rights reserved.
  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
  */
@@ -1824,7 +1824,8 @@ static int _tmc_disable_etr_sink(struct coresight_device *csdev,
 	drvdata->perf_buf = NULL;
 
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-	tmc_etr_byte_cntr_stop(drvdata->byte_cntr);
+	if (drvdata->out_mode == TMC_ETR_OUT_MODE_MEM)
+		tmc_etr_byte_cntr_stop(drvdata->byte_cntr);
 
 	dev_dbg(&csdev->dev, "TMC-ETR disabled\n");
 	return 0;
