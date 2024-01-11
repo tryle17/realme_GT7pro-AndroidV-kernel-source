@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/atomic.h>
@@ -4568,6 +4568,59 @@ restore:
 			LRA_IMPEDANCE_MEAS_EN_BIT, 0);
 }
 
+static int haptics_lra_impedance_sweeping(struct haptics_chip *chip, u32 *low, u32 *high)
+{
+	u32 amplitude, duty_milli_pct, low_milli_pct, high_milli_pct;
+	int i, rc;
+	u8 val;
+
+	low_milli_pct = MIN_DUTY_MILLI_PCT;
+	high_milli_pct = MAX_DUTY_MILLI_PCT;
+	/* Sweep duty cycle using binary approach */
+	for (i = 0; i < MAX_SWEEP_STEPS; i++) {
+		/* Set direct play amplitude */
+		duty_milli_pct = (low_milli_pct + high_milli_pct) / 2;
+		amplitude = (duty_milli_pct * DIRECT_PLAY_MAX_AMPLITUDE)
+						/ 100000;
+		rc = haptics_set_direct_play(chip, (u8)amplitude);
+		if (rc < 0)
+			return rc;
+
+		dev_dbg(chip->dev, "sweeping milli_pct %u, amplitude %#x\n",
+				duty_milli_pct, amplitude);
+		/* Enable play */
+		chip->play.pattern_src = DIRECT_PLAY;
+		rc = haptics_enable_play(chip, true);
+		if (rc < 0)
+			return rc;
+
+		/* Play a cycle then read SC fault status */
+		usleep_range(chip->config.t_lra_us,
+				chip->config.t_lra_us + 1000);
+		rc = haptics_read(chip, chip->cfg_addr_base,
+				HAP_CFG_FAULT_STATUS_REG, &val, 1);
+		if (rc < 0)
+			return rc;
+
+		if (val & SC_FLAG_BIT)
+			high_milli_pct = duty_milli_pct;
+		else
+			low_milli_pct = duty_milli_pct;
+
+		/* Disable play */
+		rc = haptics_enable_play(chip, false);
+		if (rc < 0)
+			return rc;
+
+		/* Sleep 4ms */
+		usleep_range(4000, 5000);
+	}
+
+	*low = low_milli_pct;
+	*high = high_milli_pct;
+	return 0;
+}
+
 static int haptics_detect_lra_impedance(struct haptics_chip *chip)
 {
 	int rc, i;
@@ -4577,9 +4630,9 @@ static int haptics_detect_lra_impedance(struct haptics_chip *chip)
 		{ HAP_CFG_VMAX_HDRM_REG, 0x00 },
 	};
 	struct haptics_reg_info backup[LRA_CONFIG_REGS];
-	u8 val, cfg1, cfg2, reg1, reg2, mask1, mask2, val1, val2;
-	u32 duty_milli_pct, low_milli_pct, high_milli_pct;
-	u32 amplitude, lra_min_mohms, lra_max_mohms, capability_mohms;
+	u8 cfg1, cfg2, reg1, reg2, mask1, mask2, val1, val2;
+	u32 lra_min_mohms, lra_max_mohms, capability_mohms;
+	u32 low_milli_pct, high_milli_pct;
 
 	/* Backup default register values */
 	memcpy(backup, lra_config, sizeof(backup));
@@ -4658,47 +4711,10 @@ static int haptics_detect_lra_impedance(struct haptics_chip *chip)
 	if (rc < 0)
 		goto restore;
 
-	low_milli_pct = MIN_DUTY_MILLI_PCT;
-	high_milli_pct = MAX_DUTY_MILLI_PCT;
-	/* Sweep duty cycle using binary approach */
-	for (i = 0; i < MAX_SWEEP_STEPS; i++) {
-		/* Set direct play amplitude */
-		duty_milli_pct = (low_milli_pct + high_milli_pct) / 2;
-		amplitude = (duty_milli_pct * DIRECT_PLAY_MAX_AMPLITUDE)
-						/ 100000;
-		rc = haptics_set_direct_play(chip, (u8)amplitude);
-		if (rc < 0)
-			goto restore;
 
-		dev_dbg(chip->dev, "sweeping milli_pct %u, amplitude %#x\n",
-				duty_milli_pct, amplitude);
-		/* Enable play */
-		chip->play.pattern_src = DIRECT_PLAY;
-		rc = haptics_enable_play(chip, true);
-		if (rc < 0)
-			goto restore;
-
-		/* Play a cycle then read SC fault status */
-		usleep_range(chip->config.t_lra_us,
-				chip->config.t_lra_us + 1000);
-		rc = haptics_read(chip, chip->cfg_addr_base,
-				HAP_CFG_FAULT_STATUS_REG, &val, 1);
-		if (rc < 0)
-			goto restore;
-
-		if (val & SC_FLAG_BIT)
-			high_milli_pct = duty_milli_pct;
-		else
-			low_milli_pct = duty_milli_pct;
-
-		/* Disable play */
-		rc = haptics_enable_play(chip, false);
-		if (rc < 0)
-			goto restore;
-
-		/* Sleep 4ms */
-		usleep_range(4000, 5000);
-	}
+	rc = haptics_lra_impedance_sweeping(chip, &low_milli_pct, &high_milli_pct);
+	if (rc < 0)
+		goto restore;
 
 	capability_mohms = get_lra_impedance_capable_max(chip);
 	lra_min_mohms = low_milli_pct * capability_mohms / 100000;
