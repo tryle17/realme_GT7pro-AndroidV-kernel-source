@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/gunyah/gh_rm_drv.h>
 #include <linux/gunyah/gh_msgq.h>
@@ -115,7 +115,7 @@ static int qmsgq_gh_post(struct qmsgq_gh_device *qdev, struct qmsgq_gh_recv_buf 
 	int rc;
 
 	if (rx_buf->len < sizeof(*hdr)) {
-		pr_err("%s: len: %d < hdr size\n", __func__, rx_buf->len);
+		pr_err("%s: len: %zu < hdr size\n", __func__, rx_buf->len);
 		return -EINVAL;
 	}
 	hdr = (struct qmsgq_gh_hdr *)rx_buf->buf;
@@ -174,7 +174,7 @@ static void qmsgq_process_recv(struct qmsgq_gh_device *qdev, void *buf, size_t l
 
 	/* Check len size, can not be smaller than amount copied*/
 	if (rx_buf->len < rx_buf->copied) {
-		pr_err("%s: Size mismatch len:%d, copied:%d\n", __func__,
+		pr_err("%s: Size mismatch len:%zu, copied:%zu\n", __func__,
 		       rx_buf->len, rx_buf->copied);
 		goto err;
 	}
@@ -299,7 +299,7 @@ static int qmsgq_gh_dgram_enqueue(struct qmsgq_sock *qsk, struct sockaddr_vm *re
 		goto send_err;
 	}
 
-	pr_debug("TX DATA: Len:0x%x src[0x%x] dst[0x%x]\n", len, hdr->src_port_id,
+	pr_debug("TX DATA: Len:0x%zx src[0x%x] dst[0x%x]\n", len, hdr->src_port_id,
 		 hdr->dst_port_id);
 
 	rc = qmsgq_gh_send(qdev, buf, len + sizeof(*hdr));

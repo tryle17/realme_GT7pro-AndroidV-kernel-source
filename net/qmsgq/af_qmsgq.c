@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/compat.h>
 #include <linux/types.h>
@@ -564,7 +564,6 @@ static const struct proto_ops qmsgq_dgram_ops = {
 	.sendmsg	= qmsgq_dgram_sendmsg,
 	.recvmsg	= qmsgq_dgram_recvmsg,
 	.mmap		= sock_no_mmap,
-	.sendpage	= sock_no_sendpage,
 };
 
 static struct proto qmsgq_proto = {
@@ -704,7 +703,7 @@ int qmsgq_post(const struct qmsgq_endpoint *ep, struct sockaddr_vm *src, struct 
 
 	skb = alloc_skb_with_frags(0, len, 0, &rc, GFP_KERNEL);
 	if (!skb) {
-		pr_err("%s: Unable to get skb with len:%lu\n", __func__, len);
+		pr_err("%s: Unable to get skb with len:%d\n", __func__, len);
 		return -ENOMEM;
 	}
 	cb = (struct qmsgq_cb *)skb->cb;
