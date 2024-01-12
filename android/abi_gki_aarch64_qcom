@@ -3494,6 +3494,7 @@
   thermal_zone_device_enable
   thermal_zone_device_priv
   thermal_zone_device_register
+  thermal_zone_device_register_with_trips
   thermal_zone_device_unregister
   thermal_zone_device_update
   thermal_zone_get_num_trips
