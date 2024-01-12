@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2022, Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/acpi.h>
@@ -1827,6 +1827,7 @@ static int ufs_qcom_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op,
 			hba->curr_dev_pwr_mode, err);
 
 	cancel_dwork_unvote_cpufreq(hba);
+	ufs_qcom_ice_suspend(host);
 	return err;
 }
 
@@ -1844,6 +1845,7 @@ static int ufs_qcom_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	if (host->vccq_parent)
 		ufs_qcom_enable_vreg(hba->dev, host->vccq_parent);
 
+	ufs_qcom_ice_resume(host);
 	err = ufs_qcom_enable_lane_clks(host);
 	if (err)
 		return err;
