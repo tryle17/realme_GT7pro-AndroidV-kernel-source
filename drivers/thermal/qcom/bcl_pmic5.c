@@ -73,6 +73,7 @@
 #define BCL_GEN4_MAJOR_REV    5
 #define BCL_VBAT_SCALING_REV5_NV   194637  /* 64.879uV (one bit) * 3 VD */
 #define BCL_IBAT_SCALING_REV5_NA   61037
+#define BCL_IBAT_THRESH_SCALING_REV5_UA   156255 /* 610.37uA * 256 */
 #define BCL_VBAT_TRIP_CNT     3
 
 #define MAX_PERPH_COUNT       2
@@ -321,6 +322,10 @@ static int bcl_set_ibat(struct thermal_zone_device *tz, int low, int high)
 	if (bat_data->dev->ibat_ccm_enabled)
 		convert_ibat_to_adc_val(bat_data->dev, &thresh_value,
 				BCL_IBAT_CCM_SCALING_UA *
+				bat_data->dev->ibat_ext_range_factor);
+	else if (bat_data->dev->dig_major >= BCL_GEN4_MAJOR_REV)
+		convert_ibat_to_adc_val(bat_data->dev, &thresh_value,
+				BCL_IBAT_THRESH_SCALING_REV5_UA *
 				bat_data->dev->ibat_ext_range_factor);
 	else if (bat_data->dev->dig_major >= BCL_GEN3_MAJOR_REV)
 		convert_ibat_to_adc_val(bat_data->dev, &thresh_value,
