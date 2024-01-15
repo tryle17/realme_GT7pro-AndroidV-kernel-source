@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _WALT_H
@@ -82,6 +82,7 @@ enum soc_tunables {
 	SOC_ENABLE_ASYM_SIBLINGS,
 	SOC_ENABLE_BOOST_TO_NEXT_CLUSTER,
 	SOC_ENABLE_SW_CYCLE_COUNTER,
+	SOC_AVAILABLE,
 };
 
 #define WALT_LOW_LATENCY_PROCFS		BIT(0)
