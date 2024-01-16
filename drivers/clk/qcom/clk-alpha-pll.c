@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2015, 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -402,11 +402,24 @@ static int wait_for_pll(struct clk_alpha_pll *pll, u32 mask, bool inverse,
 #define wait_for_pll_update_ack_clear(pll) \
 	wait_for_pll(pll, ALPHA_PLL_ACK_LATCH, 1, "update_ack_clear")
 
-static void clk_alpha_pll_write_config(struct regmap *regmap, unsigned int reg,
-					unsigned int val)
+static void clk_alpha_pll_write_config(struct clk_alpha_pll *pll, struct regmap *regmap,
+				       unsigned int reg_type, unsigned int val)
 {
-	if (val)
-		regmap_write(regmap, reg, val);
+	unsigned int reg;
+
+	/*
+	 * The pll_configure() functions are shared across many generations of
+	 * PLL, which may have different numbers of configuration registers. If
+	 * the common function attempts to configure a register that doesn't
+	 * exist for the specific instance, then just skip it.
+	 */
+	reg = pll->regs[reg_type];
+	if (!reg)
+		return;
+
+	reg += pll->offset;
+
+	regmap_write(regmap, reg, val);
 }
 
 void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
@@ -450,7 +463,7 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 				   config->test_ctl_mask,
 				   config->test_ctl_val);
 	else
-		clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll),
+		clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL,
 					   config->test_ctl_val);
 
 	if (config->test_ctl_hi_mask)
@@ -458,7 +471,7 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 				   config->test_ctl_hi_mask,
 				   config->test_ctl_hi_val);
 	else
-		clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U(pll),
+		clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U,
 					   config->test_ctl_hi_val);
 
 	if (pll->flags & SUPPORTS_FSM_MODE)
@@ -1432,20 +1445,14 @@ void clk_fabia_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 {
 	u32 val, mask;
 
-	clk_alpha_pll_write_config(regmap, PLL_L_VAL(pll), config->l);
-	clk_alpha_pll_write_config(regmap, PLL_FRAC(pll), config->alpha);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL(pll),
-						config->config_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U(pll),
-						config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL(pll),
-						config->user_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U(pll),
-						config->user_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll),
-						config->test_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U(pll),
-						config->test_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, config->l);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_FRAC, config->alpha);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL, config->config_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U, config->config_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL, config->user_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U, config->user_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL, config->test_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U, config->test_ctl_hi_val);
 
 	if (config->post_div_mask) {
 		mask = config->post_div_mask;
@@ -1907,32 +1914,23 @@ void clk_trion_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 		return;
 	}
 
-	clk_alpha_pll_write_config(regmap, PLL_L_VAL(pll), config->l);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, config->l);
 
 	if (config->cal_l)
 		regmap_write(regmap, PLL_CAL_L_VAL(pll), config->cal_l);
 	else
 		regmap_write(regmap, PLL_CAL_L_VAL(pll), TRION_PLL_CAL_VAL);
 
-	clk_alpha_pll_write_config(regmap, PLL_ALPHA_VAL(pll), config->alpha);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL(pll),
-				     config->config_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U(pll),
-				     config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U1(pll),
-				     config->config_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL(pll),
-					config->user_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U(pll),
-					config->user_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U1(pll),
-					config->user_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll),
-					config->test_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U(pll),
-					config->test_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U1(pll),
-					config->test_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_ALPHA_VAL, config->alpha);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL, config->config_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U, config->config_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U1, config->config_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL, config->user_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U, config->user_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U1, config->user_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL, config->test_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U, config->test_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U1, config->test_ctl_hi1_val);
 
 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_UPDATE_BYPASS,
 			   PLL_UPDATE_BYPASS);
@@ -2175,18 +2173,13 @@ EXPORT_SYMBOL_GPL(clk_alpha_pll_postdiv_lucid_ops);
 void clk_agera_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 			const struct alpha_pll_config *config)
 {
-	clk_alpha_pll_write_config(regmap, PLL_L_VAL(pll), config->l);
-	clk_alpha_pll_write_config(regmap, PLL_ALPHA_VAL(pll), config->alpha);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL(pll),
-							config->user_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL(pll),
-						config->config_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U(pll),
-						config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll),
-						config->test_ctl_val);
-	clk_alpha_pll_write_config(regmap,  PLL_TEST_CTL_U(pll),
-						config->test_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, config->l);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_ALPHA_VAL, config->alpha);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL, config->user_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL, config->config_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U, config->config_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL, config->test_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap,  PLL_OFF_TEST_CTL_U, config->test_ctl_hi_val);
 }
 EXPORT_SYMBOL_GPL(clk_agera_pll_configure);
 
@@ -2485,17 +2478,17 @@ EXPORT_SYMBOL_GPL(clk_alpha_pll_postdiv_lucid_5lpe_ops);
 void clk_zonda_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 			     const struct alpha_pll_config *config)
 {
-	clk_alpha_pll_write_config(regmap, PLL_L_VAL(pll), config->l);
-	clk_alpha_pll_write_config(regmap, PLL_ALPHA_VAL(pll), config->alpha);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL(pll), config->config_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U(pll), config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U1(pll), config->config_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL(pll), config->user_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U(pll), config->user_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U1(pll), config->user_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll), config->test_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U(pll), config->test_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U1(pll), config->test_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, config->l);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_ALPHA_VAL, config->alpha);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL, config->config_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U, config->config_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U1, config->config_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL, config->user_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U, config->user_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U1, config->user_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL, config->test_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U, config->test_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U1, config->test_ctl_hi1_val);
 
 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_BYPASSNL, 0);
 
@@ -2718,17 +2711,18 @@ void clk_lucid_evo_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 
 	lval |= TRION_PLL_CAL_VAL << LUCID_EVO_PLL_CAL_L_VAL_SHIFT;
 	lval |= TRION_PLL_CAL_VAL << LUCID_OLE_PLL_PROCESS_CAL_L_VAL_SHIFT;
-	clk_alpha_pll_write_config(regmap, PLL_L_VAL(pll), lval);
-	clk_alpha_pll_write_config(regmap, PLL_ALPHA_VAL(pll), config->alpha);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL(pll), config->config_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U(pll), config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U1(pll), config->config_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL(pll), config->user_ctl_val | PLL_OUT_MASK);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U(pll), config->user_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll), config->test_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U(pll), config->test_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U1(pll), config->test_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U2(pll), config->test_ctl_hi2_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, lval);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_ALPHA_VAL, config->alpha);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL, config->config_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U, config->config_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U1, config->config_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL,
+				   config->user_ctl_val | PLL_OUT_MASK);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U, config->user_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL, config->test_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U, config->test_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U1, config->test_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U2, config->test_ctl_hi2_val);
 
 	/* Disable PLL output */
 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_OUTCTRL, 0);
@@ -3154,15 +3148,15 @@ EXPORT_SYMBOL(clk_alpha_pll_crm_postdiv_lucid_evo_ops);
 void clk_rivian_evo_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 				  const struct alpha_pll_config *config)
 {
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL(pll), config->config_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U(pll), config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U1(pll), config->config_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U2(pll), config->config_ctl_hi2_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll), config->test_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U(pll), config->test_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_L_VAL(pll), config->l);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL(pll), config->user_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U(pll), config->user_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL, config->config_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U, config->config_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U1, config->config_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U2, config->config_ctl_hi2_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL, config->test_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U, config->test_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, config->l);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL, config->user_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U, config->user_ctl_hi_val);
 
 	regmap_write(regmap, PLL_OPMODE(pll), PLL_STANDBY);
 
@@ -3354,20 +3348,20 @@ void clk_pongo_elu_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 	if (regval)
 		return;
 
-	clk_alpha_pll_write_config(regmap, PLL_L_VAL(pll), lval);
-	clk_alpha_pll_write_config(regmap, PLL_ALPHA_VAL(pll), config->alpha);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL(pll), config->config_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U(pll), config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U1(pll), config->config_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_CONFIG_CTL_U2(pll), config->config_ctl_hi2_val);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL(pll),
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, lval);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_ALPHA_VAL, config->alpha);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL, config->config_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U, config->config_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U1, config->config_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U2, config->config_ctl_hi2_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL,
 				   config->user_ctl_val | PONGO_PLL_OUT_MASK);
-	clk_alpha_pll_write_config(regmap, PLL_USER_CTL_U(pll), config->user_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL(pll), config->test_ctl_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U(pll), config->test_ctl_hi_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U1(pll), config->test_ctl_hi1_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U2(pll), config->test_ctl_hi2_val);
-	clk_alpha_pll_write_config(regmap, PLL_TEST_CTL_U3(pll), config->test_ctl_hi3_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U, config->user_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL, config->test_ctl_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U, config->test_ctl_hi_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U1, config->test_ctl_hi1_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U2, config->test_ctl_hi2_val);
+	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U3, config->test_ctl_hi3_val);
 
 	/* Disable PLL output */
 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_OUTCTRL, 0);
