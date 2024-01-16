@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kmemleak.h>
@@ -103,16 +103,48 @@ static int walt_proc_group_thresholds_handler(struct ctl_table *table, int write
 	static DEFINE_MUTEX(mutex);
 	struct rq *rq = cpu_rq(cpumask_first(cpu_possible_mask));
 	unsigned long flags;
+	unsigned int *data = (unsigned int *)table->data;
+	int val;
+	struct ctl_table tmp = {
+		.data	= &val,
+		.maxlen	= sizeof(int),
+		.mode	= table->mode,
+	};
 
 	if (unlikely(num_sched_clusters <= 0))
 		return -EPERM;
 
 	mutex_lock(&mutex);
-	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
-	if (ret || !write) {
-		mutex_unlock(&mutex);
-		return ret;
+
+	if (!write) {
+		ret = proc_dointvec(table, write, buffer, lenp, ppos);
+		goto unlock_mutex;
 	}
+
+	ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
+	if (ret)
+		goto unlock_mutex;
+
+	/*
+	 * Ensure 0 <= sched_group_dowmigrate < sched_group_upmigrate,
+	 * unless sched_group_downmigrate is 0, in which case sched_group_upmigrate can also be 0,
+	 * which will disable colocation.
+	 */
+	if (data == &sysctl_sched_group_upmigrate_pct) {
+		if (sysctl_sched_group_downmigrate_pct != 0 && val <= 0) {
+			ret = -EINVAL;
+			goto unlock_mutex;
+		} else if (val <= sysctl_sched_group_downmigrate_pct) {
+			ret = -EINVAL;
+			goto unlock_mutex;
+		}
+	} else {
+		if (val < 0 || val >= sysctl_sched_group_upmigrate_pct) {
+			ret = -EINVAL;
+			goto unlock_mutex;
+		}
+	}
+	*data = val;
 
 	/*
 	 * The load scale factor update happens with all
@@ -124,6 +156,7 @@ static int walt_proc_group_thresholds_handler(struct ctl_table *table, int write
 	walt_update_group_thresholds();
 	raw_spin_unlock_irqrestore(&rq->__lock, flags);
 
+unlock_mutex:
 	mutex_unlock(&mutex);
 
 	return ret;
@@ -838,7 +871,6 @@ static struct ctl_table walt_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= walt_proc_group_thresholds_handler,
-		.extra1		= &sysctl_sched_group_downmigrate_pct,
 	},
 	{
 		.procname	= "sched_group_downmigrate",
@@ -846,8 +878,6 @@ static struct ctl_table walt_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= walt_proc_group_thresholds_handler,
-		.extra1		= SYSCTL_ZERO,
-		.extra2		= &sysctl_sched_group_upmigrate_pct,
 	},
 	{
 		.procname	= "sched_boost",

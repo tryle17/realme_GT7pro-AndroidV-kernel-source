@@ -3012,6 +3012,11 @@ static void _set_preferred_cluster(struct walt_related_thread_group *grp)
 	bool prev_skip_min = grp->skip_min;
 	struct walt_task_struct *wts;
 
+	if (sched_group_upmigrate == 0) {
+		grp->skip_min = false;
+		goto out;
+	}
+
 	if (list_empty(&grp->tasks)) {
 		grp->skip_min = false;
 		goto out;
