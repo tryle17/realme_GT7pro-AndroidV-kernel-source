@@ -1277,7 +1277,8 @@ static int haptics_check_hpwr_status(struct haptics_chip *chip)
 	int i, rc = 0;
 	u8 val;
 
-	if (chip->hw_type != HAP525_HV)
+	/* Apply the HPWR_READY check for haptics module revision HAP525_HV and later. */
+	if (chip->hw_type < HAP525_HV)
 		return 0;
 
 	for (i = 0; i < VMAX_SETTLE_COUNT; i++) {
@@ -1647,7 +1648,7 @@ static int haptics_force_vreg_ready(struct haptics_chip *chip, bool ready)
 	u8 mask;
 
 	mask = FORCE_VREG_RDY_BIT;
-	if (chip->hw_type == HAP525_HV)
+	if (chip->hw_type >= HAP525_HV)
 		mask |= FORCE_VSET_ACK_BIT;
 
 	return haptics_masked_write(chip, chip->cfg_addr_base,
@@ -1729,7 +1730,11 @@ static int haptics_wait_brake_complete(struct haptics_chip *chip)
 	int rc;
 	u8 val;
 
-	if (chip->hw_type != HAP525_HV)
+	/*
+	 * Apply the brake synchronization delay for haptics module
+	 * revision HAP525_HV and later.
+	 */
+	if (chip->hw_type < HAP525_HV)
 		return 0;
 
 	t_lra_us = (chip->config.cl_t_lra_us) ?
@@ -1863,6 +1868,12 @@ static int haptics_set_pattern(struct haptics_chip *chip,
 	int i, rc, tmp;
 	u32 play_rate_us;
 
+	if (chip->hw_type >= HAP530_HV) {
+		dev_dbg(chip->dev, "haptics module with revision %d no longer supports PATTERNx mode, ignore parsing pattern effect DT\n",
+				chip->hw_type);
+		return 0;
+	}
+
 	if (src != PATTERN1 && src != PATTERN2) {
 		dev_err(chip->dev, "no pattern src specified!\n");
 		return -EINVAL;
@@ -1983,7 +1994,7 @@ static int haptics_update_fifo_samples(struct haptics_chip *chip,
 		return -EINVAL;
 	}
 
-	if ((chip->hw_type == HAP525_HV || chip->hw_type == HAP530_HV) && !refill) {
+	if ((chip->hw_type >= HAP525_HV) && !refill) {
 		val = MEM_FLUSH_RELOAD_BIT;
 		rc = haptics_write(chip, chip->ptn_addr_base,
 				HAP_PTN_MEM_OP_ACCESS_REG, &val, 1);
@@ -2012,8 +2023,8 @@ static int haptics_update_pat_mem_samples(struct haptics_chip *chip,
 		return -EINVAL;
 	}
 
-	/* only HAP525_HV/HAP530_HV supports PATx_MEM pattern source */
-	if (chip->hw_type != HAP525_HV && chip->hw_type != HAP530_HV) {
+	/* Haptics module revision HAP525_HV and above support PATx_MEM pattern source */
+	if (chip->hw_type < HAP525_HV) {
 		dev_dbg(chip->dev, "HW type %d doesn't support PATx_MEM pattern source\n",
 				chip->hw_type);
 		return 0;
@@ -2351,6 +2362,12 @@ static int haptics_load_predefined_effect(struct haptics_chip *chip,
 	switch (play->pattern_src) {
 	case PATTERN1:
 	case PATTERN2:
+		if (chip->hw_type >= HAP530_HV) {
+			dev_dbg(chip->dev, "haptics module with revision %d no longer supports PATTERNx mode, ignore parsing pattern effect DT\n",
+					chip->hw_type);
+			return 0;
+		}
+
 		if (play->effect->pattern->preload) {
 			dev_dbg(chip->dev, "Ignore preloaded PATTERNx effect: %d\n",
 					play->effect->id);
@@ -2605,7 +2622,7 @@ static u32 get_play_length_effect_us(struct haptics_effect *effect)
 	if ((effect->src == PATTERN1 || effect->src == PATTERN2)
 			&& effect->pattern)
 		length_us += effect->pattern->play_length_us;
-	else if (effect->src == FIFO && effect->fifo)
+	else if ((effect->src == FIFO || effect->src == PATTERN_MEM) && effect->fifo)
 		length_us += effect->fifo->play_length_us;
 
 	return length_us;
@@ -3235,7 +3252,8 @@ static int haptics_init_fifo_memory(struct haptics_chip *chip)
 	int counts;
 	int rc;
 
-	if (chip->hw_type != HAP525_HV && chip->hw_type != HAP530_HV) {
+	/* HAP525_HV haptics module and above support PATx_MEM pattern source */
+	if (chip->hw_type < HAP525_HV) {
 		dev_dbg(chip->dev, "HW type %d doesn't support mmap\n",
 				chip->hw_type);
 		return 0;
@@ -3409,7 +3427,7 @@ static int haptics_init_vmax_config(struct haptics_chip *chip)
 
 	chip->is_hv_haptics = true;
 	chip->max_vmax_mv = MAX_VMAX_MV;
-	if (chip->hw_type == HAP520_MV || chip->hw_type == HAP525_HV) {
+	if (chip->hw_type > HAP520_MV) {
 		rc = haptics_read(chip, chip->cfg_addr_base,
 			HAP_CFG_HW_CONFIG_REG, &val, 1);
 		if (rc < 0)
@@ -3585,6 +3603,12 @@ static int haptics_parse_effect_pattern_data(struct haptics_chip *chip,
 	struct haptics_hw_config *config = &chip->config;
 	u32 data[SAMPLES_PER_PATTERN * 3];
 	int rc, tmp, i;
+
+	if (chip->hw_type >= HAP530_HV) {
+		dev_dbg(chip->dev, "haptics module with revision %d no longer supports PATTERNx mode, ignore parsing pattern effect DT\n",
+				chip->hw_type);
+		return 0;
+	}
 
 	effect->t_lra_us = config->t_lra_us;
 	tmp = of_property_count_elems_of_size(node,
@@ -4002,7 +4026,7 @@ static int haptics_parse_lra_dt(struct haptics_chip *chip)
 		}
 	}
 
-	if (chip->hw_type == HAP525_HV)
+	if (chip->hw_type >= HAP525_HV)
 		config->measure_lra_impedance = of_property_read_bool(node,
 				"qcom,rt-imp-detect");
 
@@ -4433,6 +4457,7 @@ static u32 get_lra_impedance_capable_max(struct haptics_chip *chip)
 		min_isc_ma = 140;
 		break;
 	case HAP525_HV:
+	case HAP530_HV:
 		if (chip->clamp_at_5v) {
 			max_vmax_mv = 5000;
 			min_isc_ma = 125;
@@ -4456,9 +4481,8 @@ static u32 get_lra_impedance_capable_max(struct haptics_chip *chip)
 #define RT_IMPD_DET_VMAX_DEFAULT_MV		4500
 static int haptics_measure_realtime_lra_impedance(struct haptics_chip *chip)
 {
-	int rc;
-	u8 val, current_sel;
-	u32 vmax_mv, nominal_ohm, current_ma, vmax_margin_mv;
+	u32 vmax_mv, nominal_ohm, current_ma, vmax_margin_mv, play_length_us;
+	u8 samples[4] = {0x7f, 0x7f, 0x7f, 0x7f};
 	struct pattern_cfg pattern = {
 		.samples = {
 			    {0xff, T_LRA, false},
@@ -4474,6 +4498,15 @@ static int haptics_measure_realtime_lra_impedance(struct haptics_chip *chip)
 		.play_length_us = chip->config.t_lra_us + 2000, /* drive it at least 1 cycle */
 		.preload = false,
 	};
+	struct fifo_cfg fifo = {
+		.samples = samples,
+		.num_s = ARRAY_SIZE(samples),
+		.period_per_s = T_LRA_DIV_2,	/* drive off resonance of the LRA */
+		.play_length_us = chip->config.t_lra_us * ARRAY_SIZE(samples) / 2 + 2000,
+		.preload = false,
+	};
+	u8 val, current_sel;
+	int rc;
 
 	/* calculate Vmax according to nominal resistance */
 	vmax_mv = RT_IMPD_DET_VMAX_DEFAULT_MV;
@@ -4526,19 +4559,41 @@ static int haptics_measure_realtime_lra_impedance(struct haptics_chip *chip)
 	if (rc < 0)
 		goto restore;
 
-	/* play 1 drive cycle using PATTERN1 source */
-	rc = haptics_set_pattern(chip, &pattern, PATTERN1);
-	if (rc < 0)
-		goto restore;
+	if (chip->hw_type >= HAP530_HV) {
+		chip->play.brake = NULL;
+		rc = haptics_set_fifo(chip, &fifo);
+		if (rc < 0)
+			goto restore;
 
-	chip->play.pattern_src = PATTERN1;
+		chip->play.pattern_src = FIFO;
+		play_length_us = fifo.play_length_us;
+	} else {
+		/* play 1 drive cycle using PATTERN1 source */
+		rc = haptics_set_pattern(chip, &pattern, PATTERN1);
+		if (rc < 0)
+			goto restore;
+
+		chip->play.pattern_src = PATTERN1;
+		play_length_us = pattern.play_length_us;
+	}
+
 	rc = haptics_enable_play(chip, true);
 	if (rc < 0)
 		goto restore;
 
-	usleep_range(pattern.play_length_us, pattern.play_length_us + 1);
+	usleep_range(play_length_us, play_length_us + 1);
 
-	rc = haptics_enable_play(chip, false);
+	if (chip->hw_type >= HAP530_HV) {
+		rc = haptics_stop_fifo_play(chip);
+		if (rc < 0)
+			goto restore;
+
+		val = 0;
+		rc = haptics_write(chip, chip->cfg_addr_base,
+				HAP_CFG_MOD_STATUS_SEL_REG, &val, 1);
+	} else {
+		rc = haptics_enable_play(chip, false);
+	}
 	if (rc < 0)
 		goto restore;
 
@@ -4664,6 +4719,7 @@ static int haptics_detect_lra_impedance(struct haptics_chip *chip)
 				ISC_THRESH_HAP520_MV_140MA;
 			break;
 		case HAP525_HV:
+		case HAP530_HV:
 			reg1 = HAP_CFG_ISC_CFG_REG;
 			mask1 = EN_SC_DET_P_HAP525_HV_BIT | EN_SC_DET_N_HAP525_HV_BIT |
 				EN_IMP_DET_HAP525_HV_BIT | ILIM_PULSE_DENSITY_MASK;
@@ -4785,7 +4841,7 @@ static int haptics_detect_lra_frequency(struct haptics_chip *chip)
 		return rc;
 	}
 
-	if (chip->hw_type == HAP525_HV)
+	if (chip->hw_type >= HAP525_HV)
 		val = AUTORES_EN_DLY_7_CYCLES << AUTORES_EN_DLY_SHIFT|
 			AUTORES_ERR_WINDOW_25_PERCENT | AUTORES_EN_BIT;
 	else
@@ -4799,7 +4855,7 @@ static int haptics_detect_lra_frequency(struct haptics_chip *chip)
 	if (rc < 0)
 		return rc;
 
-	if (chip->hw_type == HAP525_HV) {
+	if (chip->hw_type >= HAP525_HV) {
 		mask = ADT_DRV_DUTY_EN_BIT | ADT_BRK_DUTY_EN_BIT |
 			DRV_DUTY_MASK | BRK_DUTY_MASK;
 		val = DRV_DUTY_62P5_PCT << DRV_DUTY_SHIFT | BRK_DUTY_75_PCT;
