@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "%s:%s " fmt, KBUILD_MODNAME, __func__
@@ -34,23 +34,17 @@ struct bcl_device {
 
 static struct bcl_device *bcl_perph;
 
-static int bcl_soc_get_trend(struct thermal_zone_device *tz, int trip,
-				    enum thermal_trend *trend)
+static int bcl_soc_get_trend(struct thermal_zone_device *tz,
+			const struct thermal_trip *trip,
+			enum thermal_trend *trend)
 {
-	int trip_temp = 0, trip_hyst = 0, temp, ret;
+	int trip_temp = 0, trip_hyst = 0, temp;
 
-	if (!tz)
+	if (!tz || !trip)
 		return -EINVAL;
 
-	ret = tz->ops->get_trip_temp(tz, trip, &trip_temp);
-	if (ret)
-		return ret;
-
-	if (tz->ops->get_trip_hyst) {
-		ret = tz->ops->get_trip_hyst(tz, trip, &trip_hyst);
-		if (ret)
-			return ret;
-	}
+	trip_temp = trip->temperature;
+	trip_hyst = trip->hysteresis;
 	temp = READ_ONCE(tz->temperature);
 
 	if (temp >= trip_temp)
