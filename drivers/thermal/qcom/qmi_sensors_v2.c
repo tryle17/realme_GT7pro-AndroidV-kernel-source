@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "%s:%s " fmt, KBUILD_MODNAME, __func__
@@ -265,6 +265,7 @@ static struct thermal_zone_device_ops qmi_sensor_ops = {
 	.get_temp = qmi_sensor_read,
 	.set_trips = qmi_sensor_set_trips,
 	.change_mode = qti_tz_change_mode,
+	.get_trend = qti_tz_get_trend,
 };
 
 static struct qmi_msg_handler handlers[] = {
