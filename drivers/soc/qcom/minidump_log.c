@@ -1305,13 +1305,12 @@ static int md_module_process(struct module *mod)
 	}
 
 	if (md_mod_info_seq_buf) {
-		base_addr = (unsigned long)mod->core_layout.base;
+		base_addr = (unsigned long)mod->mem[MOD_TEXT].base;
 		seq_buf_printf(md_mod_info_seq_buf, "name: %s, base: %lx",
 				mod->name, base_addr);
 		if (is_key_module) {
-			dump_start = base_addr +
-					mod->core_layout.ro_after_init_size;
-			dump_end = base_addr + mod->core_layout.size;
+			dump_start = (unsigned long)mod->mem[MOD_DATA].base;
+			dump_end = dump_start + mod->mem[MOD_DATA].size;
 			if (((dump_end - dump_start) / PAGE_SIZE) <
 				msm_minidump_get_available_region()) {
 				for (i = 0; i < mod->sect_attrs->nsections ; i++) {
