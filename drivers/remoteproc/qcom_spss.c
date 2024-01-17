@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Qualcomm Technologies, Inc. SPSS Peripheral Image Loader
  *
  */
@@ -491,7 +491,11 @@ static int spss_attach(struct rproc *rproc)
 	read_sp2cl_debug_registers(spss);
 	if (rproc->recovery_disabled && !ret) {
 		dev_err(spss->dev, "%d ms timeout poked\n", SPSS_TIMEOUT);
-		panic("Panicking, %s attach timed out\n", rproc->name);
+		dev_err(spss->dev, "%s attach timed out\n", rproc->name);
+		/*
+		 * TODO: Panic on attach failure temporary removed due to a false
+		 * interrupt detection. Add back when SPU fix patch provided.
+		 */
 	} else if (!ret) {
 		dev_err(spss->dev, "recovery disabled (after timeout)\n");
 	}
