@@ -682,13 +682,15 @@ int haptics_create_debugfs(struct haptics_chip *chip)
 	if (rc < 0)
 		goto exit;
 
-	file = debugfs_create_file_unsafe("preload_effect_idx", 0644, hap_dir,
-			chip, &preload_effect_idx_dbgfs_ops);
-	if (IS_ERR(file)) {
-		rc = PTR_ERR(file);
-		dev_err(chip->dev, "create preload_effect_idx debugfs failed, rc=%d\n",
-				rc);
-		goto exit;
+	if (chip->hw_type < HAP530_HV) {
+		file = debugfs_create_file_unsafe("preload_effect_idx", 0644, hap_dir,
+				chip, &preload_effect_idx_dbgfs_ops);
+		if (IS_ERR(file)) {
+			rc = PTR_ERR(file);
+			dev_err(chip->dev, "create preload_effect_idx debugfs failed, rc=%d\n",
+					rc);
+			goto exit;
+		}
 	}
 
 	debugfs_create_u32("fifo_empty_thresh", 0600, hap_dir,
