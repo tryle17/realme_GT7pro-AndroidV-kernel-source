@@ -1359,19 +1359,40 @@ static int haptics_get_vmax_headroom_mv(struct haptics_chip *chip, u32 *hdrm_mv)
 	return 0;
 }
 
-static int haptics_set_vmax_mv(struct haptics_chip *chip, u32 vmax_mv)
+static int __haptics_set_vmax_mv(struct haptics_chip *chip, u32 vmax_mv)
 {
 	int rc = 0;
 	u8 val, vmax_step;
-	u32 nominal_ohm, vmax_hdrm_mv;
 
-	mutex_lock(&chip->vmax_lock);
 	if (vmax_mv > chip->max_vmax_mv) {
 		dev_dbg(chip->dev, "vmax (%d) exceed the max value: %d\n",
 					vmax_mv, chip->max_vmax_mv);
 		vmax_mv = chip->max_vmax_mv;
 	}
 
+	vmax_step = (chip->is_hv_haptics) ? VMAX_HV_STEP_MV : VMAX_MV_STEP_MV;
+	val = vmax_mv / vmax_step;
+	rc = haptics_write(chip, chip->cfg_addr_base,
+			HAP_CFG_VMAX_REG, &val, 1);
+	if (rc < 0) {
+		dev_err(chip->dev, "config VMAX failed, rc=%d\n", rc);
+		return rc;
+	}
+
+	dev_dbg(chip->dev, "Set Vmax to %u mV\n", vmax_mv);
+	rc = haptics_check_hpwr_status(chip);
+	if (rc < 0)
+		dev_err(chip->dev, "check hpwr_status failed, rc=%d\n", rc);
+
+	return rc;
+}
+
+static int haptics_set_vmax_mv(struct haptics_chip *chip, u32 vmax_mv)
+{
+	int rc = 0;
+	u32 nominal_ohm, vmax_hdrm_mv;
+
+	mutex_lock(&chip->vmax_lock);
 	if (vmax_mv > chip->clamped_vmax_mv)
 		vmax_mv = chip->clamped_vmax_mv;
 
@@ -1401,23 +1422,7 @@ static int haptics_set_vmax_mv(struct haptics_chip *chip, u32 vmax_mv)
 		dev_dbg(chip->dev, "update VMAX_HDRM to %d mv\n", vmax_hdrm_mv);
 	}
 
-	vmax_step = (chip->is_hv_haptics) ?
-				VMAX_HV_STEP_MV : VMAX_MV_STEP_MV;
-	val = vmax_mv / vmax_step;
-	rc = haptics_write(chip, chip->cfg_addr_base,
-			HAP_CFG_VMAX_REG, &val, 1);
-	if (rc < 0) {
-		dev_err(chip->dev, "config VMAX failed, rc=%d\n", rc);
-		mutex_unlock(&chip->vmax_lock);
-		return rc;
-	}
-
-	dev_dbg(chip->dev, "Set Vmax to %u mV\n", vmax_mv);
-
-	rc = haptics_check_hpwr_status(chip);
-	if (rc < 0)
-		dev_err(chip->dev, "check hpwr_status failed, rc=%d\n", rc);
-
+	rc = __haptics_set_vmax_mv(chip, vmax_mv);
 	mutex_unlock(&chip->vmax_lock);
 	return rc;
 }
@@ -4438,7 +4443,7 @@ static int haptics_pbs_trigger_isc_config(struct haptics_chip *chip)
 #define MAX_SWEEP_STEPS		5
 #define MIN_DUTY_MILLI_PCT	0
 #define MAX_DUTY_MILLI_PCT	100000
-#define LRA_CONFIG_REGS		3
+#define LRA_CONFIG_REGS		2
 static u32 get_lra_impedance_capable_max(struct haptics_chip *chip)
 {
 	u32 mohms;
@@ -4681,7 +4686,6 @@ static int haptics_detect_lra_impedance(struct haptics_chip *chip)
 	int rc, i;
 	struct haptics_reg_info lra_config[LRA_CONFIG_REGS] = {
 		{ HAP_CFG_DRV_WF_SEL_REG, 0x10 },
-		{ HAP_CFG_VMAX_REG, 0xC8 },
 		{ HAP_CFG_VMAX_HDRM_REG, 0x00 },
 	};
 	struct haptics_reg_info backup[LRA_CONFIG_REGS];
@@ -4756,6 +4760,10 @@ static int haptics_detect_lra_impedance(struct haptics_chip *chip)
 	}
 
 	/* Set square drive waveform, 10V Vmax, no HDRM */
+	rc = __haptics_set_vmax_mv(chip, 10000);
+	if (rc < 0)
+		goto restore;
+
 	for (i = 0; i < LRA_CONFIG_REGS; i++) {
 		rc = haptics_write(chip, chip->cfg_addr_base,
 				lra_config[i].addr, &lra_config[i].val, 1);
