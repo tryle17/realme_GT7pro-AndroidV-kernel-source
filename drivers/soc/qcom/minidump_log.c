@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/cache.h>
@@ -725,7 +725,7 @@ static void md_dump_task_info(struct task_struct *task, char *status,
 	se = &task->se;
 	if (task == curr) {
 		seq_buf_printf(md_runq_seq_buf,
-			       "[status: curr] pid: %d preempt: %#x\n",
+			       "[status: curr] pid: %d preempt: %#llx\n",
 			       task_pid_nr(task),
 			       task->thread_info.preempt_count);
 		return;
@@ -797,8 +797,6 @@ static void md_dump_cfs_rq(struct cfs_rq *cfs, struct task_struct *curr)
 
 	md_dump_cgroup_state("curr", cfs->curr, curr);
 	md_dump_cgroup_state("next", cfs->next, curr);
-	md_dump_cgroup_state("last", cfs->last, curr);
-	md_dump_cgroup_state("skip", cfs->skip, curr);
 	md_rb_walk_cfs(rb_root_cached_p, curr);
 }
 
@@ -872,7 +870,7 @@ static void md_dump_next_event(void)
 	for_each_possible_cpu(cpu) {
 		event_dev = per_cpu(device_dump->evtdev, cpu);
 		if (event_dev)
-			pr_emerg("CPU%d next event is %ld\n", cpu,
+			pr_emerg("CPU%d next event is %lld\n", cpu,
 				event_dev->next_event);
 		else
 			pr_emerg("CPU%d next event is not available\n", cpu);
@@ -942,8 +940,8 @@ static void md_dump_runqueues(void)
 		seq_buf_printf(md_runq_seq_buf, "%*s", 6, md_get_task_state(t));
 #if IS_ENABLED(CONFIG_SCHED_WALT)
 		wts = (struct walt_task_struct *) t->android_vendor_data1;
-		seq_buf_printf(md_runq_seq_buf, "%17ld", wts->last_enqueued_ts);
-		seq_buf_printf(md_runq_seq_buf, "%16ld", wts->last_sleep_ts);
+		seq_buf_printf(md_runq_seq_buf, "%17llu", wts->last_enqueued_ts);
+		seq_buf_printf(md_runq_seq_buf, "%16llu", wts->last_sleep_ts);
 #endif
 		seq_buf_printf(md_runq_seq_buf, "\n");
 	}
