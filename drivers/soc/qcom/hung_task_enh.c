@@ -208,15 +208,6 @@ struct ctl_table hung_task_table[] = {
 	{ }
 };
 
-struct ctl_table hung_task_base_table[] = {
-	{
-		.procname	= "hung_task_enh",
-		.mode		= 0555,
-		.child		= hung_task_table,
-	},
-	{ }
-};
-
 static int __init hung_task_enh_init(void)
 {
 	int ret;
@@ -236,8 +227,8 @@ static int __init hung_task_enh_init(void)
 		return ret;
 	}
 
-	hung_task_enh.ctl_table_hdr = register_sysctl_table(
-						hung_task_base_table);
+	hung_task_enh.ctl_table_hdr = register_sysctl("hung_task_enh",
+						hung_task_table);
 	if (!hung_task_enh.ctl_table_hdr) {
 		unregister_trace_android_vh_check_uninterruptible_tasks(
 						qcom_before_check_tasks, NULL);
