@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2015, 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -12,6 +12,7 @@
 
 #include "clk-alpha-pll.h"
 #include "clk-debug.h"
+#include "vdd-level.h"
 #include "common.h"
 
 #define PLL_MODE(p)		((p)->offset + 0x0)
@@ -322,6 +323,7 @@ EXPORT_SYMBOL_GPL(clk_alpha_pll_regs);
 #define LUCID_EVO_PLL_L_VAL_MASK        GENMASK(15, 0)
 #define LUCID_EVO_PLL_CAL_L_VAL_SHIFT	16
 #define LUCID_OLE_PLL_PROCESS_CAL_L_VAL_SHIFT	24
+#define LUCID_OLE_PROCESS_CAL_L_VAL_MASK	GENMASK(23, 16)
 #define LUCID_EVO_STATUS_EN		BIT(8)
 #define LUCID_EVO_STATUS_SEL_SHIFT	10
 #define LUCID_EVO_STATUS_SEL_MASK	GENMASK(14, 10)
@@ -2823,11 +2825,23 @@ static void _alpha_pll_lucid_evo_disable(struct clk_hw *hw, bool reset)
 		regmap_update_bits(regmap, PLL_MODE(pll), PLL_RESET_N, 0);
 }
 
+/*
+ * The Lucid PLL requires a power-on self-calibration which happens when the
+ * PLL comes out of reset. The calibration is performed at an output frequency
+ * of ~1300 MHz which means that SW will have to vote on a voltage that's
+ * equal to or greater than SVS_L1 on the corresponding rail. Since this is not
+ * feasible to do in the atomic enable path, temporarily bring up the PLL here,
+ * let it calibrate, and place it in standby before returning.
+ */
 static int _alpha_pll_lucid_evo_prepare(struct clk_hw *hw, bool reset)
 {
 	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
+	struct clk_regmap *rclk = to_clk_regmap(hw);
+	struct regmap *regmap = pll->clkr.regmap;
 	struct clk_hw *p;
-	u32 val = 0;
+	unsigned long rate;
+	u32 val;
+	int vdd_level;
 	int ret;
 
 	ret = clk_prepare_regmap(hw);
@@ -2835,23 +2849,47 @@ static int _alpha_pll_lucid_evo_prepare(struct clk_hw *hw, bool reset)
 		return ret;
 
 	/* Return early if calibration is not needed. */
-	regmap_read(pll->clkr.regmap, PLL_MODE(pll), &val);
+	regmap_read(regmap, PLL_MODE(pll), &val);
 	if (!(val & LUCID_EVO_PCAL_NOT_DONE) && !(pll->flags & ENABLE_IN_PREPARE))
 		return 0;
 
 	p = clk_hw_get_parent(hw);
-	if (!p)
-		return -EINVAL;
+	if (!p) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	/* Find required FMax voltage for pll calibration */
+	regmap_read(regmap, PLL_L_VAL(pll), &val);
+	val = (val & LUCID_OLE_PROCESS_CAL_L_VAL_MASK) >> LUCID_EVO_PLL_CAL_L_VAL_SHIFT;
+
+	rate = val * clk_hw_get_rate(p);
+	rate = clk_hw_round_rate(hw, rate);
+
+	vdd_level = clk_find_vdd_level(hw, &rclk->vdd_data, rate);
+	if (vdd_level < 0) {
+		ret = vdd_level;
+		goto err;
+	}
+
+	ret = clk_vote_vdd_level(&rclk->vdd_data, vdd_level);
+	if (ret)
+		goto err;
 
 	ret = _alpha_pll_lucid_evo_enable(hw);
+	clk_unvote_vdd_level(&rclk->vdd_data, vdd_level);
 	if (ret)
-		return ret;
+		goto err;
 
 	/* Do not disable pll if ENABLE_IN_PREPARE*/
 	if (!(pll->flags & ENABLE_IN_PREPARE))
 		_alpha_pll_lucid_evo_disable(hw, reset);
 
 	return 0;
+
+err:
+	clk_unprepare_regmap(hw);
+	return ret;
 }
 
 static void alpha_pll_lucid_evo_disable(struct clk_hw *hw)
