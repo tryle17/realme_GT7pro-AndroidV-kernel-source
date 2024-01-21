@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/err.h>
@@ -306,10 +306,8 @@ static void handle_alloc_generic_req(struct qmi_handle *handle,
 		dev_err(memsh_drv->dev,
 			"memshare_alloc: client not found for index: %d, requested client: %d, proc_id: %d\n",
 			index, alloc_req->client_id, alloc_req->proc_id);
-		kfree(alloc_resp);
-		alloc_resp = NULL;
 		mutex_unlock(&memsh_drv->mem_share);
-		return;
+		goto resp_send;
 	}
 
 	for (i = 0; i < num_clients; i++) {
@@ -325,10 +323,8 @@ static void handle_alloc_generic_req(struct qmi_handle *handle,
 	if (!client_node) {
 		dev_err(memsh_drv->dev,
 			"memshare_alloc: No valid client node found\n");
-		kfree(alloc_resp);
-		alloc_resp = NULL;
 		mutex_unlock(&memsh_drv->mem_share);
-		return;
+		goto resp_send;
 	}
 
 	if (!memblock[index].allotted && alloc_req->num_bytes > 0) {
@@ -384,6 +380,7 @@ static void handle_alloc_generic_req(struct qmi_handle *handle,
 		alloc_resp->dhms_mem_alloc_addr_info[0].num_bytes,
 		(unsigned long)alloc_resp->resp.result);
 
+resp_send:
 	rc = qmi_send_response(mem_share_svc_handle, sq, txn,
 			  MEM_ALLOC_GENERIC_RESP_MSG_V01,
 			  sizeof(struct mem_alloc_generic_resp_msg_v01),
@@ -407,7 +404,7 @@ static void handle_free_generic_req(struct qmi_handle *handle,
 	int rc, flag = 0, ret = 0, size = 0, i, j;
 	int index = DHMS_MEM_CLIENT_INVALID;
 	struct qcom_scm_vmperm dest_vmids[] = {{QCOM_SCM_VMID_HLOS},
-					       {PERM_READ|PERM_WRITE|PERM_EXEC}};
+						{PERM_READ|PERM_WRITE|PERM_EXEC}};
 
 	mutex_lock(&memsh_drv->mem_free);
 	free_req = (struct mem_free_generic_req_msg_v01 *)decoded_msg;
@@ -439,7 +436,7 @@ static void handle_free_generic_req(struct qmi_handle *handle,
 		dev_err(memsh_drv->dev,
 			"memshare_free: No valid client node found\n");
 		mutex_unlock(&memsh_drv->mem_free);
-		return;
+		goto resp_fill;
 	}
 
 	if (client_node->mem_entry) {
@@ -501,6 +498,8 @@ static void handle_free_generic_req(struct qmi_handle *handle,
 	}
 
 	mutex_unlock(&memsh_drv->mem_free);
+
+resp_fill:
 	rc = qmi_send_response(mem_share_svc_handle, sq, txn,
 			  MEM_FREE_GENERIC_RESP_MSG_V01,
 			  MEM_FREE_REQ_MAX_MSG_LEN_V01,
@@ -525,8 +524,11 @@ static void handle_query_size_req(struct qmi_handle *handle,
 		mutex_unlock(&memsh_drv->mem_share);
 		return;
 	}
+	query_resp->resp.result = QMI_RESULT_FAILURE_V01;
+	query_resp->resp.error = QMI_ERR_INTERNAL_V01;
+
 	dev_dbg(memsh_drv->dev,
-		"memshare_query: query on availalbe memory size for client id: %d, proc_id: %d\n",
+		"memshare_query: query on available memory size for client id: %d, proc_id: %d\n",
 		query_req->client_id, query_req->proc_id);
 	index = check_client(query_req->client_id, query_req->proc_id,
 								CHECK);
@@ -535,10 +537,8 @@ static void handle_query_size_req(struct qmi_handle *handle,
 		dev_err(memsh_drv->dev,
 			"memshare_query: client not found, requested client: %d, proc_id: %d\n",
 			query_req->client_id, query_req->proc_id);
-		kfree(query_resp);
-		query_resp = NULL;
 		mutex_unlock(&memsh_drv->mem_share);
-		return;
+		goto resp_fill;
 	}
 
 	if (memblock[index].init_size) {
@@ -552,6 +552,7 @@ static void handle_query_size_req(struct qmi_handle *handle,
 	query_resp->resp.error = QMI_ERR_NONE_V01;
 	mutex_unlock(&memsh_drv->mem_share);
 
+resp_fill:
 	dev_info(memsh_drv->dev,
 		"memshare_query: client_id : %d, query_resp.size :%d, query_resp.resp.result :%lx\n",
 		query_req->client_id, query_resp->size,
