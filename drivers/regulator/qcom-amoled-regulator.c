@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt)	"AMOLED: %s: " fmt, __func__
@@ -18,49 +18,55 @@
 #include <linux/regulator/machine.h>
 
 /* Register definitions */
-#define PERIPH_REVISION4		0x03
-#define IBB_PERIPH_TYPE			0x20
-#define AB_PERIPH_TYPE			0x24
-#define OLEDB_PERIPH_TYPE		0x2C
+#define PERIPH_REVISION4			0x03
+#define IBB_PERIPH_TYPE				0x20
+#define AB_PERIPH_TYPE				0x24
+#define OLEDB_PERIPH_TYPE			0x2C
 
-#define PERIPH_SUBTYPE			0x05
+#define PERIPH_SUBTYPE				0x05
 
 /* AB */
-#define AB_LDO_PD_CTL(chip)		(chip->ab_base + 0x78)
+#define PMD802X_AB_PULL_DOWN_CTL(chip)		(chip->ab_base + 0x47)
+#define PM8350B_AB_LDO_PD_CTL(chip)		(chip->ab_base + 0x78)
 
-/* AB_LDO_PD_CTL */
-#define PULLDN_EN_BIT			BIT(7)
+/* PM8350B_AB_LDO_PD_CTL */
+#define PM8350B_AB_PULLDN_EN_BIT		BIT(7)
+
+/* PMD802X_AB_PULL_DOWN_CTL */
+#define PMD802X_AB_PULLDN_EN_BIT		BIT(1)
+#define PMD802X_AB_PULLDN_STRENGTH_BIT		BIT(0)
+#define PMD802X_AB_PULLDN_STRENGTH_STRONG	1
 
 /* IBB */
-#define IBB_PD_CTL(chip)		(chip->ibb_base + 0x47)
+#define IBB_PD_CTL(chip)			(chip->ibb_base + 0x47)
 
 /* IBB_PD_CTL */
-#define ENABLE_PD_BIT			BIT(7)
+#define ENABLE_PD_BIT				BIT(7)
 
-#define IBB_DUAL_PHASE_CTL(chip)	(chip->ibb_base + 0x70)
+#define IBB_DUAL_PHASE_CTL(chip)		(chip->ibb_base + 0x70)
 
 /* IBB_DUAL_PHASE_CTL */
-#define IBB_DUAL_PHASE_CTL_MASK		GENMASK(2, 0)
-#define AUTO_DUAL_PHASE_BIT		BIT(2)
-#define FORCE_DUAL_PHASE_BIT		BIT(1)
-#define FORCE_SINGLE_PHASE_BIT		BIT(0)
+#define IBB_DUAL_PHASE_CTL_MASK			GENMASK(2, 0)
+#define AUTO_DUAL_PHASE_BIT			BIT(2)
+#define FORCE_DUAL_PHASE_BIT			BIT(1)
+#define FORCE_SINGLE_PHASE_BIT			BIT(0)
 
 /* IBB SPUR FSM/SQM CTL */
-#define IBB_SPUR_CTL(chip)		(chip->ibb_base + 0xB6)
-#define SPUR_FSM_EN			BIT(7)
-#define SPUR_SQM_EN			BIT(6)
+#define IBB_SPUR_CTL(chip)			(chip->ibb_base + 0xB6)
+#define SPUR_FSM_EN				BIT(7)
+#define SPUR_SQM_EN				BIT(6)
 
-#define IBB_SPUR_FREQ_CTL(chip)		(chip->ibb_base + 0xB7)
-#define FREQ_RES_SEL			BIT(0)
+#define IBB_SPUR_FREQ_CTL(chip)			(chip->ibb_base + 0xB7)
+#define FREQ_RES_SEL				BIT(0)
 
-#define IBB_SPUR_FREQ_THRESH_HIGH(i)	(chip->ibb_base + 0xB8 + i*2)
-#define IBB_SPUR_FREQ_THRESH_LOW(i)	(chip->ibb_base + 0xB9 + i*2)
+#define IBB_SPUR_FREQ_THRESH_HIGH(i)		(chip->ibb_base + 0xB8 + i*2)
+#define IBB_SPUR_FREQ_THRESH_LOW(i)		(chip->ibb_base + 0xB9 + i*2)
 
-#define MAX_SPUR_FREQ_BANDS		 3
-#define MAX_SPUR_FREQ_KHZ		248
-#define AMOLED_SDAM_OFFSET		0xB8
-#define SQM_TIMER_LOWER_LIMIT_MS	100
-#define SQM_TIMER_UPPER_LIMIT_MS	10000
+#define MAX_SPUR_FREQ_BANDS			3
+#define MAX_SPUR_FREQ_KHZ			248
+#define AMOLED_SDAM_OFFSET			0xB8
+#define SQM_TIMER_LOWER_LIMIT_MS		100
+#define SQM_TIMER_UPPER_LIMIT_MS		10000
 
 enum {
 	SPUR_MITIGATION_DISABLED,
@@ -85,6 +91,7 @@ struct oledb_regulator {
 
 struct ab_regulator {
 	struct amoled_regulator	vreg;
+	u8			subtype;
 
 	/* DT params */
 	bool			swire_control;
@@ -128,9 +135,15 @@ enum reg_type {
 	IBB,
 };
 
+enum ab_subtype {
+	PM8350B_AB = 0x06,
+	PMD802X_AB = 0x07,
+};
+
 enum ibb_subtype {
 	PM8150A_IBB = 0x03,
 	PM8350B_IBB = 0x04,
+	PMD802X_IBB = 0x05,
 };
 
 enum ibb_rev4 {
@@ -268,14 +281,35 @@ static int amoled_ab_ibb_regulator_get_voltage(struct regulator_dev *rdev)
 
 static int amoled_ab_pd_control(struct amoled_chip *chip, bool en)
 {
-	u8 val = en ? PULLDN_EN_BIT : 0;
+	u8 val, mask;
+	u16 addr;
 
-	return amoled_write(chip, AB_LDO_PD_CTL(chip), &val, 1);
+	if (!chip->ab.pd_control)
+		return 0;
+
+	if (chip->ab.subtype == PM8350B_AB) {
+		addr = PM8350B_AB_LDO_PD_CTL(chip);
+		val = en ? PM8350B_AB_PULLDN_EN_BIT : 0;
+		mask = PM8350B_AB_PULLDN_EN_BIT;
+	} else if (chip->ab.subtype == PMD802X_AB) {
+		addr = PMD802X_AB_PULL_DOWN_CTL(chip);
+		val = en ? PMD802X_AB_PULLDN_EN_BIT |
+			PMD802X_AB_PULLDN_STRENGTH_STRONG : 0;
+		mask = PMD802X_AB_PULLDN_EN_BIT |
+			PMD802X_AB_PULLDN_STRENGTH_BIT;
+	} else {
+		return -EINVAL;
+	}
+
+	return amoled_masked_write(chip, addr, mask, val);
 }
 
 static int amoled_ibb_pd_control(struct amoled_chip *chip, bool en)
 {
 	u8 val = en ? ENABLE_PD_BIT : 0;
+
+	if (!chip->ibb.pd_control)
+		return 0;
 
 	return amoled_masked_write(chip, IBB_PD_CTL(chip), ENABLE_PD_BIT,
 					val);
@@ -299,29 +333,21 @@ static int amoled_ab_ibb_regulator_set_mode(struct regulator_dev *rdev,
 	pr_debug("mode: %d\n", mode);
 
 	if (mode == REGULATOR_MODE_NORMAL || mode == REGULATOR_MODE_STANDBY) {
-		if (chip->ibb.pd_control) {
-			rc = amoled_ibb_pd_control(chip, true);
-			if (rc < 0)
-				goto error;
-		}
+		rc = amoled_ibb_pd_control(chip, true);
+		if (rc < 0)
+			goto error;
 
-		if (chip->ab.pd_control) {
-			rc = amoled_ab_pd_control(chip, true);
-			if (rc < 0)
-				goto error;
-		}
+		rc = amoled_ab_pd_control(chip, true);
+		if (rc < 0)
+			goto error;
 	} else if (mode == REGULATOR_MODE_IDLE) {
-		if (chip->ibb.pd_control) {
-			rc = amoled_ibb_pd_control(chip, false);
-			if (rc < 0)
-				goto error;
-		}
+		rc = amoled_ibb_pd_control(chip, false);
+		if (rc < 0)
+			goto error;
 
-		if (chip->ab.pd_control) {
-			rc = amoled_ab_pd_control(chip, false);
-			if (rc < 0)
-				goto error;
-		}
+		rc = amoled_ab_pd_control(chip, false);
+		if (rc < 0)
+			goto error;
 	}
 
 	chip->ab.vreg.mode = chip->ibb.vreg.mode = mode;
@@ -679,6 +705,7 @@ static int amoled_parse_dt(struct amoled_chip *chip)
 			break;
 		case AB_PERIPH_TYPE:
 			chip->ab_base = base;
+			chip->ab.subtype = val[2];
 			chip->ab.vreg.node = temp;
 			chip->ab.swire_control = of_property_read_bool(temp,
 							"qcom,swire-control");
