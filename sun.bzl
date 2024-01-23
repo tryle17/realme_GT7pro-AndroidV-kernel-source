@@ -110,6 +110,7 @@ def define_sun():
         "drivers/power/supply/qti_battery_charger.ko",
         "drivers/regulator/debug-regulator.ko",
         "drivers/regulator/proxy-consumer.ko",
+        "drivers/regulator/qcom-amoled-regulator.ko",
         "drivers/regulator/qti-fixed-regulator.ko",
         "drivers/regulator/qti-ocp-notifier.ko",
         "drivers/regulator/rpmh-regulator.ko",
