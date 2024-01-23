@@ -18,6 +18,7 @@ ABL_EXTENSIONS = "build/abl_extensions.bzl"
 DEFAULT_MSM_EXTENSIONS_SRC = "../msm-kernel/msm_kernel_extensions.bzl"
 DEFAULT_ABL_EXTENSIONS_SRC = "../bootable/bootloader/edk2/abl_extensions.bzl"
 DEFAULT_OUT_DIR = "{workspace}/out/msm-kernel-{target}-{variant}"
+DEFAULT_CACHE_DIR = "/tmp/bazel"
 
 class Target:
     def __init__(self, workspace, target, variant, bazel_label, out_dir=None):
@@ -54,7 +55,7 @@ class Target:
 class BazelBuilder:
     """Helper class for building with Bazel"""
 
-    def __init__(self, target_list, skip_list, out_dir, dry_run, user_opts):
+    def __init__(self, target_list, skip_list, out_dir, cache_dir, dry_run, user_opts):
         self.workspace = os.path.realpath(
             os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
         )
@@ -71,6 +72,7 @@ class BazelBuilder:
                 logging.error("invalid target_variant combo \"%s_%s\"", t, v)
                 sys.exit(1)
 
+        self.bazel_cache = "--output_user_root=" + cache_dir
         self.target_list = target_list
         self.skip_list = skip_list
         self.dry_run = dry_run
@@ -144,6 +146,7 @@ class BazelBuilder:
 
             cmdline = [
                 self.bazel_bin,
+                self.bazel_cache,
                 "query",
                 "--ui_event_filters=-info",
                 "--noshow_progress",
@@ -215,7 +218,7 @@ class BazelBuilder:
         bazel_target_opts=None,
     ):
         """Execute a bazel command"""
-        cmdline = [self.bazel_bin, bazel_subcommand]
+        cmdline = [self.bazel_bin, self.bazel_cache, bazel_subcommand]
         if extra_options:
             cmdline.extend(extra_options)
         cmdline.extend([t.bazel_label for t in targets])
@@ -350,6 +353,12 @@ def main():
         action="store_true",
         help="Perform a dry-run of the build which will perform loading/analysis of build files",
     )
+    parser.add_argument(
+        "--cache_dir",
+        metavar="CACHE_DIR",
+        default=DEFAULT_CACHE_DIR,
+        help='Specify the bazel cache directory (defaults to ' + DEFAULT_CACHE_DIR + ')'
+    )
 
     args, user_opts = parser.parse_known_args(sys.argv[1:])
 
@@ -360,7 +369,14 @@ def main():
 
     args.skip.extend(DEFAULT_SKIP_LIST)
 
-    builder = BazelBuilder(args.target, args.skip, args.out_dir, args.dry_run, user_opts)
+    builder = BazelBuilder(
+        args.target,
+        args.skip,
+        args.out_dir,
+        args.cache_dir,
+        args.dry_run,
+        user_opts
+    )
     try:
         if args.menuconfig:
             builder.run_menuconfig()
