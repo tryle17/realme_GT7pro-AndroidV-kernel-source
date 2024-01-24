@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -1018,6 +1018,7 @@ static struct clk_rcg2 cam_cc_camnoc_axi_rt_clk_src = {
 	.clkr = {
 		.crm = &cam_crm,
 		.crm_vcd = 8,
+		.crm_num_node = 2,
 	},
 	.clkr.hw.init = &(const struct clk_init_data){
 		.name = "cam_cc_camnoc_axi_rt_clk_src",
