@@ -134,7 +134,7 @@ static int walt_proc_group_thresholds_handler(struct ctl_table *table, int write
 		if (sysctl_sched_group_downmigrate_pct != 0 && val <= 0) {
 			ret = -EINVAL;
 			goto unlock_mutex;
-		} else if (val <= sysctl_sched_group_downmigrate_pct) {
+		} else if (val <= sysctl_sched_group_downmigrate_pct && val != 0) {
 			ret = -EINVAL;
 			goto unlock_mutex;
 		}
