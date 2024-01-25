@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kobject.h>
@@ -217,7 +217,7 @@ static int __free_si_object(struct si_object *object)
 		if (object->ops->release)
 			object->ops->release(object);
 
-		kfree(name);
+		kfree_const(name);
 		break;
 	}
 	case SI_OT_ROOT:
@@ -279,7 +279,7 @@ int init_si_object_user(struct si_object *object, enum si_object_type ot,
 		if (!object->ops->dispatch)
 			return -EINVAL;
 
-		object->name = kvasprintf(GFP_KERNEL, fmt, ap);
+		object->name = kvasprintf_const(GFP_KERNEL, fmt, ap);
 		if (!object->name)
 			return -ENOMEM;
 
@@ -1180,8 +1180,8 @@ static int __init si_core_init(void)
 	if (ret)
 		return ret;
 
-	/* Create '/sys/firmware/si_core'. */
-	si_core_kobj = kobject_create_and_add("si_core", firmware_kobj);
+	/* Create '/sys/kernel/si_core'. */
+	si_core_kobj = kobject_create_and_add("si_core", kernel_kobj);
 	if (!si_core_kobj) {
 		destroy_si_core_wq();
 
