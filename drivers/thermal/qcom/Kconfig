@@ -138,6 +138,16 @@ config QTI_CPUFREQ_CDEV
 	   framework and allow limiting the cpu frequency by
 	   userspace.
 
+config QTI_THERMALZONE_CONFIG_DEBUG
+	tristate "QTI Thermal Zone config debug driver"
+	depends on THERMAL && THERMAL_OF && DEBUG_FS
+	help
+	   This enables debugfs based interface support for thermal zones
+	   to read the entire configuration of a given thermal zone. It
+	   includes passive/polling delay, cooling device upper or lower
+	   level configuration etc. The userspace client can use this
+	   debugfs interface to understand full snapshot of a thermal zone.
+
 config QTI_SDPM_CLOCK_MONITOR
 	tristate "QTI SDPM Clock Monitor"
 	depends on COMMON_CLK && CPU_FREQ
