@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/build_bug.h>
@@ -313,7 +313,6 @@ static void coresight_disable_sink(struct coresight_device *csdev)
 	if (ret)
 		return;
 	csdev->enable = false;
-	csdev->activated = false;
 }
 
 static int coresight_enable_link(struct coresight_device *csdev,
