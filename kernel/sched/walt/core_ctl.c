@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt)	"core_ctl: " fmt
@@ -679,7 +679,8 @@ static int compute_cluster_nr_run(int index)
 		nr_need += nr_stats[cpu].nr;
 	}
 
-	if (active_cpu_count_from_mask(&cluster->nrrun_cpu_mask) <= nr_need)
+	if (cpumask_intersects(&cluster->nrrun_cpu_mask, cpu_partial_halt_mask) &&
+			active_cpu_count_from_mask(&cluster->nrrun_cpu_mask) <= nr_need)
 		nr_need = nr_need - active_cpu_count_from_mask(&cluster->nrrun_cpu_mask);
 
 	return nr_need;

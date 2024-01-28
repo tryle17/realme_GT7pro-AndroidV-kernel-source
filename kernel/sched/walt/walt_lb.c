@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <trace/hooks/sched.h>
@@ -275,6 +275,9 @@ static inline bool need_active_lb(struct task_struct *p, int dst_cpu,
 	if (cpu_rq(src_cpu)->active_balance)
 		return false;
 
+	if ((cpu_cluster(src_cpu) == cpu_cluster(dst_cpu)) && cpu_halted(src_cpu))
+		return true;
+
 	if (!check_for_higher_capacity(dst_cpu, src_cpu))
 		return false;
 
@@ -479,6 +482,23 @@ static int find_first_idle_if_others_are_busy(void)
 	return first_idle;
 }
 
+static bool similar_cap_skip_cpu(int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+	int cfs_nr_running = rq->cfs.h_nr_running;
+
+	if (cpu_halted(cpu) && cfs_nr_running)
+		return false;
+
+	if (rq->nr_running < 2)
+		return true;
+
+	if (!cfs_nr_running)
+		return true;
+
+	return false;
+}
+
 static int walt_lb_find_busiest_similar_cap_cpu(int dst_cpu, const cpumask_t *src_mask,
 		int *has_misfit, bool is_newidle)
 {
@@ -491,7 +511,7 @@ static int walt_lb_find_busiest_similar_cap_cpu(int dst_cpu, const cpumask_t *sr
 		wrq = &per_cpu(walt_rq, i);
 		trace_walt_lb_cpu_util(i, wrq);
 
-		if (cpu_rq(i)->nr_running < 2 || !cpu_rq(i)->cfs.h_nr_running)
+		if (similar_cap_skip_cpu(i))
 			continue;
 
 		util = walt_lb_cpu_util(i);
