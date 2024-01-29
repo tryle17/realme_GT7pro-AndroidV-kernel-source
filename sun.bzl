@@ -36,6 +36,8 @@ def define_sun():
         "drivers/edac/qcom_edac.ko",
         "drivers/firmware/arm_scmi/qcom_scmi_vendor.ko",
         "drivers/firmware/qcom-scm.ko",
+        "drivers/firmware/qcom/si_core/mem_object.ko",
+        "drivers/firmware/qcom/si_core/si_core_module.ko",
         "drivers/gpu/drm/display/drm_display_helper.ko",
         "drivers/gpu/drm/display/drm_dp_aux_bus.ko",
         "drivers/hwmon/hwmon.ko",
