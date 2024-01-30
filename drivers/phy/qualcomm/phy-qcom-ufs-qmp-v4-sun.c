@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "phy-qcom-ufs-qmp-v4-sun.h"
@@ -156,6 +156,9 @@ static
 void ufs_qcom_phy_qmp_v4_power_control(struct ufs_qcom_phy *phy,
 					 bool power_ctrl)
 {
+	struct device *dev = phy->dev;
+	int err;
+
 	if (!power_ctrl) {
 		/* apply analog power collapse */
 		writel_relaxed(0x0, phy->mmio + UFS_PHY_POWER_DOWN_CONTROL);
@@ -165,6 +168,23 @@ void ufs_qcom_phy_qmp_v4_power_control(struct ufs_qcom_phy *phy,
 		 */
 		mb();
 		ufs_qcom_phy_qmp_v4_tx_pull_down_ctrl(phy, true);
+
+		/*
+		 * The Sun's platform supports the retention of the PHY registers
+		 * when the phy power is collapsed.
+		 * Ensure the target's "gcc_ufs_phy_gdsc" DT entry has the support
+		 * by having the "qcom,retain-regs" flag. The gdsc driver would
+		 * enable the ufs phy retention support during its probe.
+		 * Turn off the PHY gdsc here as the phy retention support is
+		 * platform specific.
+		 */
+		if (phy->vdd_phy_gdsc.reg) {
+			err = ufs_qcom_phy_disable_vreg(dev, &phy->vdd_phy_gdsc);
+			if (err)
+				dev_err(dev, "%s disable phy_gdsc err = %d\n",
+				__func__, err);
+		}
+
 	} else {
 		ufs_qcom_phy_qmp_v4_tx_pull_down_ctrl(phy, false);
 		/* bring PHY out of analog power collapse */
