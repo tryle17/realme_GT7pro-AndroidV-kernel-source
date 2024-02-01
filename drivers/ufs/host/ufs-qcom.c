@@ -2403,12 +2403,16 @@ static int ufs_qcom_vdd_hba_reg_notifier(struct notifier_block *nb,
 {
 	struct ufs_qcom_host *host = container_of(nb, struct ufs_qcom_host,
 						  vdd_hba_reg_nb);
+	u16 minor = host->hw_ver.minor;
+	u8 major = host->hw_ver.major;
 
 	switch (event) {
 	case REGULATOR_EVENT_DISABLE:
 		/* The flag will be cleared during h8 exit post change */
 		if (ufs_qcom_is_link_hibern8(host->hba) &&
-		    (host->chosen_algo != STATIC_ALLOC_ALG1))
+		    (host->chosen_algo != STATIC_ALLOC_ALG1) &&
+		     ((major == 0x05 && minor == 0) ||
+		      (major == 0x06 && minor == 0)))
 			host->vdd_hba_pc = true;
 		break;
 	default:
