@@ -22,6 +22,7 @@
 #include "clk-regmap-divider.h"
 #include "clk-regmap-mux.h"
 #include "common.h"
+#include "gdsc.h"
 #include "reset.h"
 #include "vdd-level.h"
 
@@ -3413,6 +3414,36 @@ static struct clk_branch gcc_video_axi1_clk = {
 	},
 };
 
+static struct gdsc gcc_pcie_0_gdsc = {
+	.gdscr = 0x6b004,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0xf,
+	.collapse_ctrl = 0x5214c,
+	.collapse_mask = BIT(0),
+	.pd = {
+		.name = "gcc_pcie_0_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | VOTABLE,
+	.supply = "vdd_cx",
+};
+
+static struct gdsc gcc_pcie_0_phy_gdsc = {
+	.gdscr = 0x6c000,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0x2,
+	.collapse_ctrl = 0x5214c,
+	.collapse_mask = BIT(2),
+	.pd = {
+		.name = "gcc_pcie_0_phy_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | VOTABLE,
+	.supply = "vdd_mx",
+};
+
 static struct clk_regmap *gcc_sun_clocks[] = {
 	[GCC_AGGRE_NOC_PCIE_AXI_CLK] = &gcc_aggre_noc_pcie_axi_clk.clkr,
 	[GCC_AGGRE_UFS_PHY_AXI_CLK] = &gcc_aggre_ufs_phy_axi_clk.clkr,
@@ -3576,6 +3607,11 @@ static struct clk_regmap *gcc_sun_clocks[] = {
 	[GCC_VIDEO_AXI1_CLK] = &gcc_video_axi1_clk.clkr,
 };
 
+static struct gdsc *gcc_sun_gdscs[] = {
+	[GCC_PCIE_0_GDSC] = &gcc_pcie_0_gdsc,
+	[GCC_PCIE_0_PHY_GDSC] = &gcc_pcie_0_phy_gdsc,
+};
+
 static const struct qcom_reset_map gcc_sun_resets[] = {
 	[GCC_CAMERA_BCR] = { 0x26000 },
 	[GCC_DISPLAY_BCR] = { 0x27000 },
@@ -3613,7 +3649,6 @@ static const struct qcom_reset_map gcc_sun_resets[] = {
 	[GCC_VIDEO_BCR] = { 0x32000 },
 };
 
-
 static const struct clk_rcg_dfs_data gcc_dfs_clocks[] = {
 	DEFINE_RCG_DFS(gcc_qupv3_wrap1_qspi_ref_clk_src),
 	DEFINE_RCG_DFS(gcc_qupv3_wrap1_s0_clk_src),
@@ -3649,6 +3684,8 @@ static const struct qcom_cc_desc gcc_sun_desc = {
 	.num_resets = ARRAY_SIZE(gcc_sun_resets),
 	.clk_regulators = gcc_sun_regulators,
 	.num_clk_regulators = ARRAY_SIZE(gcc_sun_regulators),
+	.gdscs = gcc_sun_gdscs,
+	.num_gdscs = ARRAY_SIZE(gcc_sun_gdscs),
 };
 
 static const struct of_device_id gcc_sun_match_table[] = {
