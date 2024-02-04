@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -711,7 +711,10 @@ static void uetm_store_config(struct uetm_drvdata *drvdata)
 
 	cfg_num = drvdata->lane / 2;
 
-	*base++ = config->ocla_cfg1;
+	if (drvdata->uncore_uetm)
+		*base++ = config->ocla_cfg1;
+	else
+		*base++ = config->ocla_cfg;
 	*base++ = config->atb_cfg;
 	*base++ = config->uetm_cfg;
 
@@ -738,8 +741,10 @@ static void uetm_store_config(struct uetm_drvdata *drvdata)
 		for (j = 0; j < cfg_num; j++)
 			*base++ = config->cntr_cfg[i][j];
 
-	*base++ = config->ocla_cfg2;
-	*base++ = config->ocla_cfg1;
+	if (drvdata->uncore_uetm) {
+		*base++ = config->ocla_cfg2;
+		*base++ = config->ocla_cfg;
+	}
 
 	for (j = 0; j < cfg_num; j++)
 		*base++ = config->diff_dmask_cfg[j];
