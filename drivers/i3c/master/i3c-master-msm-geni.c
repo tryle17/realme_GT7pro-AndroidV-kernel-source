@@ -1998,6 +1998,9 @@ geni_i3c_master_priv_xfers(struct i3c_dev_desc *dev, struct i3c_priv_xfer *xfers
 		ret = geni_i3c_master_fifo_dma_priv_xfers(gi3c, xfers, dev->info.dyn_addr,
 							  num_xfers);
 
+	if (gi3c->pm_ctrl_client && !gi3c->probe_completed)
+		gi3c->probe_completed = true;
+
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s ret:%d\n", __func__, ret);
 	if (!gi3c->pm_ctrl_client)
 		i3c_geni_runtime_put_mutex_unlock(gi3c);
@@ -2057,6 +2060,9 @@ static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, const struct i2c_
 
 	if (gi3c->se_mode == GENI_GPI_DMA)
 		geni_i3c_gsi_stop_on_bus(gi3c);
+
+	if (gi3c->pm_ctrl_client && !gi3c->probe_completed)
+		gi3c->probe_completed = true;
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "i2c: txn ret:%d\n", ret);
 
@@ -3685,9 +3691,10 @@ static int geni_i3c_gpi_pause_resume(struct geni_i3c_dev *gi3c, bool is_suspend)
 static int geni_i3c_runtime_suspend(struct device *dev)
 {
 	struct geni_i3c_dev *gi3c = dev_get_drvdata(dev);
-	int ret;
+	int ret = 0;
 	u8 hj_wait_cnt = 0;
 
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s(): ret:%d start\n", __func__, ret);
 	while (gi3c->pm_ctrl_client && gi3c->hj_in_progress && hj_wait_cnt <= 50) {
 		hj_wait_cnt++;
 		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
@@ -3730,16 +3737,17 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 	}
 	/* else Continue to be in active state with i3c_ibi functionality. */
 
-	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s():ret:%d\n",
-			 __func__, ret);
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s():ret:%d end\n",
+		    __func__, ret);
 	return 0;
 }
 
 static int geni_i3c_runtime_resume(struct device *dev)
 {
-	int ret;
+	int ret = 0;
 	struct geni_i3c_dev *gi3c = dev_get_drvdata(dev);
 
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s(): ret:%d start\n", __func__, ret);
 	ret = geni_icc_enable(&gi3c->se);
 	if (ret) {
 		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
@@ -3768,11 +3776,12 @@ static int geni_i3c_runtime_resume(struct device *dev)
 			return ret;
 		}
 	}
-	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s(): ret:%d\n",
-			__func__, ret);
+
 	if (gi3c->pm_ctrl_client && gi3c->probe_completed)
 		geni_i3c_enable_ibi_ctrl(gi3c, true);
-	/* Enable TLMM I3C MODE registers */
+
+	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s(): ret:%d end\n",
+		    __func__, ret);
 	return 0;
 }
 
