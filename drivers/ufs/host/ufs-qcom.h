@@ -635,6 +635,7 @@ struct ufs_qcom_host {
 
 	bool broken_ahit_wa;
 	unsigned long active_cmds;
+	u32 hs_gear;
 };
 
 static inline u32
