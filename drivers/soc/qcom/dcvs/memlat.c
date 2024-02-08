@@ -187,8 +187,6 @@ struct memlat_mon {
 	u32				wb_filter_ipm;
 	u32				min_freq;
 	u32				max_freq;
-	u32				mon_min_freq;
-	u32				mon_max_freq;
 	u32				cur_freq;
 	struct kobject			kobj;
 	bool				is_compute;
@@ -210,6 +208,8 @@ struct memlat_group {
 	u32				fp_freq;
 	u32				*fp_votes;
 	u32				grp_ev_ids[NUM_GRP_EVS];
+	u32				hw_min_freq;
+	u32				hw_max_freq;
 	struct memlat_mon		*mons;
 	u32				num_mons;
 	u32				num_inited_mons;
@@ -358,7 +358,7 @@ static ssize_t store_min_freq(struct kobject *kobj,
 	ret = kstrtouint(buf, 10, &freq);
 	if (ret < 0)
 		return ret;
-	freq = max(freq, mon->mon_min_freq);
+	freq = max(freq, grp->hw_min_freq);
 	freq = min(freq, mon->max_freq);
 	mon->min_freq = freq;
 
@@ -392,7 +392,7 @@ static ssize_t store_max_freq(struct kobject *kobj,
 	if (ret < 0)
 		return ret;
 	freq = max(freq, mon->min_freq);
-	freq = min(freq, mon->mon_max_freq);
+	freq = min(freq, grp->hw_max_freq);
 	mon->max_freq = freq;
 	if ((mon->type & CPUCP_MON) && ops) {
 		msg.hw_type = grp->hw_type;
@@ -1787,6 +1787,7 @@ static int memlat_grp_probe(struct platform_device *pdev)
 		of_node_put(of_node);
 		return -EINVAL;
 	}
+	of_node_put(of_node);
 
 	memlat_grp = devm_kzalloc(dev, sizeof(*memlat_grp), GFP_KERNEL);
 	if (!memlat_grp)
@@ -1796,14 +1797,15 @@ static int memlat_grp_probe(struct platform_device *pdev)
 	memlat_grp->dev = dev;
 
 	memlat_grp->dcvs_kobj = qcom_dcvs_kobject_get(hw_type);
-	if (IS_ERR(memlat_grp->dcvs_kobj)) {
-		ret = PTR_ERR(memlat_grp->dcvs_kobj);
-		dev_err(dev, "error getting kobj from qcom_dcvs: %d\n", ret);
-		of_node_put(of_node);
-		return ret;
-	}
+	if (IS_ERR(memlat_grp->dcvs_kobj))
+		return dev_err_probe(dev, PTR_ERR(memlat_grp->dcvs_kobj),
+					"error getting kobj from qcom_dcvs\n");
 
-	of_node_put(of_node);
+	ret = qcom_dcvs_hw_minmax_get(hw_type, &memlat_grp->hw_min_freq,
+						&memlat_grp->hw_max_freq);
+	if (ret < 0)
+		return dev_err_probe(dev, ret, "error getting minmax from qcom_dcvs\n");
+
 	of_node = of_parse_phandle(dev->of_node, "qcom,sampling-path", 0);
 	if (of_node) {
 		ret = of_property_read_u32(of_node, "qcom,dcvs-path-type",
@@ -2019,8 +2021,8 @@ static int memlat_mon_probe(struct platform_device *pdev)
 		goto unlock_out;
 	}
 
-	mon->mon_min_freq = mon->min_freq = cpufreq_to_memfreq(mon, 0);
-	mon->mon_max_freq = mon->max_freq = cpufreq_to_memfreq(mon, U32_MAX);
+	mon->min_freq = memlat_grp->hw_min_freq;
+	mon->max_freq = memlat_grp->hw_max_freq;
 	mon->cur_freq = mon->min_freq;
 
 	if (mon->is_compute)
