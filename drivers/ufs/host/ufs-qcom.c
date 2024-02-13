@@ -848,6 +848,27 @@ static void ufs_qcom_select_unipro_mode(struct ufs_qcom_host *host)
 	mb();
 }
 
+static int ufs_qcom_phy_power_on(struct ufs_hba *hba)
+{
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+	struct phy *phy = host->generic_phy;
+	int ret = 0;
+
+	mutex_lock(&host->phy_mutex);
+	if (!host->is_phy_pwr_on) {
+		ret = phy_power_on(phy);
+		if (ret) {
+			mutex_unlock(&host->phy_mutex);
+			return ret;
+		}
+		host->is_phy_pwr_on = true;
+	}
+
+	mutex_unlock(&host->phy_mutex);
+
+	return ret;
+}
+
 /*
  * ufs_qcom_host_reset - reset host controller and PHY
  */
@@ -861,6 +882,19 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 
 	if (!host->core_reset) {
 		dev_warn(hba->dev, "%s: reset control not set\n", __func__);
+		goto out;
+	}
+
+	/*
+	 * Power on the PHY before resetting the UFS host controller
+	 * and the UFS PHY. Without power, the PHY reset may not work properly.
+	 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
+	 * would be a nop because the flag is_phy_pwr_on would be true.
+	 */
+	ret = ufs_qcom_phy_power_on(hba);
+	if (ret) {
+		dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
+			__func__, ret);
 		goto out;
 	}
 
@@ -897,27 +931,6 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 out:
 	host->vdd_hba_pc = false;
 	host->reset_in_progress = false;
-	return ret;
-}
-
-static int ufs_qcom_phy_power_on(struct ufs_hba *hba)
-{
-	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
-	struct phy *phy = host->generic_phy;
-	int ret = 0;
-
-	mutex_lock(&host->phy_mutex);
-	if (!host->is_phy_pwr_on) {
-		ret = phy_power_on(phy);
-		if (ret) {
-			mutex_unlock(&host->phy_mutex);
-			return ret;
-		}
-		host->is_phy_pwr_on = true;
-	}
-
-	mutex_unlock(&host->phy_mutex);
-
 	return ret;
 }
 
