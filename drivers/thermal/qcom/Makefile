@@ -26,3 +26,4 @@ obj-${CONFIG_QTI_SDPM_CLOCK_MONITOR} += sdpm_clk.o
 obj-$(CONFIG_QTI_CPU_PAUSE_COOLING_DEVICE) += thermal_pause.o
 obj-$(CONFIG_QTI_DEVFREQ_CDEV) += qti_devfreq_cdev.o
 obj-$(CONFIG_MAX31760_FAN_CONTROLLER) += max31760_fan.o
+obj-$(CONFIG_QTI_GPU_DUMP_SKIP_COOLING_DEVICE) += gpu_dump_skip_cdev.o
