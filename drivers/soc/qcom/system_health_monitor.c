@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014, 2016 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/cdev.h>
@@ -144,11 +144,14 @@ static int restart_notifier_cb(struct notifier_block *this,
 		container_of(this, struct hma_info, restart_nb);
 	struct restart_work *rwp;
 
+	mutex_lock(&hma_info_list_lock);
 	if (code == QCOM_SSR_BEFORE_SHUTDOWN) {
 		atomic_set(&tmp_hma_info->is_in_reset, 1);
 		tmp_hma_info->connected = false;
 		rwp = &tmp_hma_info->rwp;
-		cancel_delayed_work(&rwp->dwork);
+		if (atomic_read(&tmp_hma_info->check_state) == SHM_STATE_CHECKING)
+			cancel_delayed_work(&rwp->dwork);
+
 		SHM_INFO_LOG("%s: %s going to shutdown\n",
 			 __func__, tmp_hma_info->ssrestart_string);
 	} else if (code == QCOM_SSR_AFTER_POWERUP) {
@@ -156,6 +159,8 @@ static int restart_notifier_cb(struct notifier_block *this,
 		SHM_INFO_LOG("%s: %s powered up\n",
 			 __func__, tmp_hma_info->ssrestart_string);
 	}
+	mutex_unlock(&hma_info_list_lock);
+
 	return 0;
 }
 
