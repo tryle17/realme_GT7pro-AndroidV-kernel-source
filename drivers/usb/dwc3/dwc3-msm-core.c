@@ -6729,6 +6729,8 @@ static void msm_dwc3_perf_vote_enable(struct dwc3_msm *mdwc, bool enable)
 		schedule_delayed_work(&mdwc->perf_vote_work,
 				msecs_to_jiffies(PM_QOS_DEFAULT_SAMPLE_MS));
 	} else {
+		if (!mdwc->pm_qos_latency_cfg)
+			return;
 		cancel_delayed_work_sync(&mdwc->perf_vote_work);
 		msm_dwc3_perf_vote_update(mdwc, false);
 	}
