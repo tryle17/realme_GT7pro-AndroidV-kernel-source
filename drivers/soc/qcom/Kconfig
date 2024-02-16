@@ -782,6 +782,7 @@ config QCOM_SECURE_BUFFER
 	  buffer.
 
 source "drivers/soc/qcom/mem_buf/Kconfig"
+source "drivers/soc/qcom/tmecom/Kconfig"
 
 config QCOM_MEM_OFFLINE
 	tristate "Dynamic Memory Region Offline driver"
