@@ -195,6 +195,7 @@ def define_sun():
         "drivers/soc/qcom/sps/sps_drv.ko",
         "drivers/soc/qcom/sys_pm_vx.ko",
         "drivers/soc/qcom/sysmon_subsystem_stats.ko",
+        "drivers/soc/qcom/tmecom/tmecom-intf.ko",
         "drivers/soc/qcom/wcd_usbss_i2c.ko",
         "drivers/spi/q2spi-geni.ko",
         "drivers/spi/spi-msm-geni.ko",
