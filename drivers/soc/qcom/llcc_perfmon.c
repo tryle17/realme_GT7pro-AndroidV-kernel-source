@@ -37,12 +37,11 @@
 #define BEAC_MC_WR_BEAT_FIL0		25
 #define BEAC_MC_RD_BEAT_FIL1		38
 #define BEAC_MC_WR_BEAT_FIL1		39
-#define DRP2EWB_EVICT			0
-#define DRP2EWB_BEAT_1			10
-#define LCP2EWB_EVICT			11
-#define LCP2EWB_BEAT_1			16
-#define WB2EWB_DRAMBWR			17
-#define WB2EWB_BEAT_1			20
+
+#define RD_CMD_SENT_TO_MC_COUNT_SCALED_0	(163)
+#define RD_CMD_SENT_TO_MC_COUNT_SCALED_1	(165)
+#define RD_CMD_SENT_TO_LCP_COUNT_SCALED_0	(164)
+#define RD_CMD_SENT_TO_LCP_COUNT_SCALED_1	(166)
 
 #define MCPROF_FEAC_FLTR_0		0
 #define MCPROF_FEAC_FLTR_1		1
@@ -1195,12 +1194,55 @@ static bool feac_event_config(struct llcc_perfmon_private *llcc_priv, unsigned i
 		filter_sel = llcc_priv->configured[*counter_num].filter_sel;
 	}
 
+	if (llcc_priv->version >= LLCC_VERSION_6) {
+		if ((event_type == RD_CMD_SENT_TO_MC_COUNT_SCALED_0) ||
+				(event_type == RD_CMD_SENT_TO_MC_COUNT_SCALED_1)) {
+			/* Due to RTL bug, only FEAC_LLCC2MC_PROF_CFG_0 got used for
+			 * LLCC2MC_PROFTAG and FEAC_LLCC2MC_PROF_CFG_1 used for LCP2MC_PROFTAG.
+			 * Use RD_TX andRD_GRANULE for filtering multiple traffic.
+			 */
+			mask_val = LLCC2MC_PROFTAG_MASK_MASK | LLCC2MC_PROFTAG_MATCH_MASK;
+			offset = FEAC_LLCC2MC_PROF_CFG_0(llcc_priv->version);
+			llcc_bcast_read(llcc_priv, offset, &val);
+			if (val & mask_val) {
+				pr_err("Event configured already, reusing same.\n");
+				return false;
+			}
+
+			val = 1 << filter_sel;
+			val = (val << LLCC2MC_PROFTAG_MATCH_SHIFT) |
+				(val << LLCC2MC_PROFTAG_MASK_SHIFT);
+			llcc_bcast_modify(llcc_priv, offset, val, mask_val);
+		}
+
+		if ((event_type == RD_CMD_SENT_TO_LCP_COUNT_SCALED_0) ||
+				(event_type == RD_CMD_SENT_TO_LCP_COUNT_SCALED_1)) {
+			/* Due to RTL bug, only FEAC_LLCC2LCP_PROF_CFG_0 got used for
+			 * LLCC2MC_PROFTAG and FEAC_LLCC2LCP_PROF_CFG_1 used for LCP2MC_PROFTAG.
+			 * Use RD_TX andRD_GRANULE for filtering multiple traffic.
+			 */
+			mask_val = LLCC2LCP_PROFTAG_MASK_MASK | LLCC2LCP_PROFTAG_MATCH_MASK;
+			offset = FEAC_LLCC2MC_PROF_CFG_1(llcc_priv->version);
+			llcc_bcast_read(llcc_priv, offset, &val);
+			if (val & mask_val) {
+				pr_err("Event configured already, reusing same.\n");
+				return false;
+			}
+
+			val = 1 << filter_sel;
+			val = (val << LLCC2LCP_PROFTAG_MATCH_SHIFT) |
+				(val << LLCC2LCP_PROFTAG_MASK_SHIFT);
+			llcc_bcast_modify(llcc_priv, offset, val, mask_val);
+		}
+	}
+
+	val = 0;
 	mask_val = EVENT_SEL_MASK;
 
 	if (llcc_priv->version >= LLCC_VERSION_2) {
 		mask_val = EVENT_SEL_MASK7;
 
-		if (llcc_priv->version == LLCC_VERSION_5)
+		if (llcc_priv->version >= LLCC_VERSION_5)
 			mask_val = EVENT_SEL_MASK8;
 	}
 
@@ -1258,29 +1300,24 @@ static void feac_event_enable(struct llcc_perfmon_private *llcc_priv, bool enabl
 				FEAC_WR_BYTE_FILTER_SEL_MASK | FEAC_WR_BYTE_FILTER_EN_MASK |
 				FEAC_RD_BEAT_FILTER_SEL_MASK | FEAC_RD_BEAT_FILTER_EN_MASK |
 				FEAC_RD_BYTE_FILTER_SEL_MASK | FEAC_RD_BYTE_FILTER_EN_MASK;
-			val |= FEAC_WR_BEAT_FILTER_EN | FEAC_WR_BYTE_FILTER_EN |
-				FEAC_RD_BEAT_FILTER_EN | FEAC_RD_BYTE_FILTER_EN;
 
-			if (prof_cfg_filter && prof_cfg1_filter1) {
-				val_cfg1 = val;
+			val_cfg1 = val;
+			if (prof_cfg_filter) {
+				val |= FEAC_WR_BEAT_FILTER_EN | FEAC_WR_BYTE_FILTER_EN |
+					FEAC_RD_BEAT_FILTER_EN | FEAC_RD_BYTE_FILTER_EN;
 				val |= (FILTER_0 << FEAC_WR_BEAT_FILTER_SEL_SHIFT) |
 					(FILTER_0 << FEAC_WR_BYTE_FILTER_SEL_SHIFT) |
 					(FILTER_0 << FEAC_RD_BEAT_FILTER_SEL_SHIFT) |
 					(FILTER_0 << FEAC_RD_BYTE_FILTER_SEL_SHIFT);
+			}
+
+			if (prof_cfg1_filter1) {
+				val_cfg1 |= FEAC_WR_BEAT_FILTER_EN | FEAC_WR_BYTE_FILTER_EN |
+					FEAC_RD_BEAT_FILTER_EN | FEAC_RD_BYTE_FILTER_EN;
 				val_cfg1 |= (FILTER_1 << FEAC_WR_BEAT_FILTER_SEL_SHIFT) |
 					(FILTER_1 << FEAC_WR_BYTE_FILTER_SEL_SHIFT) |
 					(FILTER_1 << FEAC_RD_BEAT_FILTER_SEL_SHIFT) |
 					(FILTER_1 << FEAC_RD_BYTE_FILTER_SEL_SHIFT);
-			} else if (prof_cfg1_filter1) {
-				val |= (FILTER_1 << FEAC_WR_BEAT_FILTER_SEL_SHIFT) |
-					(FILTER_1 << FEAC_WR_BYTE_FILTER_SEL_SHIFT) |
-					(FILTER_1 << FEAC_RD_BEAT_FILTER_SEL_SHIFT) |
-					(FILTER_1 << FEAC_RD_BYTE_FILTER_SEL_SHIFT);
-			} else if (prof_cfg_filter) {
-				val |= (FILTER_0 << FEAC_WR_BEAT_FILTER_SEL_SHIFT) |
-					(FILTER_0 << FEAC_WR_BYTE_FILTER_SEL_SHIFT) |
-					(FILTER_0 << FEAC_RD_BEAT_FILTER_SEL_SHIFT) |
-					(FILTER_0 << FEAC_RD_BYTE_FILTER_SEL_SHIFT);
 			}
 		}
 	}
@@ -1296,7 +1333,7 @@ static void feac_event_enable(struct llcc_perfmon_private *llcc_priv, bool enabl
 	 * filter0 & 1 can be applied on PROF_CFG and PROG_CFG1 respectively. Otherwise for a
 	 * single applied filter only PROF_CFG will be used for either filter 0 or 1
 	 */
-	if (llcc_priv->version >= LLCC_VERSION_2_1 && (prof_cfg_filter && prof_cfg1_filter1)) {
+	if (llcc_priv->version >= LLCC_VERSION_2_1 && (prof_cfg_filter || prof_cfg1_filter1)) {
 		offset = FEAC_PROF_CFG(llcc_priv->version);
 		llcc_bcast_modify(llcc_priv, offset, val, mask_val);
 		mask_val &= ~PROF_CFG_EN_MASK;
@@ -1570,15 +1607,18 @@ static bool fewc_event_config(struct llcc_perfmon_private *llcc_priv, unsigned i
 	}
 
 	mask_val = EVENT_SEL_MASK;
-	if (filter_en)
-		mask_val |= FILTER_SEL_MASK | FILTER_EN_MASK;
+	if (llcc_priv->version >= LLCC_VERSION_6)
+		mask_val = EVENT_SEL_MASK7;
 
 	if (enable) {
-		val = (event_type << EVENT_SEL_SHIFT) & EVENT_SEL_MASK;
+		val = (event_type << EVENT_SEL_SHIFT) & mask_val;
 		if (filter_en)
 			val |= (filter_sel << FILTER_SEL_SHIFT) | FILTER_EN;
 
 	}
+
+	if (filter_en)
+		mask_val |= FILTER_SEL_MASK | FILTER_EN_MASK;
 
 	offset = FEWC_PROF_EVENT_n_CFG(llcc_priv->version, *counter_num);
 	llcc_bcast_modify(llcc_priv, offset, val, mask_val);
@@ -1838,19 +1878,24 @@ static bool ewb_event_config(struct llcc_perfmon_private *llcc_priv, unsigned in
 
 	cfg_val = (BEAT_SCALING << EWB_BEAT_SCALING_FACTOR_0_SHIFT) |
 		(BEAT_SCALING << EWB_BEAT_SCALING_FACTOR_1_SHIFT);
-	mask_val = EWB_EVENT_SEL_MASK;
 	cfg_mask = EWB_BEAT_SCALING_FACTOR_0_MASK | EWB_BEAT_SCALING_FACTOR_1_MASK;
-	if (filter_en)
-		cfg_mask |= EWB_BEAT_FILTER_SEL_1_MASK | EWB_BEAT_FILTER_EN_1_MASK |
-			EWB_BEAT_FILTER_SEL_0_MASK | EWB_BEAT_FILTER_EN_0_MASK;
+	if (filter_en) {
+		if (filter_sel == FILTER_0)
+			cfg_mask |= EWB_BEAT_FILTER_SEL_0_MASK | EWB_BEAT_FILTER_EN_0_MASK;
 
+		if (filter_sel == FILTER_1)
+			cfg_mask |= EWB_BEAT_FILTER_SEL_1_MASK | EWB_BEAT_FILTER_EN_1_MASK;
+	}
+
+	mask_val = EWB_EVENT_SEL_MASK;
 	if (enable) {
 		val = (event_type << EWB_EVENT_SEL_SHIFT) & EWB_EVENT_SEL_MASK;
 		if (filter_en) {
 			if (filter_sel == FILTER_1)
 				cfg_val |= (FILTER_1 << EWB_BEAT_FILTER_SEL_1_SHIFT) |
 					EWB_BEAT_FILTER_EN_1_EN;
-			else
+
+			if (filter_sel == FILTER_0)
 				cfg_val |= (FILTER_0 << EWB_BEAT_FILTER_SEL_0_SHIFT) |
 					EWB_BEAT_FILTER_EN_0_EN;
 		}
@@ -2005,8 +2050,6 @@ static bool trp_event_config(struct llcc_perfmon_private *llcc_priv, unsigned in
 
 	if (enable) {
 		val = (event_type << EVENT_SEL_SHIFT) & mask_val;
-		if (llcc_priv->version >= LLCC_VERSION_2)
-			val = (event_type << EVENT_SEL_SHIFT) & EVENT_SEL_MASK7;
 
 		if (filter_en)
 			val |= (filter_sel << FILTER_SEL_SHIFT) | FILTER_EN;
