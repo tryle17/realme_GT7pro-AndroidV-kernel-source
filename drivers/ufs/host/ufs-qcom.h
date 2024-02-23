@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef UFS_QCOM_H_
@@ -298,11 +298,6 @@ static inline void ufs_qcom_deassert_reset(struct ufs_hba *hba)
 }
 
 struct ufs_qcom_bus_vote {
-	uint32_t client_handle;
-	uint32_t curr_vote;
-	int min_bw_vote;
-	int max_bw_vote;
-	int saved_vote;
 	bool is_max_bw_needed;
 	struct device_attribute max_bus_bw;
 };
@@ -320,25 +315,6 @@ struct ufs_qcom_testbus {
 };
 
 struct gpio_desc;
-
-struct qcom_bus_vectors {
-	uint32_t ab;
-	uint32_t ib;
-};
-
-struct qcom_bus_path {
-	unsigned int num_paths;
-	struct qcom_bus_vectors *vec;
-};
-
-struct qcom_bus_scale_data {
-	struct qcom_bus_path *usecase;
-	unsigned int num_usecase;
-	struct icc_path *ufs_ddr;
-	struct icc_path *cpu_ufs;
-
-	const char *name;
-};
 
 struct qos_cpu_group {
 	cpumask_t mask;
@@ -557,6 +533,9 @@ struct ufs_qcom_host {
 	struct clk *tx_l1_sync_clk;
 	bool is_lane_clks_enabled;
 
+	struct icc_path *icc_ddr;
+	struct icc_path *icc_cpu;
+
 #ifdef CONFIG_SCSI_UFS_CRYPTO
 	struct qcom_ice *ice;
 #endif
@@ -581,7 +560,6 @@ struct ufs_qcom_host {
 	struct ufs_qcom_dev_params host_pwr_cap;
 
 	bool disable_lpm;
-	struct qcom_bus_scale_data *qbsd;
 
 	bool vdd_hba_pc;
 	struct notifier_block vdd_hba_reg_nb;
