@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "qcom-memlat: " fmt
@@ -33,6 +33,7 @@
 #include <linux/scmi_protocol.h>
 #include <linux/sched/clock.h>
 #include <linux/qcom_scmi_vendor.h>
+#include <linux/cpu_phys_log_map.h>
 #include "trace-dcvs.h"
 
 #define MAX_MEMLAT_GRPS	NUM_DCVS_HW_TYPES
@@ -1227,35 +1228,23 @@ out:
 	spin_unlock_irqrestore(&stats->ctrs_lock, flags);
 }
 
-static void get_mpidr_cpu(void *cpu)
-{
-	u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
-
-	*((uint32_t *)cpu) = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-}
-
 static int get_mask_and_mpidr_from_pdev(struct platform_device *pdev,
 					cpumask_t *mask, u32 *cpus_mpidr)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *dev_phandle;
-	struct device *cpu_dev;
 	int cpu, i = 0;
 	uint32_t physical_cpu;
 	int ret = -ENODEV;
 
 	dev_phandle = of_parse_phandle(dev->of_node, "qcom,cpulist", i++);
 	while (dev_phandle) {
-		for_each_possible_cpu(cpu) {
-			cpu_dev = get_cpu_device(cpu);
-			if (cpu_dev && cpu_dev->of_node == dev_phandle) {
-				cpumask_set_cpu(cpu, mask);
-				smp_call_function_single(cpu, get_mpidr_cpu,
-							 &physical_cpu, true);
-				*cpus_mpidr |= BIT(physical_cpu);
-				ret = 0;
-				break;
-			}
+		cpu = of_cpu_node_to_id(dev_phandle);
+		if (cpu >= 0) {
+			cpumask_set_cpu(cpu, mask);
+			physical_cpu = cpu_logical_to_phys(cpu);
+			*cpus_mpidr |= BIT(physical_cpu);
+			ret = 0;
 		}
 		of_node_put(dev_phandle);
 		dev_phandle = of_parse_phandle(dev->of_node, "qcom,cpulist", i++);
@@ -1949,6 +1938,9 @@ static int memlat_mon_probe(struct platform_device *pdev)
 	struct scmi_device *scmi_dev;
 #endif
 
+	ret = cpu_logical_to_phys(0);
+	if (ret == -EPROBE_DEFER)
+		return ret;
 	memlat_grp = dev_get_drvdata(dev->parent);
 	if (!memlat_grp) {
 		dev_err(dev, "Mon probe called without memlat_grp inited.\n");
