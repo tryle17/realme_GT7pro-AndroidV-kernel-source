@@ -169,6 +169,7 @@ def define_sun():
         "drivers/soc/qcom/memshare/msm_memshare.ko",
         "drivers/soc/qcom/minidump.ko",
         "drivers/soc/qcom/msm_performance.ko",
+        "drivers/soc/qcom/msm_show_epoch.ko",
         "drivers/soc/qcom/panel_event_notifier.ko",
         "drivers/soc/qcom/pcie-pdc.ko",
         "drivers/soc/qcom/pdr_interface.ko",
