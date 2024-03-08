@@ -50,6 +50,14 @@
 /* MCP code size register holds size divided by a factor. */
 #define MCP_SIZE_MUL_FACTOR (4)
 
+#ifdef CONFIG_ARCH_SUN
+#define QC_SPARE_0_8_ADDR 0x221C8490
+#define QC_SPARE_0_8_SP_PBL_PATCH_VERSION_MASK 0x3F
+#define QC_SPARE_0_8_SIZE_IN_BYTES 0x4
+
+static uint32_t sp_pbl_patch_version;
+#endif
+
 static bool ssr_already_occurred_since_boot;
 
 #define NUM_OF_DEBUG_REGISTERS_READ 0x3
@@ -491,11 +499,14 @@ static int spss_attach(struct rproc *rproc)
 	read_sp2cl_debug_registers(spss);
 	if (rproc->recovery_disabled && !ret) {
 		dev_err(spss->dev, "%d ms timeout poked\n", SPSS_TIMEOUT);
-		dev_err(spss->dev, "%s attach timed out\n", rproc->name);
-		/*
-		 * TODO: Panic on attach failure temporary removed due to a false
-		 * interrupt detection. Add back when SPU fix patch provided.
-		 */
+#ifdef CONFIG_ARCH_SUN
+		if (sp_pbl_patch_version == 0x0)
+			dev_err(spss->dev, "%s attach timed out\n", rproc->name);
+		else
+			panic("Panicking, %s attach timed out\n", rproc->name);
+#else
+		panic("Panicking, %s attach timed out\n", rproc->name);
+#endif
 	} else if (!ret) {
 		dev_err(spss->dev, "recovery disabled (after timeout)\n");
 	}
@@ -739,6 +750,13 @@ static int qcom_spss_probe(struct platform_device *pdev)
 	const char *fw_name;
 	bool signal_aop;
 	int ret;
+#ifdef CONFIG_ARCH_SUN
+	void __iomem *sp_pbl_ver_reg = ioremap(QC_SPARE_0_8_ADDR, QC_SPARE_0_8_SIZE_IN_BYTES);
+
+	sp_pbl_patch_version = readl(sp_pbl_ver_reg) & QC_SPARE_0_8_SP_PBL_PATCH_VERSION_MASK;
+	dev_info(&pdev->dev, "SP-PBL patch version is %d\n", sp_pbl_patch_version);
+	iounmap(sp_pbl_ver_reg);
+#endif
 
 	desc = of_device_get_match_data(&pdev->dev);
 	if (!desc)
