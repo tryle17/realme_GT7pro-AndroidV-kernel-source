@@ -290,6 +290,13 @@ config ARCH_RAVELIN
         help
           This enables support for the Qualcomm Technologies, Inc.'s
           RAVELIN chipset. If you do not wish to build a kernel that
+
+config ARCH_MONACO
+        bool "Enable Support for Qualcomm Technologies, Inc. MONACO"
+        depends on ARCH_QCOM
+        help
+          This enables support for the Qualcomm Technologies, Inc.'s
+          MONACO chipset. If you do not wish to build a kernel that
           runs on this chipset or if you are unsure, say 'N' here.
 
 config ARCH_REALTEK
