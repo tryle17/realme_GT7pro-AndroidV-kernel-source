@@ -329,6 +329,9 @@ static BWMON_ATTR_RW(idle_mbps);
 show_attr(ab_scale);
 store_attr(ab_scale, 0U, 100U);
 static BWMON_ATTR_RW(ab_scale);
+show_attr(second_ab_scale);
+store_attr(second_ab_scale, 0U, 100U);
+static BWMON_ATTR_RW(second_ab_scale);
 show_list_attr(mbps_zones, NUM_MBPS_ZONES);
 store_list_attr(mbps_zones, NUM_MBPS_ZONES, 0U, UINT_MAX);
 static BWMON_ATTR_RW(mbps_zones);
@@ -353,6 +356,7 @@ static struct attribute *bwmon_attrs[] = {
 	&idle_length.attr,
 	&idle_mbps.attr,
 	&ab_scale.attr,
+	&second_ab_scale.attr,
 	&mbps_zones.attr,
 	&throttle_adj.attr,
 	&second_vote_limit.attr,
@@ -759,6 +763,8 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 				node->cur_freqs[1].ib = 0;
 			node->cur_freqs[1].ib = min(node->cur_freqs[1].ib,
 							hw->second_vote_limit);
+			node->cur_freqs[1].ab = mult_frac(new_freq.ab,
+							node->second_ab_scale, 100);
 		}
 		return true;
 	}
@@ -910,6 +916,7 @@ static int configure_hwmon_node(struct bw_hwmon *hwmon)
 	node->idle_length = 0;
 	node->idle_mbps = 400;
 	node->ab_scale = 100;
+	node->second_ab_scale = 0;
 	node->mbps_zones[0] = 0;
 	node->hw = hwmon;
 
