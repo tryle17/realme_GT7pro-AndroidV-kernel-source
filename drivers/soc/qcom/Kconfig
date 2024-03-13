@@ -964,4 +964,13 @@ config SHOW_SUSPEND_EPOCH
           synchronize various subsystem timestamps and have an unique
           timestamp to correlate between various subsystems.
 
+config QCOM_DYNAMIC_RAMOOPS
+	tristate "Enable Dynamic Ramoops Device support"
+	depends on ARCH_QCOM
+	depends on PSTORE_RAM
+	help
+	  Enablement of this driver ensures that ramoops region can be anywhere
+	  reserved in ram instead of being fixed address which needs boot firmware
+	  awareness and it reads all ramoops property from device tree and registers
+	  ramoops platform device and driver for this device will still be fs/pstore/ram.c .
 endmenu
