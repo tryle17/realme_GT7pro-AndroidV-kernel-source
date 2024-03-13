@@ -17,6 +17,7 @@
 #define MBPS_TO_KHZ(mbps, w)	(mult_frac(mbps, MBYTE, w * 1000ULL))
 #define KHZ_TO_MBPS(khz, w)	(mult_frac(w * 1000ULL, khz, MBYTE))
 #define to_bwmon(ptr)		container_of(ptr, struct bwmon, hw)
+#define MAX_NAME_SIZE		64
 
 enum mon_reg_type {
 	MON1,
@@ -79,6 +80,7 @@ struct bw_hwmon {
 	u32			second_dcvs_width;
 	bool			second_vote_supported;
 	u32			second_vote_limit;
+	char			second_dev_name[MAX_NAME_SIZE + 1];
 	struct bwmon_second_map	*second_map;
 	struct hwmon_node	*node;
 	ktime_t			last_update_ts;

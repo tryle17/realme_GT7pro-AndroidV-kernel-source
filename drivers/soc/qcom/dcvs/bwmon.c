@@ -738,6 +738,7 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 	struct bw_hwmon *hw = node->hw;
 	struct dcvs_freq new_freq;
 	u32 primary_mbps;
+	bool ret = false;
 
 	get_bw_and_set_irq(node, &new_freq);
 
@@ -766,10 +767,17 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 			node->cur_freqs[1].ab = mult_frac(new_freq.ab,
 							node->second_ab_scale, 100);
 		}
-		return true;
+		ret = true;
 	}
 
-	return false;
+	if (hw->second_vote_supported)
+		trace_bw_hwmon_update(hw->second_dev_name,
+				/* use original hw width for ab to get true mbps */
+				KHZ_TO_MBPS(node->cur_freqs[1].ab, hw->dcvs_width),
+				KHZ_TO_MBPS(node->cur_freqs[1].ib, hw->second_dcvs_width),
+				0, 0);
+
+	return ret;
 }
 
 static const u64 HALF_TICK_NS = (NSEC_PER_SEC / HZ) >> 1;
@@ -1949,15 +1957,17 @@ static int bwmon_dcvs_register(struct platform_device *pdev, struct bwmon *m)
 				return -EINVAL;
 			}
 		}
-		if (!m->hw.second_map) {
-			ret = of_property_read_u32(tmp_of_node, "qcom,bus-width",
-						&m->hw.second_dcvs_width);
-			if (ret < 0 || !m->hw.second_dcvs_width) {
+		ret = of_property_read_u32(tmp_of_node, "qcom,bus-width",
+					&m->hw.second_dcvs_width);
+		if (ret < 0 || !m->hw.second_dcvs_width) {
+			if (!m->hw.second_map) {
 				dev_err(dev, "invalid sec hw width=%d, ret=%d\n",
-						m->hw.second_dcvs_width, ret);
+					m->hw.second_dcvs_width, ret);
 				return -EINVAL;
 			}
 		}
+		snprintf(m->hw.second_dev_name, MAX_NAME_SIZE + 1, "%s_hw-%d",
+						dev_name(dev), second_hw);
 		m->hw.second_vote_supported = true;
 	}
 
