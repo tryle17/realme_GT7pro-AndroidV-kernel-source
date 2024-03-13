@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -24,19 +24,30 @@
 #define MAX_RESIDUAL_SIZE	MAX_PRINT_SIZE
 #define SIZE_ADJUST		4
 #define SRC_OFFSET		4
-
 #define CREATE_TRACE_POINTS
 #include "trace_cpucp.h"
 #if IS_ENABLED(CONFIG_QTI_SCMI_VENDOR_PROTOCOL)
 #define CPUCP_CTRL_ALGO_STR (0x435055435043544c) /* CPUCPCTL ASCII */
+#define LOG_NAME_MAX_LENGTH 32
 static struct scmi_protocol_handle *ph;
 static const struct qcom_scmi_vendor_ops *ops;
-#endif
-
 enum cpucp_ctrl_param_ids {
 	LOGBUF_IDX = 1,
 	DDR_LOGBUF_FLUSH = 3,
+	MODULE_LOG_LEVEL = 5,
 };
+
+struct __packed scmi_module_log_level_t {
+	uint32_t module_id;
+	uint32_t log_level;
+};
+
+struct __packed scmi_module_log_data_t {
+	uint32_t module_id;
+	char module_name[LOG_NAME_MAX_LENGTH];
+	uint32_t remaining_modules;
+};
+#endif
 
 struct remote_mem {
 	void __iomem *start;
@@ -112,8 +123,79 @@ static int get_log_level(void *data, u64 *val)
 	*val = log_level;
 	return 0;
 }
+
+static ssize_t get_module_ids(struct file *file, char __user *user_buf,
+			     size_t count, loff_t *ppos)
+{
+	int ret;
+	struct scmi_module_log_data_t  rx_value;
+	ssize_t r = 0, bytes = 0;
+	char *kern_buf;
+	u32 module_id = 0;
+
+	module_id = 0;
+	kern_buf = kzalloc(2048, GFP_KERNEL);
+	if (!kern_buf)
+		return -ENOMEM;
+	bytes = scnprintf(kern_buf, 30, "Module ID Module Name\n");
+
+	do {
+		rx_value.module_id = module_id;
+		ret =  ops->get_param(ph, &rx_value, CPUCP_CTRL_ALGO_STR,
+				MODULE_LOG_LEVEL, sizeof(module_id),
+				sizeof(struct scmi_module_log_data_t));
+		if (!ret) {
+			bytes += scnprintf(kern_buf + bytes, 2048 - bytes, "%9d %s\n",
+					 rx_value.module_id,
+					 rx_value.module_name);
+			module_id++;
+		} else
+			pr_err("Failed to get supported module list %d\n", ret);
+
+	} while ((rx_value.remaining_modules != 0) && (!ret));
+
+	r = simple_read_from_buffer(user_buf, count, ppos, kern_buf, bytes);
+	kfree(kern_buf);
+	return r;
+}
+
+static ssize_t set_module_log_level(struct file *file,
+	const char __user *user_buf, size_t count, loff_t *ppos)
+{
+	struct scmi_module_log_level_t log_cfg;
+	void *kern_buf;
+	int ret;
+
+	/* Copy the user space buf */
+	kern_buf = memdup_user(user_buf, count);
+	if (IS_ERR(kern_buf))
+		return PTR_ERR(kern_buf);
+	ret = sscanf(kern_buf, "%u %u", &log_cfg.module_id, &log_cfg.log_level);
+	if (ret < 0)
+		return ret;
+	ret =  ops->set_param(ph, &log_cfg, CPUCP_CTRL_ALGO_STR,
+			MODULE_LOG_LEVEL, sizeof(log_cfg));
+	if (ret < 0) {
+		pr_err("failed to set module log level, ret = %d\n", ret);
+		kfree(kern_buf);
+		return ret;
+	}
+	kfree(kern_buf);
+	return count;
+}
+
 DEFINE_DEBUGFS_ATTRIBUTE(log_level_ops, get_log_level, set_log_level, "%llu\n");
 DEFINE_DEBUGFS_ATTRIBUTE(flush_log_ops, NULL, flush_cpucp_log, "%llu\n");
+
+static const struct file_operations avbl_module_ops = {
+	.read = get_module_ids,
+	.open = simple_open,
+	.llseek = default_llseek,
+};
+
+static const struct file_operations set_module_log_level_fops = {
+	.write = set_module_log_level,
+};
 #endif
 
 static inline bool get_last_newline(char *buf, int size, int *cnt)
@@ -152,6 +234,18 @@ static int scmi_cpucp_log_create_fs_entries(struct device *dev)
 	if (IS_ERR(ret)) {
 		dev_err(dev, "Debugfs directory creation failed\n");
 		return -ENOENT;
+	}
+
+	ret = debugfs_create_file("module_log_level", 0200, dir, NULL, &set_module_log_level_fops);
+	if (IS_ERR(ret)) {
+		dev_err(dev, "Debugfs directory creation failed for set_module_log_level\n");
+		return -ENOENT;
+	}
+	ret = debugfs_create_file("available_modules", 0400, dir, NULL,
+				  &avbl_module_ops);
+	if (IS_ERR(ret)) {
+		pr_err("Debugfs directory creation for available_modules failed\n");
+		return PTR_ERR(ret);
 	}
 	return 0;
 }
