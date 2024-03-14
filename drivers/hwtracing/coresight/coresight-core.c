@@ -118,15 +118,57 @@ struct coresight_device *coresight_get_percpu_sink(int cpu)
 }
 EXPORT_SYMBOL_GPL(coresight_get_percpu_sink);
 
+static struct coresight_device *coresight_get_source(struct list_head *path)
+{
+	struct coresight_device *csdev;
+
+	if (!path)
+		return NULL;
+
+	csdev = list_first_entry(path, struct coresight_node, link)->csdev;
+	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE)
+		return NULL;
+
+	return csdev;
+}
+
+/**
+ * coresight_source_filter - checks whether the connection matches the source
+ * of path if connection is binded to specific source.
+ * @path:	The list of devices
+ * @conn:	The connection of one outport
+ *
+ * Return zero if the connection doesn't have a source binded or source of the
+ * path matches the source binds to connection.
+ */
+static int coresight_source_filter(struct list_head *path,
+			struct coresight_connection *conn)
+{
+	int ret = 0;
+	struct coresight_device *source = NULL;
+
+	if (conn->source_name == NULL)
+		return ret;
+
+	source = coresight_get_source(path);
+	if (source == NULL)
+		return ret;
+
+	return strcmp(conn->source_name, dev_name(&source->dev));
+}
+
 static struct coresight_connection *
 coresight_find_out_connection(struct coresight_device *src_dev,
-			      struct coresight_device *dest_dev)
+			      struct coresight_device *dest_dev,
+			      struct list_head *path)
 {
 	int i;
 	struct coresight_connection *conn;
 
 	for (i = 0; i < src_dev->pdata->nr_outconns; i++) {
 		conn = src_dev->pdata->out_conns[i];
+		if (coresight_source_filter(path, conn))
+			continue;
 		if (conn->dest_dev == dest_dev)
 			return conn;
 	}
@@ -317,7 +359,8 @@ static void coresight_disable_sink(struct coresight_device *csdev)
 
 static int coresight_enable_link(struct coresight_device *csdev,
 				 struct coresight_device *parent,
-				 struct coresight_device *child)
+				 struct coresight_device *child,
+				 struct list_head *path)
 {
 	int ret = 0;
 	int link_subtype;
@@ -326,8 +369,8 @@ static int coresight_enable_link(struct coresight_device *csdev,
 	if (!parent || !child)
 		return -EINVAL;
 
-	inconn = coresight_find_out_connection(parent, csdev);
-	outconn = coresight_find_out_connection(csdev, child);
+	inconn = coresight_find_out_connection(parent, csdev, path);
+	outconn = coresight_find_out_connection(csdev, child, path);
 	link_subtype = csdev->subtype.link_subtype;
 
 	if (link_subtype == CORESIGHT_DEV_SUBTYPE_LINK_MERG && IS_ERR(inconn))
@@ -346,7 +389,8 @@ static int coresight_enable_link(struct coresight_device *csdev,
 
 static void coresight_disable_link(struct coresight_device *csdev,
 				   struct coresight_device *parent,
-				   struct coresight_device *child)
+				   struct coresight_device *child,
+				   struct list_head *path)
 {
 	int i;
 	int link_subtype;
@@ -355,8 +399,8 @@ static void coresight_disable_link(struct coresight_device *csdev,
 	if (!parent || !child)
 		return;
 
-	inconn = coresight_find_out_connection(parent, csdev);
-	outconn = coresight_find_out_connection(csdev, child);
+	inconn = coresight_find_out_connection(parent, csdev, path);
+	outconn = coresight_find_out_connection(csdev, child, path);
 	link_subtype = csdev->subtype.link_subtype;
 
 	if (link_ops(csdev)->disable) {
@@ -512,7 +556,7 @@ static void coresight_disable_path_from(struct list_head *path,
 		case CORESIGHT_DEV_TYPE_LINK:
 			parent = list_prev_entry(nd, link)->csdev;
 			child = list_next_entry(nd, link)->csdev;
-			coresight_disable_link(csdev, parent, child);
+			coresight_disable_link(csdev, parent, child, path);
 			break;
 		default:
 			break;
@@ -594,7 +638,7 @@ int coresight_enable_path(struct list_head *path, enum cs_mode mode,
 		case CORESIGHT_DEV_TYPE_LINK:
 			parent = list_prev_entry(nd, link)->csdev;
 			child = list_next_entry(nd, link)->csdev;
-			ret = coresight_enable_link(csdev, parent, child);
+			ret = coresight_enable_link(csdev, parent, child, path);
 			if (ret)
 				goto err;
 			break;
@@ -856,7 +900,8 @@ static void coresight_drop_device(struct coresight_device *csdev)
  */
 static int _coresight_build_path(struct coresight_device *csdev,
 				 struct coresight_device *sink,
-				 struct list_head *path)
+				 struct list_head *path,
+				 struct coresight_device *source)
 {
 	int i, ret;
 	bool found = false;
@@ -868,7 +913,7 @@ static int _coresight_build_path(struct coresight_device *csdev,
 
 	if (coresight_is_percpu_source(csdev) && coresight_is_percpu_sink(sink) &&
 	    sink == per_cpu(csdev_sink, source_ops(csdev)->cpu_id(csdev))) {
-		if (_coresight_build_path(sink, sink, path) == 0) {
+		if (_coresight_build_path(sink, sink, path, source) == 0) {
 			found = true;
 			goto out;
 		}
@@ -879,8 +924,12 @@ static int _coresight_build_path(struct coresight_device *csdev,
 		struct coresight_device *child_dev;
 
 		child_dev = csdev->pdata->out_conns[i]->dest_dev;
+		if (csdev->pdata->out_conns[i]->source_name &&
+			strcmp(csdev->pdata->out_conns[i]->source_name,
+				dev_name(&source->dev)))
+			continue;
 		if (child_dev &&
-		    _coresight_build_path(child_dev, sink, path) == 0) {
+		    _coresight_build_path(child_dev, sink, path, source) == 0) {
 			found = true;
 			break;
 		}
@@ -925,7 +974,7 @@ struct list_head *coresight_build_path(struct coresight_device *source,
 
 	INIT_LIST_HEAD(path);
 
-	rc = _coresight_build_path(source, sink, path);
+	rc = _coresight_build_path(source, sink, path, source);
 	if (rc) {
 		kfree(path);
 		return ERR_PTR(rc);

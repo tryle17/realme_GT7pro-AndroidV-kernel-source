@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2012, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/acpi.h>
@@ -238,6 +238,7 @@ static int of_coresight_parse_endpoint(struct device *dev,
 	struct fwnode_handle *rdev_fwnode;
 	struct coresight_connection conn = {};
 	struct coresight_connection *new_conn;
+	struct device_node *sn = NULL;
 
 	do {
 		/* Parse the local port details */
@@ -275,7 +276,13 @@ static int of_coresight_parse_endpoint(struct device *dev,
 		 */
 		conn.dest_fwnode = fwnode_handle_get(rdev_fwnode);
 		conn.dest_port = rendpoint.port;
-
+		conn.source_name = NULL;
+		sn = of_parse_phandle(ep, "source", 0);
+		if (sn) {
+			ret = of_property_read_string(sn,
+				"coresight-name", &conn.source_name);
+				of_node_put(sn);
+		}
 		new_conn = coresight_add_out_conn(dev, pdata, &conn);
 		if (IS_ERR_VALUE(new_conn)) {
 			fwnode_handle_put(conn.dest_fwnode);
