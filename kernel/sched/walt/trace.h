@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #undef TRACE_SYSTEM
@@ -55,7 +55,7 @@ TRACE_EVENT(sched_update_pred_demand,
 		__entry->final		= final;
 	),
 
-	TP_printk("%d (%s): runtime %u cpu %d pred_demand_scaled %u start %d first %d final %d (buckets: %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u)",
+	TP_printk("pid=%d comm=%s runtime=%u cpu=%d pred_demand_scaled=%u start=%d first=%d final=%d (buckets: %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u)",
 		__entry->pid, __entry->comm,
 		__entry->runtime, __entry->cpu,
 		__entry->pred_demand_scaled, __entry->start, __entry->first, __entry->final,
@@ -71,9 +71,9 @@ TRACE_EVENT(sched_update_history,
 
 	TP_PROTO(struct rq *rq, struct task_struct *p, u32 runtime, int samples,
 			enum task_event evt, struct walt_rq *wrq, struct walt_task_struct *wts,
-			u16 ramp_up_demand),
+			u16 trailblazer_demand),
 
-	TP_ARGS(rq, p, runtime, samples, evt, wrq, wts, ramp_up_demand),
+	TP_ARGS(rq, p, runtime, samples, evt, wrq, wts, trailblazer_demand),
 
 	TP_STRUCT__entry(
 		__array(char,			comm, TASK_COMM_LEN)
@@ -88,7 +88,7 @@ TRACE_EVENT(sched_update_history,
 		__array(u16,			hist_util, RAVG_HIST_SIZE)
 		__field(unsigned int,		nr_big_tasks)
 		__field(int,			cpu)
-		__field(u16,			ramp_up_demand)
+		__field(u16,			trailblazer_demand)
 		__field(u8,			high_util_history)
 	),
 
@@ -107,11 +107,11 @@ TRACE_EVENT(sched_update_history,
 					RAVG_HIST_SIZE * sizeof(u16));
 		__entry->nr_big_tasks	= wrq->walt_stats.nr_big_tasks;
 		__entry->cpu		= rq->cpu;
-		__entry->ramp_up_demand = ramp_up_demand;
+		__entry->trailblazer_demand = trailblazer_demand;
 		__entry->high_util_history = wts->high_util_history;
 	),
 
-	TP_printk("%d (%s): runtime %u samples %d event %s demand %u (hist: %u %u %u %u %u) (hist_util: %u %u %u %u %u) coloc_demand %u pred_demand_scaled %u cpu %d nr_big %u ramp_up_demand %u high_util_history %u",
+	TP_printk("pid=%d comm=%s runtime=%u samples=%d event=%s demand=%u (hist: %u %u %u %u %u) (hist_util: %u %u %u %u %u) coloc_demand=%u pred_demand_scaled=%u cpu=%d nr_big=%u trailblazer_demand=%u high_util_history=%u",
 		__entry->pid, __entry->comm,
 		__entry->runtime, __entry->samples,
 		task_event_names[__entry->evt],
@@ -123,7 +123,7 @@ TRACE_EVENT(sched_update_history,
 		__entry->hist_util[2], __entry->hist_util[3],
 		__entry->hist_util[4],
 		__entry->coloc_demand, __entry->pred_demand_scaled,
-		__entry->cpu, __entry->nr_big_tasks, __entry->ramp_up_demand,
+		__entry->cpu, __entry->nr_big_tasks, __entry->trailblazer_demand,
 		__entry->high_util_history)
 );
 
@@ -642,10 +642,9 @@ TRACE_EVENT(core_ctl_sbt,
  * Tracepoint for sched_get_nr_running_avg
  */
 TRACE_EVENT(sched_get_nr_running_avg,
+	TP_PROTO(int cpu, int nr, int nr_misfit, int nr_max, int nr_scaled, int nr_trailblazer),
 
-	TP_PROTO(int cpu, int nr, int nr_misfit, int nr_max, int nr_scaled),
-
-	TP_ARGS(cpu, nr, nr_misfit, nr_max, nr_scaled),
+	TP_ARGS(cpu, nr, nr_misfit, nr_max, nr_scaled, nr_trailblazer),
 
 	TP_STRUCT__entry(
 		__field(int, cpu)
@@ -653,6 +652,7 @@ TRACE_EVENT(sched_get_nr_running_avg,
 		__field(int, nr_misfit)
 		__field(int, nr_max)
 		__field(int, nr_scaled)
+		__field(int, nr_trailblazer)
 	),
 
 	TP_fast_assign(
@@ -661,11 +661,12 @@ TRACE_EVENT(sched_get_nr_running_avg,
 		__entry->nr_misfit	= nr_misfit;
 		__entry->nr_max		= nr_max;
 		__entry->nr_scaled	= nr_scaled;
+		__entry->nr_trailblazer	= nr_trailblazer;
 	),
 
-	TP_printk("cpu=%d nr=%d nr_misfit=%d nr_max=%d nr_scaled=%d",
+	TP_printk("cpu=%d nr=%d nr_misfit=%d nr_max=%d nr_scaled=%d nr_trailblazer=%d",
 		__entry->cpu, __entry->nr, __entry->nr_misfit, __entry->nr_max,
-		__entry->nr_scaled)
+		__entry->nr_scaled, __entry->nr_trailblazer)
 );
 
 TRACE_EVENT(sched_busy_hyst_time,

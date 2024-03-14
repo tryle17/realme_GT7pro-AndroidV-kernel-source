@@ -527,6 +527,13 @@ unsigned int walt_big_tasks(int cpu)
 	return wrq->walt_stats.nr_big_tasks;
 }
 
+int walt_trailblazer_tasks(int cpu)
+{
+	struct walt_rq *wrq = &per_cpu(walt_rq, cpu);
+
+	return wrq->walt_stats.nr_trailblazer_tasks;
+}
+
 static void clear_walt_request(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
@@ -637,6 +644,11 @@ static inline u64 freq_policy_load(struct rq *rq, unsigned int *reason)
 		*reason = CPUFREQ_REASON_BTR;
 	}
 
+	if (walt_trailblazer_tasks(cpu_of(rq))) {
+		load = sched_ravg_window;
+		*reason = CPUFREQ_REASON_TRAILBLAZER_CPU;
+	}
+
 	trace_sched_load_to_gov(rq, aggr_grp_load, tt_load, sched_freq_aggr_en,
 				load, 0, walt_rotation_enabled,
 				sysctl_sched_user_hint, wrq, *reason);
@@ -678,6 +690,7 @@ __cpu_util_freq_walt(int cpu, struct walt_cpu_load *walt_load, unsigned int *rea
 			walt_load->ed_active = true;
 		else
 			walt_load->ed_active = false;
+		walt_load->trailblazer_state = trailblazer_state;
 	}
 
 	return (util >= capacity) ? capacity : util;
@@ -2022,11 +2035,30 @@ static void update_trailblazer_accounting(struct task_struct *p, struct rq *rq,
 		u32 runtime, u16 runtime_scaled, u32 *demand, u16 *trailblazer_demand)
 {
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
+	struct walt_rq *wrq = &per_cpu(walt_rq, cpu_of(rq));
+	bool is_prev_trailblazer = walt_flag_test(p, WALT_TRAILBLAZER);
 
 	if (((runtime >= *demand) && (wts->high_util_history >= TRAILBLAZER_THRES)) ||
 			wts->high_util_history >= TRAILBLAZER_BYPASS) {
 		*trailblazer_demand = 1 << SCHED_CAPACITY_SHIFT;
 		*demand = scale_util_to_time(*trailblazer_demand);
+		walt_flag_set(p, WALT_TRAILBLAZER, 1);
+	} else {
+		walt_flag_set(p, WALT_TRAILBLAZER, 0);
+	}
+
+	/*
+	 * In the event that a trailblazer task is detected (or an existing trailblazer task
+	 * no longer matches the criteria) and is already enqueued on the cpu, ensure to
+	 * close the prod-sum accounts for this task before the next update takes place.
+	 */
+	if (task_on_rq_queued(p)) {
+		if (is_prev_trailblazer != walt_flag_test(p, WALT_TRAILBLAZER))
+			sched_update_nr_prod(rq->cpu, 0);
+		if (is_prev_trailblazer && !walt_flag_test(p, WALT_TRAILBLAZER))
+			wrq->walt_stats.nr_trailblazer_tasks--;
+		else if (!is_prev_trailblazer && walt_flag_test(p, WALT_TRAILBLAZER))
+			wrq->walt_stats.nr_trailblazer_tasks++;
 	}
 
 	if (runtime_scaled >= FINAL_BUCKET_DEMAND) {
@@ -2481,6 +2513,7 @@ static void init_new_task_load(struct task_struct *p)
 	wts->high_util_history = 0;
 	__sched_fork_init(p);
 	walt_flag_set(p, WALT_INIT, 1);
+	walt_flag_set(p, WALT_TRAILBLAZER, 0);
 }
 
 int remove_heavy(struct walt_task_struct *wts);
@@ -4700,6 +4733,7 @@ static void walt_sched_init_rq(struct rq *rq)
 	wrq->prev_window_size = sched_ravg_window;
 	wrq->window_start = 0;
 	wrq->walt_stats.nr_big_tasks = 0;
+	wrq->walt_stats.nr_trailblazer_tasks = 0;
 	wrq->walt_flags = 0;
 	wrq->avg_irqload = 0;
 	wrq->prev_irq_time = 0;
@@ -4778,6 +4812,9 @@ static void inc_rq_walt_stats(struct rq *rq, struct task_struct *p)
 	wts->rtg_high_prio = task_rtg_high_prio(p);
 	if (wts->rtg_high_prio)
 		wrq->walt_stats.nr_rtg_high_prio_tasks++;
+
+	if (walt_flag_test(p, WALT_TRAILBLAZER))
+		wrq->walt_stats.nr_trailblazer_tasks++;
 }
 
 static void dec_rq_walt_stats(struct rq *rq, struct task_struct *p)
@@ -4791,7 +4828,11 @@ static void dec_rq_walt_stats(struct rq *rq, struct task_struct *p)
 	if (wts->rtg_high_prio)
 		wrq->walt_stats.nr_rtg_high_prio_tasks--;
 
+	if (walt_flag_test(p, WALT_TRAILBLAZER))
+		wrq->walt_stats.nr_trailblazer_tasks--;
+
 	BUG_ON(wrq->walt_stats.nr_big_tasks < 0);
+	BUG_ON(wrq->walt_stats.nr_trailblazer_tasks < 0);
 }
 
 static void android_rvh_wake_up_new_task(void *unused, struct task_struct *new)
@@ -4947,8 +4988,12 @@ static void android_rvh_enqueue_task(void *unused, struct rq *rq,
 	if (!double_enqueue)
 		walt_inc_cumulative_runnable_avg(rq, p);
 
-	if ((flags & ENQUEUE_WAKEUP) && do_pl_notif(rq))
-		waltgov_run_callback(rq, WALT_CPUFREQ_PL);
+	if ((flags & ENQUEUE_WAKEUP)) {
+		if (walt_flag_test(p, WALT_TRAILBLAZER))
+			waltgov_run_callback(rq, WALT_CPUFREQ_TRAILBLAZER);
+		else if (do_pl_notif(rq))
+			waltgov_run_callback(rq, WALT_CPUFREQ_PL);
+	}
 
 	trace_sched_enq_deq_task(p, 1, cpumask_bits(p->cpus_ptr)[0], is_mvp(wts));
 }
@@ -5420,6 +5465,7 @@ static void walt_init(struct work_struct *work)
 			 rd->pd);
 
 	walt_register_sysctl();
+	walt_register_debugfs();
 
 	input_boost_init();
 	core_ctl_init();
