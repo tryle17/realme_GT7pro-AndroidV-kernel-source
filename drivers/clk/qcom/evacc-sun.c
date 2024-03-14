@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -23,6 +23,7 @@
 #include "clk-regmap-divider.h"
 #include "clk-regmap-mux.h"
 #include "common.h"
+#include "gdsc.h"
 #include "reset.h"
 #include "vdd-level.h"
 
@@ -350,6 +351,32 @@ static struct clk_branch eva_cc_mvs0c_shift_clk = {
 	},
 };
 
+static struct gdsc eva_cc_mvs0c_gdsc = {
+	.gdscr = 0x8034,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0x6,
+	.pd = {
+		.name = "eva_cc_mvs0c_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE,
+	.supply = "vdd_mm_mxc_voter",
+};
+
+static struct gdsc eva_cc_mvs0_gdsc = {
+	.gdscr = 0x8068,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0x6,
+	.pd = {
+		.name = "eva_cc_mvs0_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.parent = &eva_cc_mvs0c_gdsc.pd,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | HW_CTRL,
+};
+
 static struct clk_regmap *eva_cc_sun_clocks[] = {
 	[EVA_CC_AHB_CLK_SRC] = &eva_cc_ahb_clk_src.clkr,
 	[EVA_CC_MVS0_CLK] = &eva_cc_mvs0_clk.clkr,
@@ -364,6 +391,11 @@ static struct clk_regmap *eva_cc_sun_clocks[] = {
 	[EVA_CC_PLL0] = &eva_cc_pll0.clkr,
 	[EVA_CC_SLEEP_CLK_SRC] = &eva_cc_sleep_clk_src.clkr,
 	[EVA_CC_XO_CLK_SRC] = &eva_cc_xo_clk_src.clkr,
+};
+
+static struct gdsc *eva_cc_sun_gdscs[] = {
+	[EVA_CC_MVS0_GDSC] = &eva_cc_mvs0_gdsc,
+	[EVA_CC_MVS0C_GDSC] = &eva_cc_mvs0c_gdsc,
 };
 
 static const struct qcom_reset_map eva_cc_sun_resets[] = {
@@ -391,6 +423,8 @@ static struct qcom_cc_desc eva_cc_sun_desc = {
 	.num_resets = ARRAY_SIZE(eva_cc_sun_resets),
 	.clk_regulators = eva_cc_sun_regulators,
 	.num_clk_regulators = ARRAY_SIZE(eva_cc_sun_regulators),
+	.gdscs = eva_cc_sun_gdscs,
+	.num_gdscs = ARRAY_SIZE(eva_cc_sun_gdscs),
 };
 
 static const struct of_device_id eva_cc_sun_match_table[] = {
