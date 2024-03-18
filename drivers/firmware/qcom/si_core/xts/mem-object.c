@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "si-mo: %s: " fmt, __func__
@@ -177,7 +177,7 @@ static void rm_shm_bridge(struct mem_object *mo)
 static void detach_dma_buf(struct mem_object *mo)
 {
 	if (mo->map.sgt) {
-		dma_buf_unmap_attachment(mo->map.buf_attach,
+		dma_buf_unmap_attachment_unlocked(mo->map.buf_attach,
 			mo->map.sgt, DMA_BIDIRECTIONAL);
 	}
 
@@ -202,7 +202,7 @@ static int init_tz_shared_memory(struct mem_object *mo)
 
 	mo->map.buf_attach = buf_attach;
 
-	sgt = dma_buf_map_attachment(buf_attach, DMA_BIDIRECTIONAL);
+	sgt = dma_buf_map_attachment_unlocked(buf_attach, DMA_BIDIRECTIONAL);
 	if (IS_ERR(sgt)) {
 		ret = PTR_ERR(sgt);
 
