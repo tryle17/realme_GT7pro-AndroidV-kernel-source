@@ -620,7 +620,7 @@ static int ufs_qcom_ice_program_key(struct ufs_hba *hba,
 	cap = hba->crypto_cap_array[cfg->crypto_cap_idx];
 	if (cap.algorithm_id != UFS_CRYPTO_ALG_AES_XTS ||
 	    cap.key_size != UFS_CRYPTO_KEY_SIZE_256)
-		return -EINVAL;
+		return -EOPNOTSUPP;
 
 	if (config_enable)
 		return qcom_ice_program_key(host->ice,
@@ -4845,7 +4845,7 @@ static int ufs_qcom_mcq_config_resource(struct ufs_hba *hba)
 		if (!res->resource) {
 			dev_info(hba->dev, "Resource %s not provided\n", res->name);
 			if (i == RES_UFS)
-				return -ENOMEM;
+				return -ENODEV;
 			continue;
 		} else if (i == RES_UFS) {
 			res_mem = res->resource;
@@ -5543,6 +5543,11 @@ static void ufs_qcom_hook_check_int_errors(void *param, struct ufs_hba *hba,
 	}
 }
 
+static void ufs_qcom_update_sdev(void *param, struct scsi_device *sdev)
+{
+	sdev->broken_fua = 1;
+}
+
 /*
  * Refer: common/include/trace/hooks/ufshcd.h for available hooks
  */
@@ -5558,6 +5563,7 @@ static void ufs_qcom_register_hooks(void)
 				ufs_qcom_hook_send_tm_command, NULL);
 	register_trace_android_vh_ufs_check_int_errors(
 				ufs_qcom_hook_check_int_errors, NULL);
+	register_trace_android_vh_ufs_update_sdev(ufs_qcom_update_sdev, NULL);
 }
 
 #ifdef CONFIG_ARM_QCOM_CPUFREQ_HW
