@@ -1975,14 +1975,12 @@ geni_i3c_master_priv_xfers(struct i3c_dev_desc *dev, struct i3c_priv_xfer *xfers
 	if (num_xfers <= 0)
 		return 0;
 
-	if (!gi3c->pm_ctrl_client) {
-		ret = i3c_geni_runtime_get_mutex_lock(gi3c);
-		if (ret) {
-			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-				    "%s: Failed, usage_count:%d\n",
-				    __func__, atomic_read(&gi3c->se.dev->power.usage_count));
-			return ret;
-		}
+	ret = i3c_geni_runtime_get_mutex_lock(gi3c);
+	if (ret) {
+		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
+			    "%s: Failed, usage_count:%d\n",
+			    __func__, atomic_read(&gi3c->se.dev->power.usage_count));
+		return ret;
 	}
 
 	geni_ios = geni_read_reg(gi3c->se.base, SE_GENI_IOS);
@@ -2002,8 +2000,7 @@ geni_i3c_master_priv_xfers(struct i3c_dev_desc *dev, struct i3c_priv_xfer *xfers
 		gi3c->probe_completed = true;
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "%s ret:%d\n", __func__, ret);
-	if (!gi3c->pm_ctrl_client)
-		i3c_geni_runtime_put_mutex_unlock(gi3c);
+	i3c_geni_runtime_put_mutex_unlock(gi3c);
 
 	return ret;
 }
@@ -2035,9 +2032,11 @@ static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, const struct i2c_
 		if (ret) {
 			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
 				    "%s: Failed:%d, usage_count:%d\n",
-				    __func__, ret, atomic_read(&gi3c->se.dev->power.usage_count));
+				     __func__, ret, atomic_read(&gi3c->se.dev->power.usage_count));
 			return ret;
 		}
+	} else {
+		mutex_lock(&gi3c->lock);
 	}
 
 	qcom_geni_i3c_conf(gi3c, PUSH_PULL_MODE);
@@ -2068,6 +2067,8 @@ static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, const struct i2c_
 
 	if (!gi3c->pm_ctrl_client)
 		i3c_geni_runtime_put_mutex_unlock(gi3c);
+	else
+		mutex_unlock(&gi3c->lock);
 
 	return ret;
 }
@@ -2287,14 +2288,12 @@ static int geni_i3c_master_send_ccc_cmd(struct i3c_master_controller *m, struct 
 	/* Call get_sync when client doesn't control PM (Regular cases) OR
 	 * when client controlls the PM and client probe didn't happened yet.
 	 */
-	if (!gi3c->pm_ctrl_client ||  !gi3c->probe_completed) {
-		ret = i3c_geni_runtime_get_mutex_lock(gi3c);
-		if (ret) {
-			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-				    "%s: Failed:%d, usage_count:%d\n",
-				    __func__, ret, atomic_read(&gi3c->se.dev->power.usage_count));
-			return ret;
-		}
+	ret = i3c_geni_runtime_get_mutex_lock(gi3c);
+	if (ret) {
+		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
+			    "%s: Failed:%d, usage_count:%d\n",
+			    __func__, ret, atomic_read(&gi3c->se.dev->power.usage_count));
+		return ret;
 	}
 
 	qcom_geni_i3c_conf(gi3c, OPEN_DRAIN_MODE);
@@ -2350,9 +2349,7 @@ static int geni_i3c_master_send_ccc_cmd(struct i3c_master_controller *m, struct 
 	}
 
 	I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev, "i3c ccc: txn ret:%d\n", ret);
-
-	if (!gi3c->pm_ctrl_client ||  !gi3c->probe_completed)
-		i3c_geni_runtime_put_mutex_unlock(gi3c);
+	i3c_geni_runtime_put_mutex_unlock(gi3c);
 
 	return ret;
 }
@@ -2815,12 +2812,12 @@ static void geni_i3c_enable_ibi_ctrl(struct geni_i3c_dev *gi3c, bool enable)
 			timeout = wait_for_completion_timeout(&gi3c->ibi.done,
 								XFER_TIMEOUT);
 			if (!timeout) {
-				I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-					"timeout while ENABLE_CHANGE bit\n");
+				I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+					    "timeout while ENABLE_CHANGE bit\n");
 				return;
 			}
-			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-					"%s: IBI ctrl enabled\n", __func__);
+			I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+				    "%s: IBI ctrl enabled\n", __func__);
 		}
 	} else {
 		 /* Disable IBI controller */
@@ -2839,14 +2836,14 @@ static void geni_i3c_enable_ibi_ctrl(struct geni_i3c_dev *gi3c, bool enable)
 			timeout = wait_for_completion_timeout(&gi3c->ibi.done,
 					XFER_TIMEOUT);
 			if (!timeout) {
-				I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-				"timeout disabling IBI: 0x%x\n", gi3c->ibi.err);
+				I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+					    "timeout disabling IBI: 0x%x\n", gi3c->ibi.err);
 				return;
 			}
-			I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
-					"%s: IBI ctrl disabled\n",  __func__);
+			I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
+				    "%s: IBI ctrl disabled\n",  __func__);
 		}
-		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
+		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
 			    "%s: IBI ctrl disabled, val:0x%x\n",  __func__, val);
 	}
 }
