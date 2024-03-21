@@ -23,6 +23,7 @@
   __arch_copy_from_user
   __arch_copy_to_user
   arch_freq_scale
+  arch_stack_walk
   arch_timer_read_counter
   argv_free
   argv_split
@@ -959,6 +960,7 @@
   memcpy
   __memcpy_fromio
   __memcpy_toio
+  memdup_user
   memmove
   memory_block_size_bytes
   memory_read_from_buffer
@@ -1134,6 +1136,7 @@
   param_get_uint
   param_get_ullong
   param_ops_bool
+  param_ops_charp
   param_ops_int
   param_ops_uint
   param_set_bool
@@ -1344,9 +1347,11 @@
   __register_chrdev
   register_chrdev_region
   register_console
+  register_die_notifier
   register_ftrace_export
   register_kretprobe
   register_memory_notifier
+  register_module_notifier
   register_netevent_notifier
   register_pm_notifier
   register_qdisc
@@ -1935,6 +1940,7 @@
   __unregister_chrdev
   unregister_chrdev_region
   unregister_console
+  unregister_die_notifier
   unregister_ftrace_export
   unregister_kretprobe
   unregister_netevent_notifier
