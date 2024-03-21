@@ -121,6 +121,16 @@ config QTI_MPAM
 	  It is intended to be used by clients familiar with modifying
 	  the ARM MPAM configuration settings.
 
+config QTI_MPAM_CONFIGFS
+	bool "Enable QCOM MPAM configfs support"
+	depends on QTI_MPAM && CONFIGFS_FS
+	default y
+	help
+	  This enables QCOM MPAM configfs support. User can config MPAM
+	  feature through configfs, inlcuding PART_ID, CPBM and tasks in
+	  a partition. Configfs also allow user to create and remove MPAM
+	  partition according to use cases.
+
 config QTI_CPUFREQ_STATS_SCMI_V2
 	tristate "Qualcomm Technologies Inc. SCMI client driver for CPU and L3 cpu freq stats"
 	depends on QTI_SCMI_VENDOR_PROTOCOL
