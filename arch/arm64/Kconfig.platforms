@@ -268,6 +268,14 @@ config ARCH_SUN
 	  chipset. If you do not wish to build a kernel that runs on this
 	  chipset or if you are unsure, say 'N' here.
 
+config ARCH_TUNA
+	bool "Enable support for Qualcomm Technologies, Inc. Tuna"
+	depends on ARCH_QCOM
+	help
+	  This enables support for Qualcomm Technologies, Inc. Tuna
+	  chipset. If you do not wish to build a kernel that runs on this
+	  chipset or if you are unsure, say 'N' here.
+
 config ARCH_PINEAPPLE
 	bool "Enable support for Qualcomm Technologies, Inc. Pineapple"
 	depends on ARCH_QCOM
