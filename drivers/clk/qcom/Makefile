@@ -131,6 +131,7 @@ obj-$(CONFIG_SM_GCC_PARROT) += gcc-parrot.o
 obj-$(CONFIG_SM_GCC_PINEAPPLE) += gcc-pineapple.o
 obj-$(CONFIG_SM_GCC_PINEAPPLE) += gcc-pineapple.o
 obj-$(CONFIG_SM_VIDEOCC_PINEAPPLE) += videocc-pineapple.o
+obj-$(CONFIG_SM_CAMCC_PARROT) += camcc-parrot.o
 obj-$(CONFIG_SM_CAMCC_PINEAPPLE) += camcc-pineapple.o
 obj-$(CONFIG_SM_DISPCC_PINEAPPLE) += dispcc-pineapple.o
 obj-$(CONFIG_SM_DEBUGCC_PINEAPPLE) += debugcc-pineapple.o

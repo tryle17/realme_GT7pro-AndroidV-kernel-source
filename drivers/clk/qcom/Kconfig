@@ -1277,4 +1277,13 @@ config SM_GPUCC_PARROT
 	  Say Y if you want to support graphics controller devices and
 	  functionality such as 3D graphics.
 
+config SM_CAMCC_PARROT
+	tristate "PARROT Camera Clock Controller"
+	select SM_GCC_PARROT
+	help
+	  Support for the camera clock controller on Qualcomm Technologies, Inc.
+	  PARROT devices.
+	  Say Y if you want to support camera devices and functionality such as
+	  capturing pictures.
+
 endif
