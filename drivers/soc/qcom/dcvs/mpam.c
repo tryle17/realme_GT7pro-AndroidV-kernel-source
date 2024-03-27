@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -18,38 +18,70 @@
 
 #define MPAM_ALGO_STR	0x4D50414D4558544E  /* "MPAMEXTN" */
 
-enum mpam_profiling_param_ids {
-	PARAM_CACHE_PORTION = 1,
+/* Parameter IDs for SET */
+enum mpam_set_param_ids {
+	PARAM_SET_CACHE_PARTITION = 1,
+	PARAM_SET_CONFIG_MONITOR = 2,
+	PARAM_SET_CAPTURE_ALL_MONITOR = 3,
 };
 
-struct mpam_cache_portion {
-	uint32_t part_id;
-	uint32_t cache_portion;
+/* Parameter IDs for GET */
+enum mpam_get_param_ids {
+	PARAM_GET_MPAM_VERSION = 1,
+	PARAM_GET_CACHE_PARTITION = 2
 };
 
-static struct mpam_cache_portion cur_cache_portion;
 static struct scmi_protocol_handle *ph;
 static const struct qcom_scmi_vendor_ops *ops;
 static struct scmi_device *sdev;
 
-int qcom_mpam_set_cache_portion(u32 part_id, u32 cache_portion)
+int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param)
 {
 	int ret = -EPERM;
-	struct mpam_cache_portion msg;
-
-	msg.part_id = part_id;
-	msg.cache_portion = cache_portion;
 
 	if (ops)
-		ret = ops->set_param(ph, &msg, MPAM_ALGO_STR, PARAM_CACHE_PORTION,
-				sizeof(msg));
-
-	if (!ret)
-		memcpy(&cur_cache_portion, &msg, sizeof(msg));
+		ret = ops->set_param(ph, param, MPAM_ALGO_STR,
+				PARAM_SET_CACHE_PARTITION,
+				sizeof(struct mpam_set_cache_partition));
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(qcom_mpam_set_cache_portion);
+EXPORT_SYMBOL_GPL(qcom_mpam_set_cache_partition);
+
+int qcom_mpam_get_version(struct mpam_ver_ret *ver)
+{
+	int ret = -EPERM;
+
+	if (ops) {
+		ret = ops->get_param(ph, ver, MPAM_ALGO_STR,
+				PARAM_GET_MPAM_VERSION, 0,
+				sizeof(struct mpam_ver_ret));
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(qcom_mpam_get_version);
+
+int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
+						struct mpam_slice_val *val)
+{
+	int ret = -EPERM;
+	uint8_t buf[32];
+
+	if (ops) {
+		memcpy(buf, param, sizeof(struct mpam_read_cache_portion));
+		ret = ops->get_param(ph, buf, MPAM_ALGO_STR,
+				PARAM_GET_CACHE_PARTITION,
+				sizeof(struct mpam_read_cache_portion),
+				sizeof(struct mpam_slice_val));
+	}
+
+	if (!ret)
+		memcpy(val, buf, sizeof(struct mpam_slice_val));
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(qcom_mpam_get_cache_partition);
 
 static int mpam_dev_probe(struct platform_device *pdev)
 {
