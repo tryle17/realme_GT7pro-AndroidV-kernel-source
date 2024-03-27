@@ -2044,7 +2044,7 @@ static void update_trailblazer_accounting(struct task_struct *p, struct rq *rq,
 		*trailblazer_demand = 1 << SCHED_CAPACITY_SHIFT;
 		*demand = scale_util_to_time(*trailblazer_demand);
 		walt_flag_set(p, WALT_TRAILBLAZER_BIT, 1);
-	} else {
+	} else if (is_prev_trailblazer) {
 		walt_flag_set(p, WALT_TRAILBLAZER_BIT, 0);
 	}
 
@@ -2127,7 +2127,9 @@ static void update_history(struct rq *rq, struct task_struct *p,
 		demand = max(avg, runtime);
 	}
 
-	update_trailblazer_accounting(p, rq, runtime, runtime_scaled, &demand, &trailblazer_demand);
+	if (walt_fair_task(p))
+		update_trailblazer_accounting(p, rq, runtime, runtime_scaled,
+				&demand, &trailblazer_demand);
 	pred_demand_scaled = predict_and_update_buckets(p, runtime_scaled);
 	demand_scaled = scale_time_to_util(demand);
 
