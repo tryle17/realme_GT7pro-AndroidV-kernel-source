@@ -328,12 +328,14 @@ arch/arm64/kvm/hyp/include/hyp/fault.h
 arch/arm64/kvm/hyp/include/hyp/switch.h
 arch/arm64/kvm/hyp/include/hyp/sysreg-sr.h
 arch/arm64/kvm/hyp/include/nvhe/alloc.h
+arch/arm64/kvm/hyp/include/nvhe/alloc_mgt.h
 arch/arm64/kvm/hyp/include/nvhe/arm-smccc.h
 arch/arm64/kvm/hyp/include/nvhe/clock.h
 arch/arm64/kvm/hyp/include/nvhe/define_events.h
 arch/arm64/kvm/hyp/include/nvhe/early_alloc.h
 arch/arm64/kvm/hyp/include/nvhe/ffa.h
 arch/arm64/kvm/hyp/include/nvhe/gfp.h
+arch/arm64/kvm/hyp/include/nvhe/iommu.h
 arch/arm64/kvm/hyp/include/nvhe/mem_protect.h
 arch/arm64/kvm/hyp/include/nvhe/memory.h
 arch/arm64/kvm/hyp/include/nvhe/mm.h
@@ -346,6 +348,7 @@ arch/arm64/kvm/hyp/include/nvhe/spinlock.h
 arch/arm64/kvm/hyp/include/nvhe/trace.h
 arch/arm64/kvm/hyp/include/nvhe/trap_handler.h
 arch/arm64/kvm/hyp/nvhe/alloc.c
+arch/arm64/kvm/hyp/nvhe/alloc_mgt.c
 arch/arm64/kvm/hyp/nvhe/cache.S
 arch/arm64/kvm/hyp/nvhe/clock.c
 arch/arm64/kvm/hyp/nvhe/debug-sr.c
@@ -357,12 +360,14 @@ arch/arm64/kvm/hyp/nvhe/hyp-init.S
 arch/arm64/kvm/hyp/nvhe/hyp-main.c
 arch/arm64/kvm/hyp/nvhe/hyp-smp.c
 arch/arm64/kvm/hyp/nvhe/hyp.lds.S
+arch/arm64/kvm/hyp/nvhe/iommu/iommu.c
 arch/arm64/kvm/hyp/nvhe/list_debug.c
 arch/arm64/kvm/hyp/nvhe/mem_protect.c
 arch/arm64/kvm/hyp/nvhe/mm.c
 arch/arm64/kvm/hyp/nvhe/modules.c
 arch/arm64/kvm/hyp/nvhe/page_alloc.c
 arch/arm64/kvm/hyp/nvhe/pkvm.c
+arch/arm64/kvm/hyp/nvhe/power/hvc.c
 arch/arm64/kvm/hyp/nvhe/psci-relay.c
 arch/arm64/kvm/hyp/nvhe/serial.c
 arch/arm64/kvm/hyp/nvhe/setup.c
@@ -386,6 +391,8 @@ arch/arm64/kvm/hyp_trace.c
 arch/arm64/kvm/hyp_trace.h
 arch/arm64/kvm/hypercalls.c
 arch/arm64/kvm/inject_fault.c
+arch/arm64/kvm/iommu.c
+arch/arm64/kvm/kvm_ptdump.h
 arch/arm64/kvm/mmio.c
 arch/arm64/kvm/mmu.c
 arch/arm64/kvm/nested.c
@@ -393,6 +400,7 @@ arch/arm64/kvm/pkvm.c
 arch/arm64/kvm/pmu-emul.c
 arch/arm64/kvm/pmu.c
 arch/arm64/kvm/psci.c
+arch/arm64/kvm/ptdump.c
 arch/arm64/kvm/pvtime.c
 arch/arm64/kvm/reset.c
 arch/arm64/kvm/stacktrace.c
@@ -461,6 +469,7 @@ arch/arm64/mm/mteswap.c
 arch/arm64/mm/pageattr.c
 arch/arm64/mm/pgd.c
 arch/arm64/mm/proc.S
+arch/arm64/mm/ptdump.c
 arch/arm64/net/bpf_jit.h
 arch/arm64/net/bpf_jit_comp.c
 arch/arm64/tools/gen-hyprel.c
@@ -630,6 +639,8 @@ drivers/android/binder.c
 drivers/android/binder_alloc.c
 drivers/android/binder_alloc.h
 drivers/android/binder_internal.h
+drivers/android/binder_pick_impl.c
+drivers/android/binder_pick_impl.h
 drivers/android/binder_trace.h
 drivers/android/binderfs.c
 drivers/android/debug_kinfo.c
@@ -853,6 +864,7 @@ drivers/firmware/arm_scmi/clock.c
 drivers/firmware/arm_scmi/common.h
 drivers/firmware/arm_scmi/driver.c
 drivers/firmware/arm_scmi/mailbox.c
+drivers/firmware/arm_scmi/msg.c
 drivers/firmware/arm_scmi/notify.c
 drivers/firmware/arm_scmi/notify.h
 drivers/firmware/arm_scmi/perf.c
@@ -865,6 +877,7 @@ drivers/firmware/arm_scmi/sensors.c
 drivers/firmware/arm_scmi/shmem.c
 drivers/firmware/arm_scmi/smc.c
 drivers/firmware/arm_scmi/system.c
+drivers/firmware/arm_scmi/virtio.c
 drivers/firmware/arm_scmi/voltage.c
 drivers/firmware/arm_scpi.c
 drivers/firmware/efi/arm-runtime.c
@@ -1120,11 +1133,12 @@ drivers/interconnect/internal.h
 drivers/interconnect/qcom/icc-common.c
 drivers/interconnect/qcom/icc-common.h
 drivers/interconnect/trace.h
+drivers/iommu/arm/arm-smmu-v3/pkvm/arm-smmu-v3-module.h
 drivers/iommu/dma-iommu.c
 drivers/iommu/dma-iommu.h
+drivers/iommu/io-pgtable-arm-common.c
 drivers/iommu/io-pgtable-arm-v7s.c
 drivers/iommu/io-pgtable-arm.c
-drivers/iommu/io-pgtable-arm.h
 drivers/iommu/io-pgtable.c
 drivers/iommu/iommu-priv.h
 drivers/iommu/iommu-sva.h
@@ -1750,11 +1764,16 @@ drivers/usb/dwc3/host.c
 drivers/usb/dwc3/io.h
 drivers/usb/dwc3/trace.c
 drivers/usb/dwc3/trace.h
+drivers/usb/gadget/android_configfs_uevent.c
+drivers/usb/gadget/android_configfs_uevent.h
 drivers/usb/gadget/composite.c
 drivers/usb/gadget/config.c
 drivers/usb/gadget/configfs.c
 drivers/usb/gadget/configfs.h
 drivers/usb/gadget/epautoconf.c
+drivers/usb/gadget/function/android_f_accessory.c
+drivers/usb/gadget/function/android_f_midi_info.c
+drivers/usb/gadget/function/android_f_midi_info.h
 drivers/usb/gadget/function/f_acm.c
 drivers/usb/gadget/function/f_ecm.c
 drivers/usb/gadget/function/f_eem.c
@@ -2625,6 +2644,8 @@ include/kvm/arm_pmu.h
 include/kvm/arm_psci.h
 include/kvm/arm_vgic.h
 include/kvm/iodev.h
+include/kvm/iommu.h
+include/kvm/power_domain.h
 include/linux/8250_pci.h
 include/linux/acct.h
 include/linux/acpi.h
@@ -2637,6 +2658,7 @@ include/linux/alarmtimer.h
 include/linux/align.h
 include/linux/amba/bus.h
 include/linux/amba/serial.h
+include/linux/android_kabi.h
 include/linux/android_vendor.h
 include/linux/anon_inodes.h
 include/linux/aperture.h
@@ -2743,6 +2765,7 @@ include/linux/cgroup_rdma.h
 include/linux/cgroup_refcnt.h
 include/linux/cgroup_subsys.h
 include/linux/circ_buf.h
+include/linux/cleancache.h
 include/linux/cleanup.h
 include/linux/clk-provider.h
 include/linux/clk.h
@@ -3043,6 +3066,7 @@ include/linux/interval_tree_generic.h
 include/linux/io-64-nonatomic-hi-lo.h
 include/linux/io-64-nonatomic-lo-hi.h
 include/linux/io-mapping.h
+include/linux/io-pgtable-arm.h
 include/linux/io-pgtable.h
 include/linux/io.h
 include/linux/io_uring.h
@@ -3345,8 +3369,10 @@ include/linux/page_counter.h
 include/linux/page_ext.h
 include/linux/page_idle.h
 include/linux/page_owner.h
+include/linux/page_pinner.h
 include/linux/page_ref.h
 include/linux/page_reporting.h
+include/linux/page_size_compat.h
 include/linux/page_table_check.h
 include/linux/pageblock-flags.h
 include/linux/pagemap.h
@@ -3452,6 +3478,7 @@ include/linux/psi.h
 include/linux/psi_types.h
 include/linux/pstore.h
 include/linux/pstore_ram.h
+include/linux/ptdump.h
 include/linux/pti.h
 include/linux/ptp_classify.h
 include/linux/ptp_clock_kernel.h
@@ -3754,6 +3781,8 @@ include/linux/unicode.h
 include/linux/units.h
 include/linux/uprobes.h
 include/linux/usb.h
+include/linux/usb/android_accessory.h
+include/linux/usb/android_configfs_uevent.h
 include/linux/usb/audio-v2.h
 include/linux/usb/audio-v3.h
 include/linux/usb/audio.h
@@ -4299,10 +4328,12 @@ include/trace/events/writeback.h
 include/trace/events/xdp.h
 include/trace/hooks/avc.h
 include/trace/hooks/binder.h
+include/trace/hooks/bug.h
 include/trace/hooks/cgroup.h
 include/trace/hooks/cpufreq.h
 include/trace/hooks/cpuidle.h
 include/trace/hooks/cpuidle_psci.h
+include/trace/hooks/creds.h
 include/trace/hooks/debug.h
 include/trace/hooks/dtask.h
 include/trace/hooks/epoch.h
@@ -4312,13 +4343,16 @@ include/trace/hooks/ftrace_dump.h
 include/trace/hooks/futex.h
 include/trace/hooks/gic.h
 include/trace/hooks/gic_v3.h
+include/trace/hooks/gzvm.h
 include/trace/hooks/hung_task.h
 include/trace/hooks/iommu.h
+include/trace/hooks/logbuf.h
 include/trace/hooks/mm.h
 include/trace/hooks/mmc.h
 include/trace/hooks/mpam.h
 include/trace/hooks/net.h
 include/trace/hooks/pm_domain.h
+include/trace/hooks/power.h
 include/trace/hooks/preemptirq.h
 include/trace/hooks/printk.h
 include/trace/hooks/psci.h
@@ -4327,9 +4361,12 @@ include/trace/hooks/remoteproc.h
 include/trace/hooks/rwsem.h
 include/trace/hooks/sched.h
 include/trace/hooks/selinux.h
+include/trace/hooks/signal.h
+include/trace/hooks/softlockup.h
 include/trace/hooks/sys.h
 include/trace/hooks/syscall_check.h
 include/trace/hooks/sysrqcrash.h
+include/trace/hooks/thermal.h
 include/trace/hooks/timer.h
 include/trace/hooks/topology.h
 include/trace/hooks/traps.h
@@ -4766,6 +4803,7 @@ include/uapi/linux/uio.h
 include/uapi/linux/uleds.h
 include/uapi/linux/un.h
 include/uapi/linux/unistd.h
+include/uapi/linux/usb/android_accessory.h
 include/uapi/linux/usb/audio.h
 include/uapi/linux/usb/cdc.h
 include/uapi/linux/usb/ch11.h
@@ -4796,6 +4834,7 @@ include/uapi/linux/virtio_fs.h
 include/uapi/linux/virtio_ids.h
 include/uapi/linux/virtio_net.h
 include/uapi/linux/virtio_ring.h
+include/uapi/linux/virtio_scmi.h
 include/uapi/linux/virtio_types.h
 include/uapi/linux/virtio_vsock.h
 include/uapi/linux/vm_sockets.h
@@ -5558,6 +5597,7 @@ lib/zstd/zstd_compress_module.c
 lib/zstd/zstd_decompress_module.c
 mm/backing-dev.c
 mm/balloon_compaction.c
+mm/cleancache.c
 mm/cma.c
 mm/cma.h
 mm/cma_debug.c
@@ -5616,8 +5656,10 @@ mm/page_ext.c
 mm/page_io.c
 mm/page_isolation.c
 mm/page_owner.c
+mm/page_pinner.c
 mm/page_reporting.c
 mm/page_reporting.h
+mm/page_size_compat.c
 mm/page_vma_mapped.c
 mm/pagewalk.c
 mm/percpu-internal.h
@@ -5626,6 +5668,7 @@ mm/percpu.c
 mm/pgalloc-track.h
 mm/pgtable-generic.c
 mm/process_vm_access.c
+mm/ptdump.c
 mm/readahead.c
 mm/rmap.c
 mm/secretmem.c

@@ -50,6 +50,7 @@
   bitmap_print_to_pagebuf
   bitmap_release_region
   __bitmap_set
+  bitmap_zalloc
   blk_execute_rq_nowait
   blk_get_queue
   blk_mq_free_request
@@ -998,7 +999,6 @@
   __module_get
   module_layout
   module_put
-  module_refcount
   __msecs_to_jiffies
   msi_domain_first_desc
   msi_domain_get_virq
@@ -1127,6 +1127,8 @@
   page_frag_alloc_align
   __page_frag_cache_drain
   page_frag_free
+  page_pinner_inited
+  __page_pinner_put_page
   panic
   panic_notifier_list
   panic_timeout
@@ -1562,6 +1564,15 @@
   snd_soc_get_pcm_runtime
   snd_soc_lookup_component
   snd_soc_rtdcom_lookup
+  snd_usb_autoresume
+  snd_usb_autosuspend
+  snd_usb_endpoint_prepare
+  snd_usb_hw_free
+  snd_usb_hw_params
+  snd_usb_lock_shutdown
+  snd_usb_register_platform_ops
+  snd_usb_unlock_shutdown
+  snd_usb_unregister_platform_ops
   snprintf
   soc_device_register
   soc_device_unregister
@@ -1715,6 +1726,9 @@
   __traceiter_android_rvh_flush_task
   __traceiter_android_rvh_get_nohz_timer_target
   __traceiter_android_rvh_gic_v3_set_affinity
+  __traceiter_android_rvh_iommu_alloc_insert_iova
+  __traceiter_android_rvh_iommu_iovad_init_alloc_algo
+  __traceiter_android_rvh_iommu_limit_align_shift
   __traceiter_android_rvh_iommu_setup_dma_ops
   __traceiter_android_rvh_is_cpu_allowed
   __traceiter_android_rvh_new_task_stats
@@ -1742,7 +1756,6 @@
   __traceiter_android_rvh_wake_up_new_task
   __traceiter_android_vh_binder_restore_priority
   __traceiter_android_vh_binder_set_priority
-  __traceiter_android_vh_binder_wakeup_ilocked
   __traceiter_android_vh_check_uninterruptible_tasks
   __traceiter_android_vh_check_uninterruptible_tasks_dn
   __traceiter_android_vh_cpufreq_fast_switch
@@ -1752,6 +1765,7 @@
   __traceiter_android_vh_cpu_idle_exit
   __traceiter_android_vh_cpuidle_psci_enter
   __traceiter_android_vh_cpuidle_psci_exit
+  __traceiter_android_vh_disable_thermal_cooling_stats
   __traceiter_android_vh_do_wake_up_sync
   __traceiter_android_vh_ftrace_dump_buffer
   __traceiter_android_vh_ftrace_format_check
@@ -1801,6 +1815,9 @@
   __tracepoint_android_rvh_flush_task
   __tracepoint_android_rvh_get_nohz_timer_target
   __tracepoint_android_rvh_gic_v3_set_affinity
+  __tracepoint_android_rvh_iommu_alloc_insert_iova
+  __tracepoint_android_rvh_iommu_iovad_init_alloc_algo
+  __tracepoint_android_rvh_iommu_limit_align_shift
   __tracepoint_android_rvh_iommu_setup_dma_ops
   __tracepoint_android_rvh_is_cpu_allowed
   __tracepoint_android_rvh_new_task_stats
@@ -1828,7 +1845,6 @@
   __tracepoint_android_rvh_wake_up_new_task
   __tracepoint_android_vh_binder_restore_priority
   __tracepoint_android_vh_binder_set_priority
-  __tracepoint_android_vh_binder_wakeup_ilocked
   __tracepoint_android_vh_check_uninterruptible_tasks
   __tracepoint_android_vh_check_uninterruptible_tasks_dn
   __tracepoint_android_vh_cpufreq_fast_switch
@@ -1838,6 +1854,7 @@
   __tracepoint_android_vh_cpu_idle_exit
   __tracepoint_android_vh_cpuidle_psci_enter
   __tracepoint_android_vh_cpuidle_psci_exit
+  __tracepoint_android_vh_disable_thermal_cooling_stats
   __tracepoint_android_vh_do_wake_up_sync
   __tracepoint_android_vh_ftrace_dump_buffer
   __tracepoint_android_vh_ftrace_format_check
@@ -1974,6 +1991,7 @@
   usb_function_register
   usb_function_unregister
   usb_gadget_wakeup
+  usb_hcd_is_primary_hcd
   usb_interface_id
   usb_phy_set_charger_current
   usb_put_function_instance
@@ -2054,4 +2072,8 @@
   xas_load
   xa_store
   xfrm_lookup
+  xhci_create_secondary_interrupter
+  xhci_initialize_ring_info
+  xhci_remove_secondary_interrupter
+  xhci_stop_endpoint_sync
   zap_vma_ptes
