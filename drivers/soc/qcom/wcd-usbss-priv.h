@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef WCD_USBSS_PRIV_H
 #define WCD_USBSS_PRIV_H
@@ -44,8 +44,10 @@ struct wcd_usbss_ctxt {
 	bool standby_enable;
 	bool is_in_standby;
 	struct mutex switch_update_lock;
+	struct mutex runtime_env_counter_lock;
 	unsigned int version;
 	int wcd_standby_status;
+	int runtime_env_counter;
 	struct nvmem_cell *nvmem_cell;
 	bool defer_writes;
 	int req_state;
