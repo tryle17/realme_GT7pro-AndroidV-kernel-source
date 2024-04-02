@@ -167,12 +167,9 @@
 #define PINCTRL_SLEEP		"sleep"
 #define PINCTRL_SHUTDOWN	"shutdown"
 
-/* Max Minor devices */
-#define MAX_DEV				2
-#define DEVICE_NAME_MAX_LEN		64
-
-#define QSPI_NUM_CS			2
-#define QSPI_BYTES_PER_WORD		4
+/* Max number of Q2SPI devices */
+#define Q2SPI_MAX_DEV			2
+#define Q2SPI_DEV_NAME_MAX_LEN		64
 
 #define Q2SPI_INFO(q2spi_ptr, x...) do { \
 if (q2spi_ptr) { \
@@ -373,11 +370,11 @@ enum var_type {
  */
 struct q2spi_chrdev {
 	dev_t q2spi_dev;
-	struct cdev cdev[MAX_DEV];
+	struct cdev cdev[Q2SPI_MAX_DEV];
 	int major;
 	int minor;
 	struct device *dev;
-	char dev_name[DEVICE_NAME_MAX_LEN];
+	char dev_name[Q2SPI_DEV_NAME_MAX_LEN];
 	struct device *class_dev;
 	struct class *q2spi_class;
 };
