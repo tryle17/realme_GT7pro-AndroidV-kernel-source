@@ -8,6 +8,24 @@
 
 #include <linux/types.h>
 
+#define SYS_MPAM0_EL1		sys_reg(3, 0, 10, 5, 1)
+#define SYS_MPAM1_EL1		sys_reg(3, 0, 10, 5, 0)
+
+#define PARTID_BITS			16
+#define PARTID_I_SHIFT		0
+#define PARTID_D_SHIFT		(PARTID_I_SHIFT + PARTID_BITS)
+
+#define PARTID_DEFAULT		0
+#define PARTID_RESERVED		16
+#define PARTID_MAX			64
+#define PARTID_AVAILABLE	(PARTID_MAX - PARTID_RESERVED)
+
+enum msc_id {
+	MSC_0 = 0,
+	MSC_1,
+	MSC_MAX,
+};
+
 /* Supported Mode */
 enum mpam_config_mode {
 	SET_CACHE_CAPACITY = 0,

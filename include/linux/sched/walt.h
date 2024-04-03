@@ -155,6 +155,7 @@ struct walt_task_struct {
 	cpumask_t			reduce_mask;
 	u64				mark_start_birth_ts;
 	u8				high_util_history;
+	u8				mpam_part_id;
 };
 
 #define wts_to_ts(wts) ({ \
