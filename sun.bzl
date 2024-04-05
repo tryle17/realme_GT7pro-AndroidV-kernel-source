@@ -179,6 +179,7 @@ def define_sun():
         "drivers/soc/qcom/qcom_aoss.ko",
         "drivers/soc/qcom/qcom_cpu_vendor_hooks.ko",
         "drivers/soc/qcom/qcom_cpucp.ko",
+        "drivers/soc/qcom/qcom_cpuss_sleep_stats_v4.ko",
         "drivers/soc/qcom/qcom_dynamic_ramoops.ko",
         "drivers/soc/qcom/qcom_ice.ko",
         "drivers/soc/qcom/qcom_logbuf_boot_log.ko",
