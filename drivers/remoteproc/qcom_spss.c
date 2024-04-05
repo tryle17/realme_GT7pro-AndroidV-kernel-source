@@ -270,6 +270,9 @@ static void clear_wdog(struct qcom_spss *spss)
 		"disabled and lead to device crash" : "enabled and kick reovery process");
 	if (spss->rproc->recovery_disabled) {
 		spss->rproc->state = RPROC_CRASHED;
+#ifdef CONFIG_ARCH_SUN
+		dev_info(spss->dev, "SP-PBL patch version is %d\n", sp_pbl_patch_version);
+#endif
 		panic("Panicking, remoterpoc %s crashed\n", spss->rproc->name);
 	}
 
@@ -500,6 +503,7 @@ static int spss_attach(struct rproc *rproc)
 	if (rproc->recovery_disabled && !ret) {
 		dev_err(spss->dev, "%d ms timeout poked\n", SPSS_TIMEOUT);
 #ifdef CONFIG_ARCH_SUN
+		dev_info(spss->dev, "SP-PBL patch version is %d\n", sp_pbl_patch_version);
 		if (sp_pbl_patch_version == 0x0)
 			dev_err(spss->dev, "%s attach timed out\n", rproc->name);
 		else
@@ -566,6 +570,10 @@ static int spss_start(struct rproc *rproc)
 	dev_err(spss->dev, "trying to read spss registers\n");
 	ret = wait_for_completion_timeout(&spss->start_done, msecs_to_jiffies(SPSS_TIMEOUT));
 	read_sp2cl_debug_registers(spss);
+#ifdef CONFIG_ARCH_SUN
+	if (!ret)
+		dev_info(spss->dev, "SP-PBL patch version is %d\n", sp_pbl_patch_version);
+#endif
 	if (rproc->recovery_disabled && !ret)
 		panic("Panicking, %s start timed out\n", rproc->name);
 	else if (!ret)
