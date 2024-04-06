@@ -710,7 +710,7 @@ static int q2spi_hrf_entry_format_sleep(struct q2spi_geni *q2spi, struct q2spi_r
 					struct q2spi_request **q2spi_hrf_req_ptr)
 {
 	struct q2spi_request *q2spi_hrf_req = NULL;
-	struct q2spi_mc_hrf_entry hrf_entry;
+	struct q2spi_mc_hrf_entry hrf_entry = {0};
 
 	q2spi_hrf_req = q2spi_kzalloc(q2spi, sizeof(struct q2spi_request), __LINE__);
 	if (!q2spi_hrf_req) {
@@ -755,7 +755,7 @@ static int q2spi_hrf_entry_format(struct q2spi_geni *q2spi, struct q2spi_request
 				  struct q2spi_request **q2spi_hrf_req_ptr)
 {
 	struct q2spi_request *q2spi_hrf_req = NULL;
-	struct q2spi_mc_hrf_entry hrf_entry;
+	struct q2spi_mc_hrf_entry hrf_entry = {0};
 	int flow_id;
 
 	q2spi_hrf_req = q2spi_kzalloc(q2spi, sizeof(struct q2spi_request), __LINE__);
@@ -1078,6 +1078,11 @@ static int q2spi_open(struct inode *inode, struct file *filp)
 	int ret = 0, rc = 0;
 
 	rc = iminor(inode);
+	if (rc >= Q2SPI_MAX_DEV) {
+		pr_err("%s Err q2spi dev minor:%d\n", __func__, rc);
+		return -ENODEV;
+	}
+
 	cdev = inode->i_cdev;
 	q2spi_cdev = container_of(cdev, struct q2spi_chrdev, cdev[rc]);
 	if (!q2spi_cdev) {
@@ -1812,8 +1817,8 @@ static int __q2spi_transfer(struct q2spi_geni *q2spi, struct q2spi_request q2spi
 		timeout = wait_for_completion_interruptible_timeout
 					(&q2spi_pkt->bulk_wait, xfer_timeout);
 		if (timeout <= 0) {
-			Q2SPI_ERROR(q2spi, "%s q2spi_pkt:%p Err timeout for bulk_wait\n",
-				    __func__, q2spi_pkt);
+			Q2SPI_ERROR(q2spi, "%s q2spi_pkt:%p Err timeout %ld for bulk_wait\n",
+				    __func__, q2spi_pkt, timeout);
 			return -ETIMEDOUT;
 		} else if (atomic_read(&q2spi->retry)) {
 			atomic_dec(&q2spi->retry);
@@ -2755,7 +2760,8 @@ int q2spi_process_hrf_flow_after_lra(struct q2spi_geni *q2spi, struct q2spi_pack
 	xfer_timeout = msecs_to_jiffies(XFER_TIMEOUT_OFFSET);
 	timeout = wait_for_completion_interruptible_timeout(&q2spi_pkt->wait_for_db, xfer_timeout);
 	if (timeout <= 0) {
-		Q2SPI_ERROR(q2spi, "%s Err timeout for doorbell_wait\n", __func__);
+		Q2SPI_ERROR(q2spi, "%s Err timeout for doorbell_wait timeout:%ld\n",
+			    __func__, timeout);
 		return -ETIMEDOUT;
 	}
 
@@ -2857,7 +2863,7 @@ int __q2spi_send_messages(struct q2spi_geni *q2spi, void *ptr)
 	if (!cm_flow_pkt && atomic_read(&q2spi->doorbell_pending)) {
 		atomic_inc(&q2spi->retry);
 		Q2SPI_DEBUG(q2spi, "%s doorbell pending retry\n", __func__);
-		complete(&q2spi_pkt->bulk_wait);
+		complete_all(&q2spi_pkt->bulk_wait);
 		q2spi_unmap_var_bufs(q2spi, q2spi_pkt);
 		ret = -EAGAIN;
 		goto send_msg_exit;
@@ -3209,7 +3215,7 @@ static int q2spi_chardev_create(struct q2spi_geni *q2spi)
 {
 	int ret = 0, i;
 
-	ret = alloc_chrdev_region(&q2spi->chrdev.q2spi_dev, 0, MAX_DEV, "q2spidev");
+	ret = alloc_chrdev_region(&q2spi->chrdev.q2spi_dev, 0, Q2SPI_MAX_DEV, "q2spidev");
 	if (ret < 0) {
 		Q2SPI_DEBUG(q2spi, "%s ret:%d\n", __func__, ret);
 		return ret;
@@ -3222,7 +3228,7 @@ static int q2spi_chardev_create(struct q2spi_geni *q2spi)
 		goto err_class_create;
 	}
 
-	for (i = 0; i < MAX_DEV; i++) {
+	for (i = 0; i < Q2SPI_MAX_DEV; i++) {
 		cdev_init(&q2spi->chrdev.cdev[i], &q2spi_fops);
 		q2spi->chrdev.cdev[i].owner = THIS_MODULE;
 		q2spi->chrdev.major = q2spi_cdev_major;
@@ -3252,7 +3258,7 @@ static int q2spi_chardev_create(struct q2spi_geni *q2spi)
 
 	return 0;
 err_dev_create:
-	for (i = 0; i < MAX_DEV; i++)
+	for (i = 0; i < Q2SPI_MAX_DEV; i++)
 		cdev_del(&q2spi->chrdev.cdev[i]);
 err_cdev_add:
 	class_destroy(q2spi->chrdev.q2spi_class);
@@ -3585,7 +3591,7 @@ void q2spi_find_pkt_by_flow_id(struct q2spi_geni *q2spi, struct q2spi_cr_packet 
 		Q2SPI_DEBUG(q2spi, "%s Found q2spi_pkt %p with flow_id %d\n",
 			    __func__, q2spi_pkt, flow_id);
 		/* wakeup HRF flow which is waiting for this CR doorbell */
-		complete(&q2spi_pkt->wait_for_db);
+		complete_all(&q2spi_pkt->wait_for_db);
 		return;
 	}
 	Q2SPI_DEBUG(q2spi, "%s Err q2spi_pkt not found for flow_id %d\n", __func__, flow_id);
@@ -3655,7 +3661,7 @@ void q2spi_complete_bulk_status(struct q2spi_geni *q2spi, struct q2spi_cr_packet
 		Q2SPI_DEBUG(q2spi, "%s Found q2spi_pkt %p with flow_id %d\n",
 			    __func__, q2spi_pkt, flow_id);
 		q2spi_copy_cr_data_to_pkt(q2spi_pkt, cr_pkt, idx);
-		complete(&q2spi_pkt->bulk_wait);
+		complete_all(&q2spi_pkt->bulk_wait);
 	} else {
 		Q2SPI_DEBUG(q2spi, "%s Err q2spi_pkt not found for flow_id %d\n",
 			    __func__, flow_id);
@@ -3815,7 +3821,7 @@ static void q2spi_chardev_destroy(struct q2spi_geni *q2spi)
 {
 	int i;
 
-	for (i = 0; i < MAX_DEV; i++) {
+	for (i = 0; i < Q2SPI_MAX_DEV; i++) {
 		device_destroy(q2spi->chrdev.q2spi_class, MKDEV(q2spi_cdev_major, i));
 		cdev_del(&q2spi->chrdev.cdev[i]);
 	}
@@ -4101,8 +4107,9 @@ resources_off:
 chardev_destroy:
 	q2spi_chardev_destroy(q2spi);
 q2spi_err:
-	Q2SPI_ERROR(q2spi, "%s: failed, ret:%d\n", __func__, ret);
-	q2spi->base = NULL;
+	if (q2spi)
+		q2spi->base = NULL;
+	pr_err("%s: failed ret:%d\n", __func__, ret);
 	return ret;
 }
 
