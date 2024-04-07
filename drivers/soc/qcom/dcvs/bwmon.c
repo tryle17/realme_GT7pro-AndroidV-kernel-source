@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "qcom-bwmon: " fmt
@@ -1652,23 +1652,12 @@ static const struct of_device_id qcom_bwmon_match_table[] = {
 	{}
 };
 
-static int qcom_bwmon_driver_probe(struct platform_device *pdev)
+static int configure_bwmon_resources(struct platform_device *pdev, struct bwmon *m)
 {
 	struct device *dev = &pdev->dev;
 	struct resource *res;
-	struct bwmon *m;
-	struct hwmon_node *node;
+	u32 data;
 	int ret;
-	u32 data, count_unit;
-	u32 dcvs_hw = NUM_DCVS_PATHS;
-	struct kobject *dcvs_kobj;
-	struct device_node *of_node;
-
-	m = devm_kzalloc(dev, sizeof(*m), GFP_KERNEL);
-	if (!m)
-		return -ENOMEM;
-	m->dev = dev;
-	m->hw.dev = dev;
 
 	m->spec = of_device_get_match_data(dev);
 	if (!m->spec) {
@@ -1715,6 +1704,15 @@ static int qcom_bwmon_driver_probe(struct platform_device *pdev)
 		return m->irq;
 	}
 
+	return 0;
+}
+
+static int configure_bwmon_hw(struct platform_device *pdev, struct bwmon *m)
+{
+	struct device *dev = &pdev->dev;
+	u32 count_unit;
+	int ret;
+
 	if (m->spec->hw_sampling) {
 		ret = of_property_read_u32(dev->of_node, "qcom,hw-timer-hz",
 					   &m->hw_timer_hz);
@@ -1759,6 +1757,19 @@ static int qcom_bwmon_driver_probe(struct platform_device *pdev)
 		m->hw.set_throttle_adj = mon_set_throttle_adj;
 		m->hw.get_throttle_adj = mon_get_throttle_adj;
 	}
+
+	m->hw.is_active = false;
+
+	return 0;
+}
+
+static int bwmon_dcvs_register(struct platform_device *pdev, struct bwmon *m)
+{
+	struct device *dev = &pdev->dev;
+	u32 dcvs_hw = NUM_DCVS_PATHS;
+	struct device_node *of_node;
+	struct hwmon_node *node;
+	int ret;
 
 	of_node = of_parse_phandle(dev->of_node, "qcom,target-dev", 0);
 	if (!of_node) {
@@ -1810,7 +1821,14 @@ static int qcom_bwmon_driver_probe(struct platform_device *pdev)
 	node->cur_freq.ab = 0;
 	node->cur_freq.hw_type = dcvs_hw;
 
-	m->hw.is_active = false;
+	return 0;
+}
+
+static int init_and_start_bwmon(struct platform_device *pdev, struct bwmon *m)
+{
+	struct device *dev = &pdev->dev;
+	int ret;
+
 	mutex_lock(&bwmon_lock);
 	if (!bwmon_wq) {
 		bwmon_wq = create_freezable_workqueue("bwmon_wq");
@@ -1829,7 +1847,41 @@ static int qcom_bwmon_driver_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	dcvs_kobj = qcom_dcvs_kobject_get(dcvs_hw);
+	return 0;
+}
+
+static int qcom_bwmon_driver_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct kobject *dcvs_kobj;
+	struct hwmon_node *node;
+	struct bwmon *m;
+	int ret;
+
+	m = devm_kzalloc(dev, sizeof(*m), GFP_KERNEL);
+	if (!m)
+		return -ENOMEM;
+	m->dev = dev;
+	m->hw.dev = dev;
+
+	ret = configure_bwmon_resources(pdev, m);
+	if (ret < 0)
+		return ret;
+
+	ret = configure_bwmon_hw(pdev, m);
+	if (ret < 0)
+		return ret;
+
+	ret = bwmon_dcvs_register(pdev, m);
+	if (ret < 0)
+		return ret;
+
+	ret = init_and_start_bwmon(pdev, m);
+	if (ret < 0)
+		return ret;
+
+	node = m->hw.node;
+	dcvs_kobj = qcom_dcvs_kobject_get(m->hw.dcvs_hw);
 	if (IS_ERR(dcvs_kobj)) {
 		ret = PTR_ERR(dcvs_kobj);
 		dev_err(dev, "error getting kobj from qcom_dcvs: %d\n", ret);
