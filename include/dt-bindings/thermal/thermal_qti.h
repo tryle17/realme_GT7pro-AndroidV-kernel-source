@@ -1,7 +1,7 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <dt-bindings/thermal/thermal.h>
@@ -94,6 +94,7 @@
 #define QMI_SYS_THERM_4		77
 #define QMI_SYS_THERM_5		78
 #define QMI_SYS_THERM_6		79
+#define QMI_RF_CAL              86
 
 #define QMI_MODEM_INST_ID	0x0
 #define QMI_ADSP_INST_ID	0x1
