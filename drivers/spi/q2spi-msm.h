@@ -171,6 +171,8 @@
 #define Q2SPI_MAX_DEV			2
 #define Q2SPI_DEV_NAME_MAX_LEN		64
 
+#define Q2SPI_RESP_BUF_RETRIES		(100)
+
 #define Q2SPI_INFO(q2spi_ptr, x...) do { \
 if (q2spi_ptr) { \
 	ipc_log_string(q2spi_ptr->ipc, x); \
