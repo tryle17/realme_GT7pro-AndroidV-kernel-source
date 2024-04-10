@@ -44,6 +44,7 @@ def define_sun():
         "drivers/firmware/qcom-scm.ko",
         "drivers/firmware/qcom/si_core/mem_object.ko",
         "drivers/firmware/qcom/si_core/si_core_module.ko",
+        "drivers/gpu/drm/bridge/lt9611uxc.ko",
         "drivers/gpu/drm/display/drm_display_helper.ko",
         "drivers/gpu/drm/display/drm_dp_aux_bus.ko",
         "drivers/hwmon/hwmon.ko",
@@ -272,6 +273,7 @@ def define_sun():
         "net/qrtr/qrtr-smd.ko",
         "net/qrtr/qrtr-tun.ko",
         "net/wireless/cfg80211.ko",
+        "sound/soc/codecs/snd-soc-hdmi-codec.ko",
         "sound/usb/snd-usb-audio-qmi.ko",
     ]
 
