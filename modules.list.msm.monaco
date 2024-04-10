@@ -23,3 +23,4 @@ qcom_aoss.ko
 qcom-dload-mode.ko
 cpu_phys_log_map.ko
 qcom_cpu_vendor_hooks.ko
+pinctrl-monaco.ko

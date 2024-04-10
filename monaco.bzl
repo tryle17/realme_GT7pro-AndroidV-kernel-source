@@ -23,6 +23,7 @@ def define_monaco():
         "drivers/mmc/host/cqhci.ko",
         "drivers/mmc/host/sdhci-msm.ko",
         "drivers/phy/qualcomm/phy-qcom-ufs.ko",
+        "drivers/pinctrl/qcom/pinctrl-monaco.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/power/reset/qcom-dload-mode.ko",
         "drivers/power/reset/qcom-pon.ko",
