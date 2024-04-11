@@ -285,14 +285,15 @@ static void qcom_mpam_reset_param(int part_id)
 {
 	struct mpam_set_cache_partition mpam_param;
 
-	mpam_param.part_id = part_id;
-	mpam_param.msc_id = 0;
+	mpam_param.part_id = part_id + PARTID_RESERVED;
+	mpam_param.msc_id = MSC_0;
 	mpam_param.dspri = mpam_default_val.dspri;
 	mpam_param.cpbm_mask = mpam_default_val.cpbm;
 	mpam_param.cache_capacity = mpam_default_val.capacity;
+	mpam_param.mpam_config_ctrl = SET_CACHE_CAPACITY_AND_CPBM_AND_DSPRI;
 	qcom_mpam_set_cache_partition(&mpam_param);
 
-	mpam_param.msc_id = 1;
+	mpam_param.msc_id = MSC_1;
 	qcom_mpam_set_cache_partition(&mpam_param);
 }
 
