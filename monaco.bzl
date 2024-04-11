@@ -33,7 +33,6 @@ def define_monaco():
         "drivers/soc/qcom/dcc_v2.ko",
         "drivers/soc/qcom/debug_symbol.ko",
         "drivers/soc/qcom/eud.ko",
-        "drivers/soc/qcom/health_monitor.ko",
         "drivers/soc/qcom/mem_buf/mem_buf.ko",
         "drivers/soc/qcom/mem_buf/mem_buf_dev.ko",
         "drivers/soc/qcom/memshare/heap_mem_ext_v01.ko",
