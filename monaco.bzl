@@ -53,9 +53,12 @@ def define_monaco():
 
     _monaco_consolidate_in_tree_modules = _monaco_in_tree_modules + [
         # keep sorted
+        "drivers/misc/lkdtm/lkdtm.ko",
         "kernel/locking/locktorture.ko",
         "kernel/rcu/rcutorture.ko",
         "kernel/torture.ko",
+        "lib/atomic64_test.ko",
+        "lib/test_user_copy.ko",
     ]
 
     kernel_vendor_cmdline_extras = [
