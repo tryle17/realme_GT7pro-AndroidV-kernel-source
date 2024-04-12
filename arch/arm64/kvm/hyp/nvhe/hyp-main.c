@@ -24,7 +24,7 @@
 #include <nvhe/modules.h>
 #include <nvhe/mm.h>
 #include <nvhe/pkvm.h>
-#include <nvhe/trace.h>
+#include <nvhe/trace/trace.h>
 #include <nvhe/trap_handler.h>
 
 #include <linux/irqchip/arm-gic-v3.h>
@@ -1554,9 +1554,12 @@ static void handle___pkvm_host_iommu_iova_to_phys(struct kvm_cpu_context *host_c
 static void handle___pkvm_iommu_init(struct kvm_cpu_context *host_ctxt)
 {
 	DECLARE_REG(struct kvm_iommu_ops *, ops, host_ctxt, 1);
-	DECLARE_REG(unsigned long, init_arg, host_ctxt, 2);
+	DECLARE_REG(unsigned long, mc_head, host_ctxt, 2);
+	DECLARE_REG(unsigned long, nr_pages, host_ctxt, 3);
+	DECLARE_REG(unsigned long, init_arg, host_ctxt, 4);
+	struct kvm_hyp_memcache mc = {.head = mc_head, .nr_pages = nr_pages};
 
-	cpu_reg(host_ctxt, 1) = kvm_iommu_init(ops, init_arg);
+	cpu_reg(host_ctxt, 1) = kvm_iommu_init(ops, &mc, init_arg);
 }
 
 static void handle___pkvm_host_hvc_pd(struct kvm_cpu_context *host_ctxt)
@@ -1565,6 +1568,18 @@ static void handle___pkvm_host_hvc_pd(struct kvm_cpu_context *host_ctxt)
 	DECLARE_REG(u64, on, host_ctxt, 2);
 
 	cpu_reg(host_ctxt, 1) = pkvm_host_hvc_pd(device_id, on);
+}
+
+static void handle___pkvm_stage2_snapshot(struct kvm_cpu_context *host_ctxt)
+{
+#ifdef CONFIG_NVHE_EL2_DEBUG
+	DECLARE_REG(struct kvm_pgtable_snapshot *, snapshot_hva, host_ctxt, 1);
+	DECLARE_REG(pkvm_handle_t, handle, host_ctxt, 2);
+
+	cpu_reg(host_ctxt, 1) = pkvm_stage2_snapshot_by_handle(snapshot_hva, handle);
+#else
+	cpu_reg(host_ctxt, 0) = SMCCC_RET_NOT_SUPPORTED;
+#endif
 }
 
 typedef void (*hcall_t)(struct kvm_cpu_context *);
@@ -1630,6 +1645,7 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__pkvm_host_iommu_unmap_pages),
 	HANDLE_FUNC(__pkvm_host_iommu_iova_to_phys),
 	HANDLE_FUNC(__pkvm_host_hvc_pd),
+	HANDLE_FUNC(__pkvm_stage2_snapshot),
 };
 
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
