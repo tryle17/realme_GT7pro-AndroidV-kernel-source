@@ -87,6 +87,7 @@ def define_sun():
         "drivers/interconnect/qcom/icc-rpmh.ko",
         "drivers/interconnect/qcom/qnoc-qos.ko",
         "drivers/interconnect/qcom/qnoc-sun.ko",
+        "drivers/interconnect/qcom/qnoc-tuna.ko",
         "drivers/iommu/arm/arm-smmu/arm_smmu.ko",
         "drivers/iommu/iommu-logger.ko",
         "drivers/iommu/msm_dma_iommu_mapping.ko",
