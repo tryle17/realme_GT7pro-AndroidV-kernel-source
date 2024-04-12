@@ -439,9 +439,12 @@ static int qcom_mpam_probe(struct platform_device *pdev)
 	mpam_param.msc_id = 0;
 	mpam_param.part_id = PARTID_MAX - 1;
 	ret = qcom_mpam_get_cache_partition(&mpam_param, &mpam_default_val);
-	if (ret)
+	if (ret) {
 		dev_err(&pdev->dev, "Error getting default value %d\n", ret);
+		mpam_default_val.cpbm = UINT_MAX;
+	}
 	mpam_default_val.capacity = 100;
+	mpam_default_val.dspri = 0;
 
 	if (IS_ENABLED(CONFIG_QTI_MPAM_CONFIGFS)) {
 		ret = qcom_mpam_configfs_init();
