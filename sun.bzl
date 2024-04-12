@@ -107,6 +107,7 @@ def define_sun():
         "drivers/pinctrl/qcom/pinctrl-spmi-gpio.ko",
         "drivers/pinctrl/qcom/pinctrl-spmi-mpp.ko",
         "drivers/pinctrl/qcom/pinctrl-sun.ko",
+        "drivers/pinctrl/qcom/pinctrl-tuna.ko",
         "drivers/power/reset/qcom-dload-mode.ko",
         "drivers/power/reset/qcom-pon.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
