@@ -147,6 +147,7 @@ static void qcom_mpam_set_schemata(struct config_item *item,
 {
 	int ret;
 	uint32_t input;
+	bool bypass_cache = false;
 	char *token, *param_name;
 	struct mpam_set_cache_partition mpam_param;
 	struct qcom_mpam_partition *partition = to_partition(item);
@@ -175,11 +176,26 @@ static void qcom_mpam_set_schemata(struct config_item *item,
 			mpam_param.dspri = input;
 	}
 
+	/*
+	 * If cpbm_mask set from userspace is 0, it means the least allocation
+	 * for MPAM is needed. For the current hardware, the least allocation
+	 * is cpbm_mask==1, cache_capacity == 0. And when cpbm_mask == 0,
+	 * cache_capacity will always limit to 0.
+	 */
+	if (mpam_param.cpbm_mask == 0) {
+		bypass_cache = true;
+		mpam_param.cpbm_mask = 0x1;
+		mpam_param.cache_capacity = 0;
+	}
+
 	ret = qcom_mpam_set_cache_partition(&mpam_param);
 	if (!ret) {
 		partition->val[mscid].capacity = mpam_param.cache_capacity;
-		partition->val[mscid].cpbm = mpam_param.cpbm_mask;
 		partition->val[mscid].dspri = mpam_param.dspri;
+		if (unlikely(bypass_cache))
+			partition->val[mscid].cpbm = 0;
+		else
+			partition->val[mscid].cpbm = mpam_param.cpbm_mask;
 	} else
 		pr_err("set msc mpam settings failed, ret = %d\n", ret);
 }
