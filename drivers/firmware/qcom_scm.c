@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2010,2015,2019 The Linux Foundation. All rights reserved.
  * Copyright (C) 2015 Linaro Ltd.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #define pr_fmt(fmt)     "qcom-scm: %s: " fmt, __func__
 
@@ -2466,7 +2466,7 @@ static irqreturn_t qcom_scm_irq_handler(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
-static int __qcom_multi_smc_init(struct qcom_scm *__scm,
+static void  __qcom_multi_smc_init(struct qcom_scm *__scm,
 						struct platform_device *pdev)
 {
 	int ret = 0, irq;
@@ -2479,7 +2479,7 @@ static int __qcom_multi_smc_init(struct qcom_scm *__scm,
 		irq = platform_get_irq(pdev, 0);
 		if (irq < 0) {
 			dev_err(__scm->dev, "WQ IRQ is not specified: %d\n", irq);
-			return irq;
+			return;
 		}
 
 		ret = devm_request_irq(__scm->dev, irq,
@@ -2487,7 +2487,7 @@ static int __qcom_multi_smc_init(struct qcom_scm *__scm,
 				IRQF_ONESHOT, "qcom-scm", __scm);
 		if (ret < 0) {
 			dev_err(__scm->dev, "Failed to request qcom-scm irq: %d\n", ret);
-			return ret;
+			return;
 		}
 
 		/* Detect Multi SMC support present or not */
@@ -2496,8 +2496,6 @@ static int __qcom_multi_smc_init(struct qcom_scm *__scm,
 			sema_init(&qcom_scm_sem_lock,
 					(int)__scm->waitq.call_ctx_cnt);
 	}
-
-	return ret;
 }
 
 /**
@@ -2620,9 +2618,7 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	init_completion(&__scm->waitq_comp);
 
 	__get_convention();
-	ret  = __qcom_multi_smc_init(scm, pdev);
-	if (ret)
-		return ret;
+	__qcom_multi_smc_init(scm, pdev);
 
 	scm->restart_nb.notifier_call = qcom_scm_do_restart;
 	scm->restart_nb.priority = 130;
