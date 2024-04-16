@@ -31,6 +31,8 @@ static int q2spi_slave_init(struct q2spi_geni *q2spi);
 static int q2spi_gsi_submit(struct q2spi_packet *q2spi_pkt);
 static struct q2spi_geni *get_q2spi(struct device *dev);
 static int q2spi_geni_runtime_resume(struct device *dev);
+/* global variable for system restart case */
+bool q2spi_sys_restart;
 
 /* FTRACE Logging */
 void q2spi_trace_log(struct device *dev, const char *fmt, ...)
@@ -818,11 +820,21 @@ static int q2spi_hrf_entry_format(struct q2spi_geni *q2spi, struct q2spi_request
  */
 void q2spi_wait_for_doorbell_setup_ready(struct q2spi_geni *q2spi)
 {
+	long timeout = 0;
+
 	if (!q2spi->doorbell_setup) {
 		Q2SPI_DEBUG(q2spi, "%s: Waiting for Doorbell buffers to be setup\n", __func__);
 		reinit_completion(&q2spi->db_setup_wait);
-		wait_for_completion_interruptible_timeout(&q2spi->db_setup_wait,
-							  msecs_to_jiffies(50));
+		timeout = wait_for_completion_interruptible_timeout(&q2spi->db_setup_wait,
+								    msecs_to_jiffies(50));
+		if (timeout <= 0) {
+			Q2SPI_DEBUG(q2spi, "%s Err timeout for DB buffers setup wait:%ld\n",
+				    __func__, timeout);
+			if (timeout == -ERESTARTSYS) {
+				q2spi_sys_restart = true;
+				return;
+			}
+		}
 	}
 }
 
@@ -858,6 +870,8 @@ int q2spi_map_doorbell_rx_buf(struct q2spi_geni *q2spi)
 	int ret = 0;
 
 	Q2SPI_DEBUG(q2spi, "%s Enter PID=%d\n", __func__, current->pid);
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
 
 	if (q2spi->port_release || atomic_read(&q2spi->is_suspend)) {
 		Q2SPI_DEBUG(q2spi, "%s Port being closed or suspend return\n", __func__);
@@ -940,6 +954,9 @@ void q2spi_doorbell(struct q2spi_geni *q2spi,
 		    const struct qup_q2spi_cr_header_event *q2spi_cr_hdr_event)
 {
 	Q2SPI_DEBUG(q2spi, "%s Enter PID=%d\n", __func__, current->pid);
+	if (q2spi_sys_restart)
+		return;
+
 	memcpy(&q2spi->q2spi_cr_hdr_event, q2spi_cr_hdr_event,
 	       sizeof(struct qup_q2spi_cr_header_event));
 	queue_work(q2spi->doorbell_wq, &q2spi->q2spi_doorbell_work);
@@ -1058,6 +1075,9 @@ static int q2spi_open(struct inode *inode, struct file *filp)
 	struct q2spi_chrdev *q2spi_cdev;
 	struct q2spi_geni *q2spi;
 	int ret = 0, rc = 0;
+
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
 
 	rc = iminor(inode);
 	if (rc >= Q2SPI_MAX_DEV) {
@@ -1799,6 +1819,10 @@ static int __q2spi_transfer(struct q2spi_geni *q2spi, struct q2spi_request q2spi
 		if (timeout <= 0) {
 			Q2SPI_ERROR(q2spi, "%s q2spi_pkt:%p Err timeout %ld for bulk_wait\n",
 				    __func__, q2spi_pkt, timeout);
+			if (timeout == -ERESTARTSYS) {
+				q2spi_sys_restart = true;
+				return -ERESTARTSYS;
+			}
 			return -ETIMEDOUT;
 		} else if (atomic_read(&q2spi->retry)) {
 			atomic_dec(&q2spi->retry);
@@ -1808,7 +1832,8 @@ static int __q2spi_transfer(struct q2spi_geni *q2spi, struct q2spi_request q2spi
 				usleep_range(5000, 10000);
 			return 0;
 		}
-		Q2SPI_DEBUG(q2spi, "%s q2spi_pkt:%p bulk_wait completed\n", __func__, q2spi_pkt);
+		Q2SPI_DEBUG(q2spi, "%s q2spi_pkt:%p bulk_wait completed wait DB clear\n",
+			    __func__, q2spi_pkt);
 		timeout = wait_event_interruptible(q2spi->read_wq,
 						   !atomic_read(&q2spi->doorbell_pending));
 		if (timeout) {
@@ -1870,6 +1895,9 @@ static void q2spi_transfer_soft_reset(struct q2spi_geni *q2spi)
 static int q2spi_transfer_check(struct q2spi_geni *q2spi, struct q2spi_request *q2spi_req,
 				const char __user *buf, size_t len)
 {
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
+
 	if (!q2spi)
 		return -EINVAL;
 
@@ -2007,6 +2035,7 @@ static ssize_t q2spi_transfer(struct file *filp, const char __user *buf, size_t 
 
 	for (i = 0; i <= Q2SPI_MAX_TX_RETRIES; i++) {
 		ret = __q2spi_transfer(q2spi, q2spi_req, cur_q2spi_pkt, len);
+		Q2SPI_DEBUG(q2spi, "%s flow_id:%d ret:%d\n", __func__, flow_id, ret);
 		q2spi_free_xfer_tid(q2spi, flow_id);
 		if (ret > 0 || i == Q2SPI_MAX_TX_RETRIES) {
 			if (ret == len)
@@ -2052,11 +2081,16 @@ static ssize_t q2spi_transfer(struct file *filp, const char __user *buf, size_t 
 				timeout =
 				wait_for_completion_interruptible_timeout(&q2spi->wait_for_ext_cr,
 									  xfer_timeout);
-				if (timeout <= 0)
-					Q2SPI_ERROR(q2spi, "%s Err timeout for Extended CR\n",
-						    __func__);
-				else
+				if (timeout <= 0) {
+					Q2SPI_ERROR(q2spi, "%s Err timeout %ld for Extended CR\n",
+						    __func__, timeout);
+					if (timeout == -ERESTARTSYS) {
+						q2spi_sys_restart = true;
+						return -ERESTARTSYS;
+					}
+				} else {
 					Q2SPI_DEBUG(q2spi, "%s Received Extended CR\n", __func__);
+				}
 			}
 
 			/* Should not perform SOFT RESET when UWB sets reserved[0] bit 0 set */
@@ -2097,6 +2131,9 @@ static ssize_t q2spi_transfer(struct file *filp, const char __user *buf, size_t 
 			}
 			Q2SPI_DEBUG(q2spi, "%s cur_q2spi_pkt=%p q2spi_pkt:%p\n",
 				    __func__, cur_q2spi_pkt, q2spi_pkt);
+		} else if (ret == -ERESTARTSYS) {
+			Q2SPI_DEBUG(q2spi, "%s system is in restart\n", __func__);
+			return ret;
 		} else {
 			/* Upon SW error break here */
 			break;
@@ -2124,6 +2161,9 @@ static ssize_t q2spi_response(struct file *filp, char __user *buf, size_t count,
 	struct q2spi_packet *q2spi_pkt = NULL, *q2spi_pkt_tmp1, *q2spi_pkt_tmp2;
 	int ret = 0;
 	long timeout = 0;
+
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
 
 	if (!filp || !buf || !count || !filp->private_data) {
 		pr_err("%s Err Null pointer\n", __func__);
@@ -2258,6 +2298,9 @@ static __poll_t q2spi_poll(struct file *filp, poll_table *wait)
 	struct q2spi_geni *q2spi;
 	__poll_t mask = 0;
 
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
+
 	if (!filp || !filp->private_data) {
 		pr_err("%s Err Null pointer\n", __func__);
 		return -EINVAL;
@@ -2309,6 +2352,9 @@ static int q2spi_release(struct inode *inode, struct file *filp)
 {
 	struct q2spi_geni *q2spi;
 	int ret = 0;
+
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
 
 	if (!filp || !filp->private_data) {
 		pr_err("%s Err close return\n", __func__);
@@ -2747,6 +2793,10 @@ int q2spi_process_hrf_flow_after_lra(struct q2spi_geni *q2spi, struct q2spi_pack
 	if (timeout <= 0) {
 		Q2SPI_ERROR(q2spi, "%s Err timeout for doorbell_wait timeout:%ld\n",
 			    __func__, timeout);
+		if (timeout == -ERESTARTSYS) {
+			q2spi_sys_restart = true;
+			return -ERESTARTSYS;
+		}
 		return -ETIMEDOUT;
 	}
 
@@ -3020,6 +3070,9 @@ void q2spi_geni_resources_off(struct q2spi_geni *q2spi)
 {
 	struct geni_se *se = &q2spi->se;
 	int ret = 0;
+
+	if (q2spi_sys_restart)
+		return;
 
 	mutex_lock(&q2spi->geni_resource_lock);
 	if (!q2spi->resources_on) {
@@ -3561,7 +3614,12 @@ int q2spi_send_system_mem_access(struct q2spi_geni *q2spi, struct q2spi_packet *
 		timeout = wait_for_completion_interruptible_timeout(&q2spi->sma_wr_comp,
 								    xfer_timeout);
 		if (timeout <= 0) {
-			Q2SPI_ERROR(q2spi, "%s Err timeout for sma write complete\n", __func__);
+			Q2SPI_ERROR(q2spi, "%s Err timeout %ld for sma write complete\n",
+				    __func__, timeout);
+			if (timeout == -ERESTARTSYS) {
+				q2spi_sys_restart = true;
+				return -ERESTARTSYS;
+			}
 			return -ETIMEDOUT;
 		}
 	}
@@ -3793,9 +3851,12 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 			timeout = wait_for_completion_interruptible_timeout
 				(&q2spi->sma_wait, msecs_to_jiffies(XFER_TIMEOUT_OFFSET));
 			if (timeout <= 0) {
-				Q2SPI_DEBUG(q2spi, "%s Err wait interrupted ret:%d\n",
-						__func__, ret);
-				goto exit_doorbell_work;
+				Q2SPI_DEBUG(q2spi, "%s Err wait interrupted timeout:%ld\n",
+					    __func__, timeout);
+				if (timeout == -ERESTARTSYS) {
+					q2spi_sys_restart = true;
+					return;
+				}
 			}
 		}
 	}
@@ -4281,6 +4342,9 @@ static int q2spi_geni_runtime_suspend(struct device *dev)
 	struct q2spi_geni *q2spi = get_q2spi(dev);
 	int ret = 0;
 
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
+
 	if (!q2spi) {
 		Q2SPI_DEBUG(q2spi, "%s Err q2spi is NULL, PID=%d\n", __func__, current->pid);
 		return -EINVAL;
@@ -4316,6 +4380,9 @@ static int q2spi_geni_runtime_resume(struct device *dev)
 {
 	struct q2spi_geni *q2spi = get_q2spi(dev);
 	int ret = 0;
+
+	if (q2spi_sys_restart)
+		return -ERESTARTSYS;
 
 	if (!q2spi) {
 		Q2SPI_DEBUG(q2spi, "%s Err q2spi is NULL, PID=%d\n", __func__, current->pid);
