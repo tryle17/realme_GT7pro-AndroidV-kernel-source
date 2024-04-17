@@ -24,3 +24,13 @@ qcom-dload-mode.ko
 cpu_phys_log_map.ko
 qcom_cpu_vendor_hooks.ko
 pinctrl-monaco.ko
+qcom_iommu_util.ko
+ufs-qcom.ko
+qcom-pdc.ko
+socinfo.ko
+ufshcd-crypto-qti.ko
+smem.ko
+rtc-pm8xxx.ko
+proxy-consumer.ko
+stub-regulator.ko
+debug-regulator.ko
