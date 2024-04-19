@@ -265,6 +265,7 @@
   debugfs_rename
   dec_node_page_state
   default_llseek
+  deferred_free
   delayed_work_timer_fn
   destroy_workqueue
   dev_addr_mod
