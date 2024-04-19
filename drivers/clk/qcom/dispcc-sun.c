@@ -23,6 +23,7 @@
 #include "clk-regmap-divider.h"
 #include "clk-regmap-mux.h"
 #include "common.h"
+#include "gdsc.h"
 #include "reset.h"
 #include "vdd-level.h"
 
@@ -109,7 +110,7 @@ static struct clk_alpha_pll disp_cc_pll0 = {
 			.vdd_class = &vdd_mm,
 			.num_rate_max = VDD_NUM,
 			.rate_max = (unsigned long[VDD_NUM]) {
-				[VDD_LOWER_D1] = 615000000,
+				[VDD_LOWER_D1] = 621000000,
 				[VDD_LOW] = 1066000000,
 				[VDD_LOW_L1] = 1600000000,
 				[VDD_NOMINAL] = 2000000000,
@@ -148,7 +149,7 @@ static struct clk_alpha_pll disp_cc_pll1 = {
 			.vdd_class = &vdd_mm,
 			.num_rate_max = VDD_NUM,
 			.rate_max = (unsigned long[VDD_NUM]) {
-				[VDD_LOWER_D1] = 615000000,
+				[VDD_LOWER_D1] = 621000000,
 				[VDD_LOW] = 1066000000,
 				[VDD_LOW_L1] = 1600000000,
 				[VDD_NOMINAL] = 2000000000,
@@ -161,11 +162,11 @@ static const struct alpha_pll_config disp_cc_pll2_config = {
 	.l = 0x493,
 	.cal_l = 0x493,
 	.alpha = 0x0,
-	.config_ctl_val = 0x60000f6a,
+	.config_ctl_val = 0x60000f68,
 	.config_ctl_hi_val = 0x0001c808,
 	.config_ctl_hi1_val = 0x00000000,
 	.config_ctl_hi2_val = 0x040082f4,
-	.test_ctl_val = 0x00000000,
+	.test_ctl_val = 0x00008000,
 	.test_ctl_hi_val = 0x0080c496,
 	.test_ctl_hi1_val = 0x40100180,
 	.test_ctl_hi2_val = 0x441001bc,
@@ -2028,6 +2029,32 @@ static struct clk_branch disp_cc_osc_clk = {
 	},
 };
 
+static struct gdsc disp_cc_mdss_core_gdsc = {
+	.gdscr = 0x9000,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0xf,
+	.pd = {
+		.name = "disp_cc_mdss_core_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | HW_CTRL | HW_CTRL_SKIP_DIS,
+	.supply = "vdd_mm",
+};
+
+static struct gdsc disp_cc_mdss_core_int2_gdsc = {
+	.gdscr = 0xb000,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0xf,
+	.pd = {
+		.name = "disp_cc_mdss_core_int2_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | HW_CTRL | HW_CTRL_SKIP_DIS,
+	.supply = "vdd_mm",
+};
+
 static struct clk_regmap *disp_cc_sun_clocks[] = {
 	[DISP_CC_ESYNC0_CLK] = &disp_cc_esync0_clk.clkr,
 	[DISP_CC_ESYNC0_CLK_SRC] = &disp_cc_esync0_clk_src.clkr,
@@ -2119,6 +2146,11 @@ static struct clk_regmap *disp_cc_sun_clocks[] = {
 	[DISP_CC_XO_CLK_SRC] = &disp_cc_xo_clk_src.clkr,
 };
 
+static struct gdsc *disp_cc_sun_gdscs[] = {
+	[DISP_CC_MDSS_CORE_GDSC] = &disp_cc_mdss_core_gdsc,
+	[DISP_CC_MDSS_CORE_INT2_GDSC] = &disp_cc_mdss_core_int2_gdsc,
+};
+
 static const struct qcom_reset_map disp_cc_sun_resets[] = {
 	[DISP_CC_MDSS_CORE_BCR] = { 0x8000 },
 	[DISP_CC_MDSS_CORE_INT2_BCR] = { 0xa000 },
@@ -2141,6 +2173,8 @@ static struct qcom_cc_desc disp_cc_sun_desc = {
 	.num_resets = ARRAY_SIZE(disp_cc_sun_resets),
 	.clk_regulators = disp_cc_sun_regulators,
 	.num_clk_regulators = ARRAY_SIZE(disp_cc_sun_regulators),
+	.gdscs = disp_cc_sun_gdscs,
+	.num_gdscs = ARRAY_SIZE(disp_cc_sun_gdscs),
 };
 
 static const struct of_device_id disp_cc_sun_match_table[] = {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/seq_file.h>
@@ -201,7 +201,7 @@ static void walt_get_indicies(struct task_struct *p, int *order_index,
 		walt_task_skip_min_cpu(p)) {
 		*energy_eval_needed = false;
 		*order_index = 1;
-		if (soc_feat(SOC_ENABLE_BOOST_TO_NEXT_CLUSTER))
+		if (soc_feat(SOC_ENABLE_BOOST_TO_NEXT_CLUSTER_BIT))
 			*end_index = 1;
 
 		if (sysctl_sched_asymcap_boost) {
@@ -864,17 +864,16 @@ int walt_find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 
 	wts = (struct walt_task_struct *) p->android_vendor_data1;
 	pipeline_cpu = wts->pipeline_cpu;
-	if ((wts->low_latency & WALT_LOW_LATENCY_MASK) &&
-			(pipeline_cpu != -1) &&
-			walt_task_skip_min_cpu(p) &&
-			cpumask_test_cpu(pipeline_cpu, p->cpus_ptr) &&
-			cpu_active(pipeline_cpu) &&
-			!cpu_halted(pipeline_cpu)) {
-		if (!walt_pipeline_low_latency_task(cpu_rq(pipeline_cpu)->curr)) {
-			best_energy_cpu = pipeline_cpu;
-			fbt_env.fastpath = PIPELINE_FASTPATH;
-			goto out;
-		}
+	if (walt_pipeline_low_latency_task(p) &&
+		(sched_boost_type != CONSERVATIVE_BOOST) &&
+		(pipeline_cpu != -1) &&
+		cpumask_test_cpu(pipeline_cpu, p->cpus_ptr) &&
+		cpu_active(pipeline_cpu) &&
+		!cpu_halted(pipeline_cpu) &&
+		!walt_pipeline_low_latency_task(cpu_rq(pipeline_cpu)->curr)) {
+		best_energy_cpu = pipeline_cpu;
+		fbt_env.fastpath = PIPELINE_FASTPATH;
+		goto out;
 	}
 
 	walt_get_indicies(p, &order_index, &end_index, task_boost, uclamp_boost,
@@ -1052,32 +1051,6 @@ walt_select_task_rq_fair(void *unused, struct task_struct *p, int prev_cpu,
 	*target_cpu = walt_find_energy_efficient_cpu(p, prev_cpu, sync, sibling_count_hint);
 }
 
-static void walt_binder_low_latency_set(void *unused, struct task_struct *task,
-					bool sync, struct binder_proc *proc)
-{
-	struct walt_task_struct *wts = (struct walt_task_struct *) task->android_vendor_data1;
-
-	if (unlikely(walt_disabled))
-		return;
-	if (task && ((task_in_related_thread_group(current) &&
-			task->group_leader->prio < MAX_RT_PRIO) ||
-			(current->group_leader->prio < MAX_RT_PRIO &&
-			task_in_related_thread_group(task))))
-		wts->low_latency |= WALT_LOW_LATENCY_BINDER;
-	else
-		/*
-		 * Clear low_latency flag if criterion above is not met, this
-		 * will handle usecase where for a binder thread WALT_LOW_LATENCY_BINDER
-		 * is set by one task and before WALT clears this flag after timer expiry
-		 * some other task tries to use same binder thread.
-		 *
-		 * The only gets cleared when binder transaction is initiated
-		 * and the above condition to set flasg is nto satisfied.
-		 */
-		wts->low_latency &= ~WALT_LOW_LATENCY_BINDER;
-
-}
-
 static void binder_set_priority_hook(void *data,
 				struct binder_transaction *bndrtrans, struct task_struct *task)
 {
@@ -1092,6 +1065,28 @@ static void binder_set_priority_hook(void *data,
 		bndrtrans->android_vendor_data1  = wts->boost;
 		wts->boost = TASK_BOOST_STRICT_MAX;
 	}
+
+	if (current == task)
+		return;
+
+	if (task && ((task_in_related_thread_group(current) &&
+			task->group_leader->prio < MAX_RT_PRIO) ||
+			(walt_get_mvp_task_prio(current) == WALT_LL_PIPE_MVP) ||
+			(current->group_leader->prio < MAX_RT_PRIO &&
+			task_in_related_thread_group(task))))
+		wts->low_latency |= WALT_LOW_LATENCY_BINDER_BIT;
+	else
+		/*
+		 * Clear low_latency flag if criterion above is not met, this
+		 * will handle usecase where for a binder thread WALT_LOW_LATENCY_BINDER_BIT
+		 * is set by one task and before WALT clears this flag after timer expiry
+		 * some other task tries to use same binder thread.
+		 *
+		 * The only gets cleared when binder transaction is initiated
+		 * and the above condition to set flasg is nto satisfied.
+		 */
+		wts->low_latency &= ~WALT_LOW_LATENCY_BINDER_BIT;
+
 }
 
 static void binder_restore_priority_hook(void *data,
@@ -1435,11 +1430,43 @@ static void walt_cfs_replace_next_task_fair(void *unused, struct rq *rq, struct 
 	trace_walt_cfs_mvp_pick_next(mvp, wts, walt_cfs_mvp_task_limit(mvp));
 }
 
+void inc_rq_walt_stats(struct rq *rq, struct task_struct *p)
+{
+	struct walt_rq *wrq = &per_cpu(walt_rq, cpu_of(rq));
+	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
+
+	if (wts->misfit)
+		wrq->walt_stats.nr_big_tasks++;
+
+	wts->rtg_high_prio = task_rtg_high_prio(p);
+	if (wts->rtg_high_prio)
+		wrq->walt_stats.nr_rtg_high_prio_tasks++;
+
+	if (walt_flag_test(p, WALT_TRAILBLAZER_BIT))
+		wrq->walt_stats.nr_trailblazer_tasks++;
+}
+
+void dec_rq_walt_stats(struct rq *rq, struct task_struct *p)
+{
+	struct walt_rq *wrq = &per_cpu(walt_rq, cpu_of(rq));
+	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
+
+	if (wts->misfit)
+		wrq->walt_stats.nr_big_tasks--;
+
+	if (wts->rtg_high_prio)
+		wrq->walt_stats.nr_rtg_high_prio_tasks--;
+
+	if (walt_flag_test(p, WALT_TRAILBLAZER_BIT))
+		wrq->walt_stats.nr_trailblazer_tasks--;
+
+	BUG_ON(wrq->walt_stats.nr_big_tasks < 0);
+	BUG_ON(wrq->walt_stats.nr_trailblazer_tasks < 0);
+}
+
 void walt_cfs_init(void)
 {
 	register_trace_android_rvh_select_task_rq_fair(walt_select_task_rq_fair, NULL);
-
-	register_trace_android_vh_binder_wakeup_ilocked(walt_binder_low_latency_set, NULL);
 
 	register_trace_android_vh_binder_set_priority(binder_set_priority_hook, NULL);
 	register_trace_android_vh_binder_restore_priority(binder_restore_priority_hook, NULL);

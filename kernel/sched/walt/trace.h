@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #undef TRACE_SYSTEM
@@ -55,7 +55,7 @@ TRACE_EVENT(sched_update_pred_demand,
 		__entry->final		= final;
 	),
 
-	TP_printk("%d (%s): runtime %u cpu %d pred_demand_scaled %u start %d first %d final %d (buckets: %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u)",
+	TP_printk("pid=%d comm=%s runtime=%u cpu=%d pred_demand_scaled=%u start=%d first=%d final=%d (buckets: %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u)",
 		__entry->pid, __entry->comm,
 		__entry->runtime, __entry->cpu,
 		__entry->pred_demand_scaled, __entry->start, __entry->first, __entry->final,
@@ -71,9 +71,9 @@ TRACE_EVENT(sched_update_history,
 
 	TP_PROTO(struct rq *rq, struct task_struct *p, u32 runtime, int samples,
 			enum task_event evt, struct walt_rq *wrq, struct walt_task_struct *wts,
-			u16 ramp_up_demand),
+			u16 trailblazer_demand),
 
-	TP_ARGS(rq, p, runtime, samples, evt, wrq, wts, ramp_up_demand),
+	TP_ARGS(rq, p, runtime, samples, evt, wrq, wts, trailblazer_demand),
 
 	TP_STRUCT__entry(
 		__array(char,			comm, TASK_COMM_LEN)
@@ -88,7 +88,7 @@ TRACE_EVENT(sched_update_history,
 		__array(u16,			hist_util, RAVG_HIST_SIZE)
 		__field(unsigned int,		nr_big_tasks)
 		__field(int,			cpu)
-		__field(u16,			ramp_up_demand)
+		__field(u16,			trailblazer_demand)
 		__field(u8,			high_util_history)
 	),
 
@@ -107,11 +107,11 @@ TRACE_EVENT(sched_update_history,
 					RAVG_HIST_SIZE * sizeof(u16));
 		__entry->nr_big_tasks	= wrq->walt_stats.nr_big_tasks;
 		__entry->cpu		= rq->cpu;
-		__entry->ramp_up_demand = ramp_up_demand;
+		__entry->trailblazer_demand = trailblazer_demand;
 		__entry->high_util_history = wts->high_util_history;
 	),
 
-	TP_printk("%d (%s): runtime %u samples %d event %s demand %u (hist: %u %u %u %u %u) (hist_util: %u %u %u %u %u) coloc_demand %u pred_demand_scaled %u cpu %d nr_big %u ramp_up_demand %u high_util_history %u",
+	TP_printk("pid=%d comm=%s runtime=%u samples=%d event=%s demand=%u (hist: %u %u %u %u %u) (hist_util: %u %u %u %u %u) coloc_demand=%u pred_demand_scaled=%u cpu=%d nr_big=%u trailblazer_demand=%u high_util_history=%u",
 		__entry->pid, __entry->comm,
 		__entry->runtime, __entry->samples,
 		task_event_names[__entry->evt],
@@ -123,7 +123,7 @@ TRACE_EVENT(sched_update_history,
 		__entry->hist_util[2], __entry->hist_util[3],
 		__entry->hist_util[4],
 		__entry->coloc_demand, __entry->pred_demand_scaled,
-		__entry->cpu, __entry->nr_big_tasks, __entry->ramp_up_demand,
+		__entry->cpu, __entry->nr_big_tasks, __entry->trailblazer_demand,
 		__entry->high_util_history)
 );
 
@@ -642,10 +642,9 @@ TRACE_EVENT(core_ctl_sbt,
  * Tracepoint for sched_get_nr_running_avg
  */
 TRACE_EVENT(sched_get_nr_running_avg,
+	TP_PROTO(int cpu, int nr, int nr_misfit, int nr_max, int nr_scaled, int nr_trailblazer),
 
-	TP_PROTO(int cpu, int nr, int nr_misfit, int nr_max, int nr_scaled),
-
-	TP_ARGS(cpu, nr, nr_misfit, nr_max, nr_scaled),
+	TP_ARGS(cpu, nr, nr_misfit, nr_max, nr_scaled, nr_trailblazer),
 
 	TP_STRUCT__entry(
 		__field(int, cpu)
@@ -653,6 +652,7 @@ TRACE_EVENT(sched_get_nr_running_avg,
 		__field(int, nr_misfit)
 		__field(int, nr_max)
 		__field(int, nr_scaled)
+		__field(int, nr_trailblazer)
 	),
 
 	TP_fast_assign(
@@ -661,11 +661,12 @@ TRACE_EVENT(sched_get_nr_running_avg,
 		__entry->nr_misfit	= nr_misfit;
 		__entry->nr_max		= nr_max;
 		__entry->nr_scaled	= nr_scaled;
+		__entry->nr_trailblazer	= nr_trailblazer;
 	),
 
-	TP_printk("cpu=%d nr=%d nr_misfit=%d nr_max=%d nr_scaled=%d",
+	TP_printk("cpu=%d nr=%d nr_misfit=%d nr_max=%d nr_scaled=%d nr_trailblazer=%d",
 		__entry->cpu, __entry->nr, __entry->nr_misfit, __entry->nr_max,
-		__entry->nr_scaled)
+		__entry->nr_scaled, __entry->nr_trailblazer)
 );
 
 TRACE_EVENT(sched_busy_hyst_time,
@@ -1710,9 +1711,9 @@ TRACE_EVENT(sched_update_updown_early_migrate_values,
 
 TRACE_EVENT(sched_pipeline_tasks,
 
-	TP_PROTO(int type, int index, struct walt_task_struct *heavy_wts),
+	TP_PROTO(int type, int index, struct walt_task_struct *heavy_wts, int nr),
 
-	TP_ARGS(type, index, heavy_wts),
+	TP_ARGS(type, index, heavy_wts, nr),
 
 	TP_STRUCT__entry(
 		__field(int, index)
@@ -1723,6 +1724,7 @@ TRACE_EVENT(sched_pipeline_tasks,
 		__field(int, coloc_demand)
 		__field(int, pipeline_cpu)
 		__field(int, low_latency)
+		__field(int, nr)
 	),
 
 	TP_fast_assign(
@@ -1734,12 +1736,13 @@ TRACE_EVENT(sched_pipeline_tasks,
 		__entry->coloc_demand	= heavy_wts->coloc_demand;
 		__entry->pipeline_cpu	= heavy_wts->pipeline_cpu;
 		__entry->low_latency	= heavy_wts->low_latency;
+		__entry->nr		= nr;
 	),
 
-	TP_printk("type=%d index=%d pid=%d comm=(%s) demand=%d coloc_demand=%d pipeline_cpu=%d low_latency=0x%x",
+	TP_printk("type=%d index=%d pid=%d comm=(%s) demand=%d coloc_demand=%d pipeline_cpu=%d low_latency=0x%x nr_pipeline=%d",
 			__entry->type, __entry->index, __entry->pid,
 			__entry->comm, __entry->demand_scaled, __entry->coloc_demand,
-			__entry->pipeline_cpu, __entry->low_latency)
+			__entry->pipeline_cpu, __entry->low_latency, __entry->nr)
 );
 
 TRACE_EVENT(sched_pipeline_swapped,
@@ -1762,26 +1765,41 @@ TRACE_EVENT(sched_pipeline_swapped,
 	),
 
 	TP_fast_assign(
-		memcpy(__entry->other_comm, wts_to_ts(other_wts)->comm, TASK_COMM_LEN);
-		__entry->other_pid		= wts_to_ts(other_wts)->pid;
-		__entry->other_pipeline_cpu	= other_wts->pipeline_cpu;
-		__entry->other_demand_scaled	= other_wts->demand_scaled;
-		__entry->other_coloc_demand	= other_wts->coloc_demand;
-		memcpy(__entry->prime_comm, wts_to_ts(prime_wts)->comm, TASK_COMM_LEN);
-		__entry->prime_pid		= wts_to_ts(prime_wts)->pid;
-		__entry->prime_pipeline_cpu	= prime_wts->pipeline_cpu;
-		__entry->prime_demand_scaled	= prime_wts->demand_scaled;
-		__entry->prime_coloc_demand	= prime_wts->coloc_demand;
+		if (other_wts != NULL) {
+			memcpy(__entry->other_comm, wts_to_ts(other_wts)->comm, TASK_COMM_LEN);
+			__entry->other_pid		= wts_to_ts(other_wts)->pid;
+			__entry->other_pipeline_cpu	= other_wts->pipeline_cpu;
+			__entry->other_demand_scaled	= other_wts->demand_scaled;
+			__entry->other_coloc_demand	= other_wts->coloc_demand;
+		} else {
+			memset(__entry->other_comm, '\0', TASK_COMM_LEN);
+			__entry->other_pid		= -1;
+			__entry->other_pipeline_cpu	= -1;
+			__entry->other_demand_scaled	= -1;
+			__entry->other_coloc_demand	= -1;
+		}
+		if (prime_wts != NULL) {
+			memcpy(__entry->prime_comm, wts_to_ts(prime_wts)->comm, TASK_COMM_LEN);
+			__entry->prime_pid		= wts_to_ts(prime_wts)->pid;
+			__entry->prime_pipeline_cpu	= prime_wts->pipeline_cpu;
+			__entry->prime_demand_scaled	= prime_wts->demand_scaled;
+			__entry->prime_coloc_demand	= prime_wts->coloc_demand;
+		} else {
+			memset(__entry->prime_comm, '\0', TASK_COMM_LEN);
+			__entry->prime_pid		= -1;
+			__entry->prime_pipeline_cpu	= -1;
+			__entry->prime_demand_scaled	= -1;
+			__entry->prime_coloc_demand	= -1;
+		}
 	),
 
-
-	TP_printk("prime_pid=%d prime_comm=(%s) prime_demand=%d prime_coloc=%d prime_pipeline_cpu=%d other_pid=%d other_comm=(%s) other_demand=%d other_coloc=%d other_pipeline_cpu=%d",
-			__entry->prime_pid, __entry->prime_comm,
-			__entry->prime_demand_scaled, __entry->prime_coloc_demand,
-			__entry->prime_pipeline_cpu,
+	TP_printk("other_pid=%d other_comm=(%s) other_demand=%d other_coloc=%d other_new_pipeline_cpu=%d prime_pid=%d prime_comm=(%s) prime_demand=%d prime_coloc=%d prime_new_pipeline_cpu=%d",
 			__entry->other_pid, __entry->other_comm,
 			__entry->other_demand_scaled, __entry->other_coloc_demand,
-			__entry->other_pipeline_cpu)
+			__entry->other_pipeline_cpu,
+			__entry->prime_pid, __entry->prime_comm,
+			__entry->prime_demand_scaled, __entry->prime_coloc_demand,
+			__entry->prime_pipeline_cpu)
 );
 
 #endif /* _TRACE_WALT_H */

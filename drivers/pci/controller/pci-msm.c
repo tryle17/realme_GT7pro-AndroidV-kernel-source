@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include <dt-bindings/regulator/qcom,rpmh-regulator-levels.h>
 #include <dt-bindings/interconnect/qcom,icc.h>
@@ -31,6 +31,8 @@
 #include <linux/of_pci.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
+#include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
 #include <linux/pm_wakeup.h>
 #include <linux/remoteproc/qcom_rproc.h>
 #include <linux/reset.h>
@@ -115,6 +117,12 @@
 #define PCIE20_PARF_DEBUG_CNT_IN_L1SUB_L1 (0xc84)
 #define PCIE20_PARF_DEBUG_CNT_IN_L1SUB_L2 (0xc88)
 #define PCIE20_PARF_PM_STTS_1 (0x28)
+#define PM_STATE_L0    0
+#define PM_STATE_L0s   1
+#define PM_STATE_L1    2
+#define PM_STATE_L2    3
+#define PCIE_LINK_PM_STATE(val) ((val & (7 << 7)) >> 7)
+#define PCIE_LINK_IN_L2_STATE(val) ((PCIE_LINK_PM_STATE(val)) == PM_STATE_L2)
 #define PCIE20_PARF_L1SS_SLEEP_MODE_HANDLER_STATUS (0x4D0)
 #define PCIE20_PARF_L1SS_SLEEP_MODE_HANDLER_CFG (0x4D4)
 #define PCIE20_PARF_CORE_ERRORS (0x3C0)
@@ -1031,6 +1039,9 @@ struct msm_pcie_dev_t {
 	struct pci_host_bridge *bridge;
 	struct regulator *gdsc_core;
 	struct regulator *gdsc_phy;
+	struct device *gdsc_pd_core;
+	struct device *gdsc_pd_phy;
+	const char *gdsc_pd_name;
 	struct msm_pcie_vreg_info_t vreg[MSM_PCIE_MAX_VREG];
 	struct msm_pcie_gpio_info_t gpio[MSM_PCIE_MAX_GPIO];
 	struct msm_pcie_res_info_t res[MSM_PCIE_MAX_RES];
@@ -2079,8 +2090,13 @@ static void msm_pcie_show_status(struct msm_pcie_dev_t *dev)
 		dev->link_turned_off_counter);
 	PCIE_DBG_FS(dev, "l23_rdy_poll_timeout: %llu\n",
 		dev->l23_rdy_poll_timeout);
-	PCIE_DBG_FS(dev, "PCIe CESTA is %s\n",
-		dev->pcie_sm ? "supported" : "not_supported");
+	PCIE_DBG_FS(dev, "PCIe %s is used for resource voting\n",
+		dev->pcie_sm ? "CESTA" : "SW");
+	if (dev->drv_supported)
+		PCIE_DBG_FS(dev, "PCIe L1ss sleep is supported using %s\n",
+							dev->drv_name);
+	else
+		PCIE_DBG_FS(dev, "PCIe L1ss sleep is not supported\n");
 }
 
 static void msm_pcie_access_reg(struct msm_pcie_dev_t *dev, bool wr)
@@ -4147,8 +4163,49 @@ static void msm_pcie_vreg_deinit(struct msm_pcie_dev_t *dev)
 	PCIE_DBG(dev, "RC%d: exit\n", dev->rc_idx);
 }
 
-/* This function will initialize gdsc core and gdsc phy regulators */
-static int msm_pcie_gdsc_init(struct msm_pcie_dev_t *dev)
+static int msm_pcie_genpd_gdsc_init(struct msm_pcie_dev_t *dev)
+{
+	int rc = 0;
+
+	PCIE_DBG(dev, "RC%d: entry\n", dev->rc_idx);
+
+	if (dev->gdsc_pd_core) {
+		rc = pm_runtime_get_sync(dev->gdsc_pd_core);
+		if (rc) {
+			PCIE_ERR(dev,
+			"PCIe: fail to enable GenPD GDSC-CORE for RC%d (%s)\n",
+					dev->rc_idx, dev->pdev->name);
+			goto out;
+		}
+	}
+
+	if (dev->gdsc_pd_phy) {
+		rc = pm_runtime_get_sync(dev->gdsc_pd_phy);
+		if (rc) {
+			PCIE_ERR(dev,
+			"PCIe: fail to enable GenPD GDSC-PHY for RC%d (%s)\n",
+					dev->rc_idx, dev->pdev->name);
+			goto err;
+		}
+	}
+
+out:
+	PCIE_DBG(dev, "RC%d: exit ret %d\n", dev->rc_idx, rc);
+	return rc;
+err:
+	if (dev->gdsc_pd_core) {
+		rc = pm_runtime_put_sync(dev->gdsc_pd_core);
+		if (rc)
+			PCIE_ERR(dev,
+			"PCIe: fail to disable GenPD GDSC-CORE for RC%d (%s)\n",
+					dev->rc_idx, dev->pdev->name);
+	}
+
+	PCIE_DBG(dev, "RC%d: exit ret %d\n", dev->rc_idx, rc);
+	return rc;
+}
+
+static int msm_pcie_reg_gdsc_init(struct msm_pcie_dev_t *dev)
 {
 	int rc = 0;
 
@@ -4159,8 +4216,8 @@ static int msm_pcie_gdsc_init(struct msm_pcie_dev_t *dev)
 		if (rc) {
 			PCIE_ERR(dev,
 			"PCIe: fail to enable GDSC-CORE for RC%d (%s)\n",
-						dev->rc_idx, dev->pdev->name);
-			return rc;
+					dev->rc_idx, dev->pdev->name);
+			goto out;
 		}
 	}
 
@@ -4169,18 +4226,72 @@ static int msm_pcie_gdsc_init(struct msm_pcie_dev_t *dev)
 		if (rc) {
 			PCIE_ERR(dev,
 			"PCIe: fail to enable GDSC-PHY for RC%d (%s)\n",
-						dev->rc_idx, dev->pdev->name);
-			return rc;
+					dev->rc_idx, dev->pdev->name);
+			goto err;
 		}
 	}
 
-	PCIE_DBG(dev, "RC%d: exit\n", dev->rc_idx);
+out:
+	PCIE_DBG(dev, "RC%d: exit ret %d\n", dev->rc_idx, rc);
+	return rc;
+err:
+	if (dev->gdsc_core) {
+		rc = regulator_disable(dev->gdsc_core);
+		if (rc)
+			PCIE_ERR(dev,
+			"PCIe: fail to disable GDSC-CORE for RC%d (%s)\n",
+					dev->rc_idx, dev->pdev->name);
+	}
 
-	return 0;
+	PCIE_DBG(dev, "RC%d: exit ret %d\n", dev->rc_idx, rc);
+	return rc;
 }
 
-/* This function will de-initialize gdsc core and gdsc phy regulators */
-static int msm_pcie_gdsc_deinit(struct msm_pcie_dev_t *dev)
+/* This function will initialize gdsc core and gdsc phy regulators */
+static int msm_pcie_gdsc_init(struct msm_pcie_dev_t *dev)
+{
+	/*
+	 * Either gdsc_pd_core/phy will be set or the
+	 * gdsc_core/phy pointers will be set so not checking
+	 * for the mix-match conditions i.e devicetree node
+	 * shouldn't contain one gdsc regulator as pd controlled
+	 * and the other is regulator controlled.
+	 */
+	if (dev->gdsc_pd_core || dev->gdsc_pd_phy)
+		return msm_pcie_genpd_gdsc_init(dev);
+	return msm_pcie_reg_gdsc_init(dev);
+}
+
+static int msm_pcie_genpd_gdsc_deinit(struct msm_pcie_dev_t *dev)
+{
+	int rc = 0;
+
+	PCIE_DBG(dev, "RC%d: entry\n", dev->rc_idx);
+
+	if (dev->gdsc_pd_core) {
+		rc = pm_runtime_put_sync(dev->gdsc_pd_core);
+		if (rc) {
+			PCIE_ERR(dev,
+			"PCIe:RC%d fail to disable GenPD GDSC-CORE (%s)\n",
+					dev->rc_idx, dev->pdev->name);
+			goto out;
+		}
+	}
+
+	if (dev->gdsc_pd_phy) {
+		rc = pm_runtime_put_sync(dev->gdsc_pd_phy);
+		if (rc)
+			PCIE_ERR(dev,
+			"PCIe:RC%d fail to disable GDSC-PHY (%s)\n",
+					dev->rc_idx, dev->pdev->name);
+	}
+
+out:
+	PCIE_DBG(dev, "RC%d: exit ret %d\n", dev->rc_idx, rc);
+	return rc;
+}
+
+static int msm_pcie_reg_gdsc_deinit(struct msm_pcie_dev_t *dev)
 {
 	int rc = 0;
 
@@ -4190,25 +4301,31 @@ static int msm_pcie_gdsc_deinit(struct msm_pcie_dev_t *dev)
 		rc = regulator_disable(dev->gdsc_core);
 		if (rc) {
 			PCIE_ERR(dev,
-				"PCIe:RC%d fail to disable GDSC-CORE (%s)\n",
-						dev->rc_idx, dev->pdev->name);
-			return rc;
+			"PCIe:RC%d fail to disable GDSC-CORE (%s)\n",
+					dev->rc_idx, dev->pdev->name);
+			goto out;
 		}
 	}
 
 	if (dev->gdsc_phy) {
 		rc = regulator_disable(dev->gdsc_phy);
-		if (rc) {
+		if (rc)
 			PCIE_ERR(dev,
-				"PCIe:RC%d fail to disable GDSC-PHY (%s)\n",
-						dev->rc_idx, dev->pdev->name);
-			return rc;
-		}
+			"PCIe:RC%d fail to disable GDSC-PHY (%s)\n",
+					dev->rc_idx, dev->pdev->name);
 	}
 
-	PCIE_DBG(dev, "RC%d: exit\n", dev->rc_idx);
+out:
+	PCIE_DBG(dev, "RC%d: exit ret %d\n", dev->rc_idx, rc);
+	return rc;
+}
 
-	return 0;
+/* This function will de-initialize gdsc core and gdsc phy regulators */
+static int msm_pcie_gdsc_deinit(struct msm_pcie_dev_t *dev)
+{
+	if (dev->gdsc_pd_core || dev->gdsc_pd_phy)
+		return msm_pcie_genpd_gdsc_deinit(dev);
+	return msm_pcie_reg_gdsc_deinit(dev);
 }
 
 /* This function will reset pcie controller and phy */
@@ -4845,6 +4962,136 @@ out:
 	return -EIO;
 }
 
+static int msm_pcie_gdsc_vreg_get(struct msm_pcie_dev_t *pcie_dev,
+				const char *name, struct regulator **gdsc_vreg)
+{
+	struct platform_device *pdev = pcie_dev->pdev;
+
+	*gdsc_vreg = devm_regulator_get(&pdev->dev, name);
+
+	if (IS_ERR_OR_NULL(*gdsc_vreg)) {
+		PCIE_ERR(pcie_dev, "PCIe: RC%d: Failed to get %s %s:%ld\n",
+				pcie_dev->rc_idx, pdev->name, name,
+				PTR_ERR(*gdsc_vreg));
+		if (PTR_ERR(*gdsc_vreg) == -EPROBE_DEFER) {
+			PCIE_DBG(pcie_dev, "PCIe: EPROBE_DEFER for %s %s\n",
+					pdev->name, name);
+			return PTR_ERR(*gdsc_vreg);
+		}
+		*gdsc_vreg = NULL;
+	}
+
+	return 0;
+}
+
+static int msm_pcie_get_gdsc_reg(struct msm_pcie_dev_t *pcie_dev)
+{
+	int ret;
+
+	pcie_dev->gdsc_pd_core = NULL;
+	pcie_dev->gdsc_pd_phy = NULL;
+
+	ret = msm_pcie_gdsc_vreg_get(pcie_dev, "gdsc-core-vdd",
+							&pcie_dev->gdsc_core);
+	if (ret)
+		return ret;
+
+	ret = msm_pcie_gdsc_vreg_get(pcie_dev, "gdsc-phy-vdd",
+							&pcie_dev->gdsc_phy);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int msm_pcie_genpd_get_dev(struct msm_pcie_dev_t *pcie_dev,
+			const char *name, struct device **gdsc_pd_device)
+{
+	struct platform_device *pdev = pcie_dev->pdev;
+
+	*gdsc_pd_device = dev_pm_domain_attach_by_name(&pdev->dev, name);
+
+	if (IS_ERR_OR_NULL(*gdsc_pd_device)) {
+		PCIE_ERR(pcie_dev, "PCIe: RC%d: Failed to get %s %s:%ld\n",
+			 pcie_dev->rc_idx, pdev->name, name,
+			 PTR_ERR(*gdsc_pd_device));
+		if (PTR_ERR(*gdsc_pd_device) == -EPROBE_DEFER) {
+			PCIE_DBG(pcie_dev, "PCIe: EPROBE_DEFER for %s %s\n",
+				 pdev->name, name);
+			return PTR_ERR(*gdsc_pd_device);
+		}
+		*gdsc_pd_device = NULL;
+	}
+
+	return 0;
+}
+
+static void msm_pcie_gdsc_genpd_detach(struct msm_pcie_dev_t *pcie_dev)
+{
+	struct platform_device *pdev = pcie_dev->pdev;
+
+	/* Clean up check for multiple genpd-gdsc vs one genpd-gdsc */
+	if (pcie_dev->gdsc_pd_core && pcie_dev->gdsc_pd_phy) {
+		dev_pm_domain_detach(pcie_dev->gdsc_pd_core, false);
+		dev_pm_domain_detach(pcie_dev->gdsc_pd_phy, false);
+	} else if (pcie_dev->gdsc_pd_core || pcie_dev->gdsc_pd_phy) {
+		pm_runtime_disable(&pdev->dev);
+	}
+}
+
+static int msm_pcie_get_gdsc_genpd(struct msm_pcie_dev_t *pcie_dev)
+{
+	struct platform_device *pdev = pcie_dev->pdev;
+	int ret;
+
+	pcie_dev->gdsc_core = NULL;
+	pcie_dev->gdsc_phy = NULL;
+
+	/*
+	 * If there is only one power domain controlled gdsc supported in the
+	 * devicetree node of a pcie instance then that gdsc will already be
+	 * attached to the pcie dev node before the pcie probe. This is taken
+	 * care by the GenPD framework. So just enable the gdsc instead of
+	 * trying to attach it.
+	 */
+	if (pdev->dev.pm_domain) {
+		if (of_property_read_string(pdev->dev.of_node,
+				"power-domain-names", &pcie_dev->gdsc_pd_name))
+			return -EINVAL;
+
+		if (!strcmp(pcie_dev->gdsc_pd_name, "gdsc-core-vdd")) {
+			pcie_dev->gdsc_pd_core = &pdev->dev;
+			pcie_dev->gdsc_pd_phy = NULL;
+		} else if (!strcmp(pcie_dev->gdsc_pd_name, "gdsc-phy-vdd")) {
+			pcie_dev->gdsc_pd_core = NULL;
+			pcie_dev->gdsc_pd_phy = &pdev->dev;
+		} else {
+			return -EINVAL;
+		}
+
+		pm_runtime_enable(&pdev->dev);
+
+		return 0;
+	}
+
+	ret = msm_pcie_genpd_get_dev(pcie_dev, "gdsc-core-vdd",
+						&pcie_dev->gdsc_pd_core);
+	if (ret)
+		return ret;
+
+	ret = msm_pcie_genpd_get_dev(pcie_dev, "gdsc-phy-vdd",
+						&pcie_dev->gdsc_pd_phy);
+	if (ret)
+		goto out;
+
+	return 0;
+
+out:
+	if (pcie_dev->gdsc_pd_core)
+		dev_pm_domain_detach(pcie_dev->gdsc_pd_core, false);
+	return ret;
+}
+
 static int msm_pcie_get_vreg(struct msm_pcie_dev_t *pcie_dev)
 {
 	int i, len;
@@ -4899,33 +5146,10 @@ static int msm_pcie_get_vreg(struct msm_pcie_dev_t *pcie_dev)
 		}
 	}
 
-	pcie_dev->gdsc_core = devm_regulator_get(&pdev->dev, "gdsc-core-vdd");
+	if (of_property_present(pdev->dev.of_node, "power-domains"))
+		return msm_pcie_get_gdsc_genpd(pcie_dev);
 
-	if (IS_ERR(pcie_dev->gdsc_core)) {
-		PCIE_ERR(pcie_dev, "PCIe: RC%d: Failed to get %s GDSC-CORE:%ld\n",
-			 pcie_dev->rc_idx, pdev->name,
-			 PTR_ERR(pcie_dev->gdsc_core));
-		if (PTR_ERR(pcie_dev->gdsc_core) == -EPROBE_DEFER)
-			PCIE_DBG(pcie_dev, "PCIe: EPROBE_DEFER for %s GDSC-CORE\n",
-				 pdev->name);
-		if (!pcie_dev->pcie_sm)
-			return PTR_ERR(pcie_dev->gdsc_core);
-	}
-
-	pcie_dev->gdsc_phy = devm_regulator_get(&pdev->dev, "gdsc-phy-vdd");
-
-	if (IS_ERR(pcie_dev->gdsc_phy)) {
-		PCIE_ERR(pcie_dev, "PCIe: RC%d: Failed to get %s GDSC-PHY:%ld\n",
-			 pcie_dev->rc_idx, pdev->name,
-			 PTR_ERR(pcie_dev->gdsc_phy));
-		if (PTR_ERR(pcie_dev->gdsc_phy) == -EPROBE_DEFER) {
-			PCIE_DBG(pcie_dev, "PCIe: EPROBE_DEFER for %s GDSC-PHY\n",
-				pdev->name);
-			return PTR_ERR(pcie_dev->gdsc_phy);
-		}
-	}
-
-	return 0;
+	return msm_pcie_get_gdsc_reg(pcie_dev);
 }
 
 static int msm_pcie_get_reset(struct msm_pcie_dev_t *pcie_dev)
@@ -8230,6 +8454,9 @@ decrease_rc_num:
 	pcie_drv.rc_num--;
 	PCIE_ERR(pcie_dev, "PCIe: RC%d: Driver probe failed. ret: %d\n",
 		pcie_dev->rc_idx, ret);
+
+	msm_pcie_gdsc_genpd_detach(&msm_pcie_dev[rc_idx]);
+
 out:
 	if (rc_idx < 0 || rc_idx >= MAX_RC_NUM)
 		pr_err("PCIe: Invalid RC index %d. Driver probe failed\n",
@@ -8276,6 +8503,8 @@ static int msm_pcie_remove(struct platform_device *pdev)
 	msm_pcie_gdsc_deinit(&msm_pcie_dev[rc_idx]);
 	msm_pcie_gpio_deinit(&msm_pcie_dev[rc_idx]);
 	msm_pcie_release_resources(&msm_pcie_dev[rc_idx]);
+
+	msm_pcie_gdsc_genpd_detach(&msm_pcie_dev[rc_idx]);
 
 	list_for_each_entry_safe(dev_info, temp,
 				 &msm_pcie_dev[rc_idx].enum_ep_list,
@@ -8408,24 +8637,25 @@ invalid_link_width:
 	return -EINVAL;
 }
 
-void msm_pcie_allow_l1(struct pci_dev *pci_dev)
+int msm_pcie_allow_l1(struct pci_dev *pci_dev)
 {
 	struct pci_dev *root_pci_dev;
 	struct msm_pcie_dev_t *pcie_dev;
+	int ret = 0;
 
 	root_pci_dev = pcie_find_root_port(pci_dev);
 	if (!root_pci_dev)
-		return;
+		return -ENODEV;
 
 	pcie_dev = PCIE_BUS_PRIV_DATA(root_pci_dev->bus);
 
+	mutex_lock(&pcie_dev->setup_lock);
 	mutex_lock(&pcie_dev->aspm_lock);
 	if (pcie_dev->debugfs_l1) {
 		PCIE_DBG2(pcie_dev,
 			"PCIe: RC%d: debugfs_l1 is set so no-op\n",
 			pcie_dev->rc_idx);
-		mutex_unlock(&pcie_dev->aspm_lock);
-		return;
+		goto out;
 	}
 
 	if (!pcie_dev->l1_supported) {
@@ -8433,18 +8663,18 @@ void msm_pcie_allow_l1(struct pci_dev *pci_dev)
 			"PCIe: RC%d: %02x:%02x.%01x: l1 not supported\n",
 			pcie_dev->rc_idx, pci_dev->bus->number,
 			PCI_SLOT(pci_dev->devfn), PCI_FUNC(pci_dev->devfn));
-		mutex_unlock(&pcie_dev->aspm_lock);
-		return;
+		goto out;
 	}
 
-	/* Reject the allow_l1 call if we are already in drv state */
-	if (pcie_dev->link_status == MSM_PCIE_LINK_DRV) {
-		PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x: Error\n",
+	/* Reject the allow_l1 call if the link is not in ENABLED state */
+	if (pcie_dev->link_status != MSM_PCIE_LINK_ENABLED) {
+		ret = -EINVAL;
+		PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x: lnk_sts %d\n",
 				pcie_dev->rc_idx, pci_dev->bus->number,
 				PCI_SLOT(pci_dev->devfn),
-				PCI_FUNC(pci_dev->devfn));
-		mutex_unlock(&pcie_dev->aspm_lock);
-		return;
+				PCI_FUNC(pci_dev->devfn),
+				pcie_dev->link_status);
+		goto out;
 	}
 
 	if (unlikely(--pcie_dev->prevent_l1 < 0))
@@ -8454,10 +8684,8 @@ void msm_pcie_allow_l1(struct pci_dev *pci_dev)
 			PCI_SLOT(pci_dev->devfn), PCI_FUNC(pci_dev->devfn),
 			pcie_dev->prevent_l1);
 
-	if (pcie_dev->prevent_l1) {
-		mutex_unlock(&pcie_dev->aspm_lock);
-		return;
-	}
+	if (pcie_dev->prevent_l1)
+		goto out;
 
 	msm_pcie_write_mask(pcie_dev->parf + PCIE20_PARF_PM_CTRL, BIT(5), 0);
 	/* enable L1 */
@@ -8468,7 +8696,11 @@ void msm_pcie_allow_l1(struct pci_dev *pci_dev)
 	PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x: exit\n",
 		pcie_dev->rc_idx, pci_dev->bus->number,
 		PCI_SLOT(pci_dev->devfn), PCI_FUNC(pci_dev->devfn));
+out:
 	mutex_unlock(&pcie_dev->aspm_lock);
+	mutex_unlock(&pcie_dev->setup_lock);
+
+	return ret;
 }
 EXPORT_SYMBOL(msm_pcie_allow_l1);
 
@@ -8487,13 +8719,13 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 	pcie_dev = PCIE_BUS_PRIV_DATA(root_pci_dev->bus);
 
 	/* disable L1 */
+	mutex_lock(&pcie_dev->setup_lock);
 	mutex_lock(&pcie_dev->aspm_lock);
 	if (pcie_dev->debugfs_l1) {
 		PCIE_DBG2(pcie_dev,
 			"PCIe: RC%d: debugfs_l1 is set so no-op\n",
 			pcie_dev->rc_idx);
-		mutex_unlock(&pcie_dev->aspm_lock);
-		return 0;
+		goto out;
 	}
 
 	if (!pcie_dev->l1_supported) {
@@ -8501,25 +8733,22 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 			"PCIe: RC%d: %02x:%02x.%01x: L1 not supported\n",
 			pcie_dev->rc_idx, pci_dev->bus->number,
 			PCI_SLOT(pci_dev->devfn), PCI_FUNC(pci_dev->devfn));
-		mutex_unlock(&pcie_dev->aspm_lock);
-		return 0;
-	}
-
-	/* Reject the prevent_l1 call if we are already in drv state */
-	if (pcie_dev->link_status == MSM_PCIE_LINK_DRV) {
-		ret = -EINVAL;
-		PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x:ret %d exit\n",
-				pcie_dev->rc_idx, pci_dev->bus->number,
-				PCI_SLOT(pci_dev->devfn),
-				PCI_FUNC(pci_dev->devfn), ret);
-		mutex_unlock(&pcie_dev->aspm_lock);
 		goto out;
 	}
 
-	if (pcie_dev->prevent_l1++) {
-		mutex_unlock(&pcie_dev->aspm_lock);
-		return 0;
+	/* Reject the prevent_l1 call if the link is not in ENABLED state */
+	if (pcie_dev->link_status != MSM_PCIE_LINK_ENABLED) {
+		ret = -EINVAL;
+		PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x: lnk_sts %d\n",
+				pcie_dev->rc_idx, pci_dev->bus->number,
+				PCI_SLOT(pci_dev->devfn),
+				PCI_FUNC(pci_dev->devfn),
+				pcie_dev->link_status);
+		goto out;
 	}
+
+	if (pcie_dev->prevent_l1++)
+		goto out;
 
 	msm_pcie_write_mask(pcie_dev->dm_core +
 				(root_pci_dev->pcie_cap + PCI_EXP_LNKCTL),
@@ -8529,6 +8758,12 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 	/* confirm link is in L0/L0s */
 	while (!msm_pcie_check_ltssm_state(pcie_dev, MSM_PCIE_LTSSM_L0) &&
 		!msm_pcie_check_ltssm_state(pcie_dev, MSM_PCIE_LTSSM_L0S)) {
+		/* Exiting early if linkdown happens */
+		if (pcie_dev->link_status == MSM_PCIE_LINK_DOWN) {
+			ret = -EIO;
+			goto err;
+		}
+
 		if (unlikely(cnt++ >= cnt_max)) {
 			PCIE_ERR(pcie_dev,
 				"PCIe: RC%d: %02x:%02x.%01x: failed to transition to L0\n",
@@ -8555,14 +8790,16 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 	PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x: exit\n",
 		pcie_dev->rc_idx, pci_dev->bus->number,
 		PCI_SLOT(pci_dev->devfn), PCI_FUNC(pci_dev->devfn));
+out:
 	mutex_unlock(&pcie_dev->aspm_lock);
+	mutex_unlock(&pcie_dev->setup_lock);
 
-	return 0;
+	return ret;
 err:
 	mutex_unlock(&pcie_dev->aspm_lock);
+	mutex_unlock(&pcie_dev->setup_lock);
 	msm_pcie_allow_l1(pci_dev);
 
-out:
 	return ret;
 }
 EXPORT_SYMBOL(msm_pcie_prevent_l1);
@@ -8772,6 +9009,9 @@ static struct pci_device_id msm_pci_device_id[] = {
 	{PCI_DEVICE(0x17cb, 0x0108)},
 	{PCI_DEVICE(0x17cb, 0x010b)},
 	{PCI_DEVICE(0x17cb, 0x010c)},
+	{PCI_DEVICE(0x17cb, 0x0110)},
+	{PCI_DEVICE(0x17cb, 0x0113)},
+	{PCI_DEVICE(0x17cb, 0x011c)},
 	{0},
 };
 
@@ -9242,14 +9482,14 @@ static int msm_pcie_pm_suspend(struct pci_dev *dev,
 	PCIE_DBG(pcie_dev, "RC%d: PME_TURNOFF_MSG is sent out\n",
 		pcie_dev->rc_idx);
 
-	ret_l23 = readl_poll_timeout((pcie_dev->parf
-		+ PCIE20_PARF_PM_STTS), val, (val & BIT(5)), 10000,
-		pcie_dev->l23_rdy_poll_timeout);
+	ret_l23 = readl_poll_timeout((pcie_dev->parf + PCIE20_PARF_PM_STTS_1),
+		val, PCIE_LINK_IN_L2_STATE(val),
+		10000, pcie_dev->l23_rdy_poll_timeout);
 
 	/* check L23_Ready */
-	PCIE_DBG(pcie_dev, "RC%d: PCIE20_PARF_PM_STTS is 0x%x.\n",
+	PCIE_DBG(pcie_dev, "RC%d: PCIE20_PARF_PM_STTS_1 is 0x%x.\n",
 		pcie_dev->rc_idx,
-		readl_relaxed(pcie_dev->parf + PCIE20_PARF_PM_STTS));
+		readl_relaxed(pcie_dev->parf + PCIE20_PARF_PM_STTS_1));
 	if (!ret_l23)
 		PCIE_DBG(pcie_dev, "RC%d: PM_Enter_L23 is received\n",
 			pcie_dev->rc_idx);
@@ -9477,7 +9717,7 @@ static int msm_pcie_drv_resume(struct msm_pcie_dev_t *pcie_dev)
 	struct msm_pcie_drv_info *drv_info = pcie_dev->drv_info;
 	struct msm_pcie_clk_info_t *clk_info;
 	u32 clkreq_override_en = 0;
-	int ret, i, rpmsg_ret = 0;
+	int ret = 0, i, rpmsg_ret = 0;
 
 	mutex_lock(&pcie_dev->recovery_lock);
 	mutex_lock(&pcie_dev->setup_lock);
@@ -9492,8 +9732,12 @@ static int msm_pcie_drv_resume(struct msm_pcie_dev_t *pcie_dev)
 
 	PCIE_DBG(pcie_dev, "PCIe: RC%d:enable gdsc-core\n", pcie_dev->rc_idx);
 
-	if (pcie_dev->gdsc_core && !pcie_dev->gdsc_clk_drv_ss_nonvotable) {
-		ret = regulator_enable(pcie_dev->gdsc_core);
+	if (!pcie_dev->gdsc_clk_drv_ss_nonvotable) {
+		if (pcie_dev->gdsc_pd_core)
+			ret = pm_runtime_get_sync(pcie_dev->gdsc_pd_core);
+		else if (pcie_dev->gdsc_core)
+			ret = regulator_enable(pcie_dev->gdsc_core);
+
 		if (ret)
 			PCIE_ERR(pcie_dev,
 			"PCIe: RC%d: failed to enable GDSC: ret %d\n",
@@ -9727,8 +9971,12 @@ static int msm_pcie_drv_suspend(struct msm_pcie_dev_t *pcie_dev,
 		return ret;
 	}
 
-	if (pcie_dev->gdsc_core && !pcie_dev->gdsc_clk_drv_ss_nonvotable)
-		regulator_disable(pcie_dev->gdsc_core);
+	if (!pcie_dev->gdsc_clk_drv_ss_nonvotable) {
+		if (pcie_dev->gdsc_pd_core)
+			pm_runtime_put_sync(pcie_dev->gdsc_pd_core);
+		else if (pcie_dev->gdsc_core)
+			regulator_disable(pcie_dev->gdsc_core);
+	}
 
 	msm_pcie_vreg_deinit(pcie_dev);
 

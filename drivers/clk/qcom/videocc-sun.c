@@ -23,6 +23,7 @@
 #include "clk-regmap-divider.h"
 #include "clk-regmap-mux.h"
 #include "common.h"
+#include "gdsc.h"
 #include "reset.h"
 #include "vdd-level.h"
 
@@ -256,22 +257,29 @@ static struct clk_branch video_cc_mvs0_clk = {
 	},
 };
 
-static struct clk_branch video_cc_mvs0_freerun_clk = {
-	.halt_reg = 0x808c,
-	.halt_check = BRANCH_HALT,
-	.clkr = {
-		.enable_reg = 0x808c,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "video_cc_mvs0_freerun_clk",
-			.parent_hws = (const struct clk_hw*[]) {
-				&video_cc_mvs0_div_clk_src.clkr.hw,
+static struct clk_mem_branch video_cc_mvs0_freerun_clk = {
+	.mem_enable_reg = 0x8090,
+	.mem_ack_reg =  0x8090,
+	.mem_enable_mask = BIT(3),
+	.mem_enable_ack_mask = 0xc00,
+	.mem_enable_inverted = true,
+	.branch = {
+		.halt_reg = 0x808c,
+		.halt_check = BRANCH_HALT,
+		.clkr = {
+			.enable_reg = 0x808c,
+			.enable_mask = BIT(0),
+			.hw.init = &(const struct clk_init_data) {
+				.name = "video_cc_mvs0_freerun_clk",
+				.parent_hws = (const struct clk_hw*[]) {
+					&video_cc_mvs0_div_clk_src.clkr.hw,
+				},
+				.num_parents = 1,
+				.flags = CLK_SET_RATE_PARENT,
+				.ops = &clk_branch2_mem_ops,
 			},
-			.num_parents = 1,
-			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
 		},
-	},
+	}
 };
 
 static struct clk_branch video_cc_mvs0_shift_clk = {
@@ -350,12 +358,38 @@ static struct clk_branch video_cc_mvs0c_shift_clk = {
 	},
 };
 
+static struct gdsc video_cc_mvs0c_gdsc = {
+	.gdscr = 0x8034,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0x6,
+	.pd = {
+		.name = "video_cc_mvs0c_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE,
+	.supply = "vdd_mm_mxc_voter",
+};
+
+static struct gdsc video_cc_mvs0_gdsc = {
+	.gdscr = 0x8068,
+	.en_rest_wait_val = 0x2,
+	.en_few_wait_val = 0x2,
+	.clk_dis_wait_val = 0x6,
+	.pd = {
+		.name = "video_cc_mvs0_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.parent = &video_cc_mvs0c_gdsc.pd,
+	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | HW_CTRL,
+};
+
 static struct clk_regmap *video_cc_sun_clocks[] = {
 	[VIDEO_CC_AHB_CLK_SRC] = &video_cc_ahb_clk_src.clkr,
 	[VIDEO_CC_MVS0_CLK] = &video_cc_mvs0_clk.clkr,
 	[VIDEO_CC_MVS0_CLK_SRC] = &video_cc_mvs0_clk_src.clkr,
 	[VIDEO_CC_MVS0_DIV_CLK_SRC] = &video_cc_mvs0_div_clk_src.clkr,
-	[VIDEO_CC_MVS0_FREERUN_CLK] = &video_cc_mvs0_freerun_clk.clkr,
+	[VIDEO_CC_MVS0_FREERUN_CLK] = &video_cc_mvs0_freerun_clk.branch.clkr,
 	[VIDEO_CC_MVS0_SHIFT_CLK] = &video_cc_mvs0_shift_clk.clkr,
 	[VIDEO_CC_MVS0C_CLK] = &video_cc_mvs0c_clk.clkr,
 	[VIDEO_CC_MVS0C_DIV2_DIV_CLK_SRC] = &video_cc_mvs0c_div2_div_clk_src.clkr,
@@ -364,6 +398,11 @@ static struct clk_regmap *video_cc_sun_clocks[] = {
 	[VIDEO_CC_PLL0] = &video_cc_pll0.clkr,
 	[VIDEO_CC_SLEEP_CLK_SRC] = &video_cc_sleep_clk_src.clkr,
 	[VIDEO_CC_XO_CLK_SRC] = &video_cc_xo_clk_src.clkr,
+};
+
+static struct gdsc *video_cc_sun_gdscs[] = {
+	[VIDEO_CC_MVS0_GDSC] = &video_cc_mvs0_gdsc,
+	[VIDEO_CC_MVS0C_GDSC] = &video_cc_mvs0c_gdsc,
 };
 
 static const struct qcom_reset_map video_cc_sun_resets[] = {
@@ -392,6 +431,8 @@ static struct qcom_cc_desc video_cc_sun_desc = {
 	.num_resets = ARRAY_SIZE(video_cc_sun_resets),
 	.clk_regulators = video_cc_sun_regulators,
 	.num_clk_regulators = ARRAY_SIZE(video_cc_sun_regulators),
+	.gdscs = video_cc_sun_gdscs,
+	.num_gdscs = ARRAY_SIZE(video_cc_sun_gdscs),
 };
 
 static const struct of_device_id video_cc_sun_match_table[] = {

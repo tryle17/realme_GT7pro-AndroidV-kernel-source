@@ -139,6 +139,7 @@ enum EV_PRIORITY {
 	((0x0 << 20) | (0x0 << 16) | (link_rx << 11) | (bei << 10) | \
 	(ieot << 9) | (ieob << 8) | ch)
 #define NOOP_TRE (0x0 << 20 | 0x1 << 16)
+#define HID_CMD_TIMEOUT_MS (250)
 
 struct __packed gpi_error_log_entry {
 	u32 routine : 4;
@@ -412,13 +413,13 @@ static const struct {
 		GPI_CH_CMD_ENABLE_HID,
 		GPI_GPII_n_CH_CMD_ENABLE_HID,
 		CH_STATE_ENABLE_HID,
-		CMD_TIMEOUT_MS,
+		HID_CMD_TIMEOUT_MS,
 	},
 	{
 		GPI_CH_CMD_DISABLE_HID,
 		GPI_GPII_n_CH_CMD_DISABLE_HID,
 		CH_STATE_DISABLE_HID,
-		CMD_TIMEOUT_MS,
+		HID_CMD_TIMEOUT_MS,
 	},
 	{
 		GPI_EV_CMD_ALLOCATE,
@@ -1691,51 +1692,95 @@ int geni_gsi_ch_start(struct dma_chan *chan)
 EXPORT_SYMBOL_GPL(geni_gsi_ch_start);
 
 /*
- * geni_gsi_ch_disconenct_doorbell() - gsi channel commond to disconnect doorbell to GSI
+ * gpi_terminate_channel() - Stop gpi rx and tx channels and
+ *                           if fails do reset of the channels
  * @chan: gsi channel handle
  *
  * Return: Returns success or failure
  */
-int geni_gsi_ch_disconnect_doorbell(struct dma_chan *chan)
+int gpi_terminate_channel(struct gpii_chan *gpii_chan)
+{
+	struct gpii *gpii = gpii_chan->gpii;
+	int ret = 0;
+
+	mutex_lock(&gpii->ctrl_lock);
+	ret = gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_STOP);
+	if (ret) {
+		GPII_ERR(gpii, gpii_chan->chid,
+			 "Error Stopping Chan:%d,resetting\n", ret);
+		/* If STOP cmd fails, send command to Reset the channel */
+		ret = gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_RESET);
+		if (ret)
+			GPII_ERR(gpii, gpii_chan->chid,
+				 "error resetting channel:%d\n", ret);
+	}
+	mutex_unlock(&gpii->ctrl_lock);
+	return ret;
+}
+
+/*
+ * geni_gsi_disconnect_doorbell_stop_ch() - function to disconnect gsi doorbell and stop channel
+ * @chan: gsi channel handle
+ * @stop_ch: stop channel if set to true
+ *
+ * Return: Returns success or failure
+ */
+int geni_gsi_disconnect_doorbell_stop_ch(struct dma_chan *chan, bool stop_ch)
 {
 	struct gpii_chan *gpii_chan = to_gpii_chan(chan);
 	struct gpii *gpii = gpii_chan->gpii;
-	int i, ret = 0;
+	int ret = 0;
+	bool error = false;
 
 	/*
 	 * Use asynchronous channel command 49 (see section 3.10.7) to dis-connect
 	 * io_6 input from GSI interrupt input.
 	 */
 	GPII_VERB(gpii, gpii_chan->chid, "Enter\n");
-	mutex_lock(&gpii->ctrl_lock);
 	ret = gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_DISABLE_HID);
-	if (ret)
+	if (ret) {
 		GPII_ERR(gpii, gpii_chan->chid,
 			 "Error disable Chan:%d HID interrupt\n", ret);
-	for (i = 1; i >= 0 ; i--) {
-		gpii_chan = &gpii->gpii_chan[i];
-		GPII_INFO(gpii, gpii_chan->chid, "Stop chan:%d\n", i);
-		ret = gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_STOP);
-		if (ret) {
-			GPII_ERR(gpii, gpii_chan->chid,
-				 "Error Stopping Chan:%d resetting\n", ret);
-			/* If STOP cmd fails, send command to Stop the channel */
-			ret = gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_RESET);
-			if (ret) {
-				GPII_ERR(gpii, gpii_chan->chid,
-					 "error resetting channel:%d\n", ret);
-				mutex_unlock(&gpii->ctrl_lock);
-				return ret;
-			}
-		}
+		error = true;
+		gpi_dump_debug_reg(gpii);
 	}
-	GPII_VERB(gpii, gpii_chan->chid, "Free chan desc\n");
+
+	/* Disconnect only doorbell & free Rx chan desc */
+	if (!stop_ch) {
+		GPII_VERB(gpii, gpii_chan->chid, "Free RX chan desc\n");
+		gpi_free_chan_desc(&gpii->gpii_chan[1]);
+		return ret;
+	}
+
+	/* Stop RX channel */
+	GPII_INFO(gpii, gpii_chan->chid, "Stop RX chan\n");
+	ret = gpi_terminate_channel(&gpii->gpii_chan[1]);
+	if (ret) {
+		GPII_ERR(gpii, gpii_chan->chid,
+			 "Error Stopping RX Chan:%d\n", ret);
+		error = true;
+		gpi_dump_debug_reg(gpii);
+	}
+
+	GPII_VERB(gpii, gpii_chan->chid, "Free RX chan desc\n");
 	gpi_free_chan_desc(&gpii->gpii_chan[1]);
-	mutex_unlock(&gpii->ctrl_lock);
+
+	/* Stop TX channel */
+	GPII_INFO(gpii, gpii_chan->chid, "Stop TX chan\n");
+	ret = gpi_terminate_channel(&gpii->gpii_chan[0]);
+	if (ret) {
+		GPII_ERR(gpii, gpii_chan->chid,
+			 "Error Stopping TX Chan:%d\n", ret);
+		error = true;
+		gpi_dump_debug_reg(gpii);
+	}
 	GPII_VERB(gpii, gpii_chan->chid, "End\n");
+	if (error)
+		return -EBUSY;
+
 	return ret;
 }
-EXPORT_SYMBOL_GPL(geni_gsi_ch_disconnect_doorbell);
+EXPORT_SYMBOL_GPL(geni_gsi_disconnect_doorbell_stop_ch);
 
 /* program transfer ring DB register */
 static inline void gpi_write_ch_db(struct gpii_chan *gpii_chan,

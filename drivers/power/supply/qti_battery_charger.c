@@ -761,8 +761,15 @@ static void battery_chg_update_usb_type_work(struct work_struct *work)
 		return;
 	}
 
+	if (pst->prop[USB_ADAP_TYPE] == POWER_SUPPLY_USB_TYPE_UNKNOWN) {
+		usb_psy_desc.type = POWER_SUPPLY_TYPE_USB;
+		pr_debug("Unknown USB adapter type\n");
+		return;
+	}
+
 	/* Reset usb_icl_ua whenever USB adapter type changes */
 	if (pst->prop[USB_ADAP_TYPE] != POWER_SUPPLY_USB_TYPE_SDP &&
+	    pst->prop[USB_ADAP_TYPE] != POWER_SUPPLY_USB_TYPE_CDP &&
 	    pst->prop[USB_ADAP_TYPE] != POWER_SUPPLY_USB_TYPE_PD)
 		bcdev->usb_icl_ua = 0;
 
@@ -1038,6 +1045,7 @@ static int usb_psy_set_icl(struct battery_chg_dev *bcdev, u32 prop_id, int val)
 	case POWER_SUPPLY_USB_TYPE_CDP:
 		break;
 	default:
+		bcdev->usb_icl_ua = 0;
 		return -EINVAL;
 	}
 
@@ -1247,6 +1255,21 @@ static int battery_psy_set_charge_start_threshold(struct battery_chg_dev *bcdev,
 			val, rc);
 	else
 		bcdev->chg_ctrl_start_thr = val;
+
+	return rc;
+}
+
+static int get_charge_control_en(struct battery_chg_dev *bcdev)
+{
+	int rc;
+
+	rc = read_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_BATTERY],
+				BATT_CHG_CTRL_EN);
+	if (rc < 0)
+		pr_err("Failed to read the CHG_CTRL_EN, rc = %d\n", rc);
+	else
+		bcdev->chg_ctrl_en =
+			bcdev->psy_list[PSY_TYPE_BATTERY].prop[BATT_CHG_CTRL_EN];
 
 	return rc;
 }
@@ -1838,6 +1861,11 @@ static ssize_t charge_control_en_show(const struct class *c,
 {
 	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
 						battery_class);
+	int rc;
+
+	rc = get_charge_control_en(bcdev);
+	if (rc < 0)
+		return rc;
 
 	return scnprintf(buf, PAGE_SIZE, "%d\n", bcdev->chg_ctrl_en);
 }
@@ -2543,6 +2571,10 @@ static int battery_chg_probe(struct platform_device *pdev)
 	battery_chg_notify_enable(bcdev);
 	device_init_wakeup(bcdev->dev, true);
 	schedule_work(&bcdev->usb_type_work);
+
+	rc = get_charge_control_en(bcdev);
+	if (rc < 0)
+		pr_debug("Failed to read charge_control_en, rc = %d\n", rc);
 
 	return 0;
 error:

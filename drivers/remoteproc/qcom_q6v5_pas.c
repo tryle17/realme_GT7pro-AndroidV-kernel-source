@@ -56,6 +56,8 @@
 
 struct adsp_data {
 	int crash_reason_smem;
+	int crash_reason_stack;
+	unsigned int smem_host_id;
 	const char *firmware_name;
 	const char *dtb_firmware_name;
 	int pas_id;
@@ -106,6 +108,8 @@ struct qcom_adsp {
 	unsigned int minidump_id;
 	bool both_dumps;
 	int crash_reason_smem;
+	int crash_reason_stack;
+	unsigned int smem_host_id;
 	bool decrypt_shutdown;
 	const char *info_name;
 
@@ -155,9 +159,6 @@ struct qcom_adsp {
 	void *config_addr;
 	bool check_status;
 };
-
-static bool recovery_set_cb;
-bool timeout_disabled;
 
 static ssize_t txn_id_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -391,12 +392,13 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
 {
 	struct qcom_adsp *adsp = rproc->priv;
 	struct device *dev = NULL;
-	int ret;
+	int ret = 0;
+
+	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_load", "enter");
 
 	if (adsp->dma_phys_below_32b)
 		dev = adsp->dev;
 
-	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_load", "enter");
 	rproc_coredump_cleanup(adsp->rproc);
 
 	/* Store firmware handle to be used in adsp_start() */
@@ -407,7 +409,7 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
 		if (ret) {
 			dev_err(adsp->dev, "request_firmware failed for %s: %d\n",
 				adsp->dtb_firmware_name, ret);
-			return ret;
+			goto exit_load;
 		}
 
 		ret = qcom_mdt_pas_init(adsp->dev, adsp->dtb_firmware, adsp->dtb_firmware_name,
@@ -426,7 +428,7 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
 
 	adsp_add_coredump_segments(adsp, fw);
 
-	return 0;
+	goto exit_load;
 
 release_dtb_metadata:
 	qcom_scm_pas_metadata_release(&adsp->dtb_pas_metadata, dev);
@@ -434,6 +436,7 @@ release_dtb_metadata:
 release_dtb_firmware:
 	release_firmware(adsp->dtb_firmware);
 
+exit_load:
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_load", "exit");
 
 	return ret;
@@ -570,13 +573,14 @@ static int adsp_start(struct rproc *rproc)
 	struct device *dev = NULL;
 	int ret;
 
+	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_start", "enter");
+
 	if (adsp->dma_phys_below_32b)
 		dev = adsp->dev;
-	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_start", "enter");
 
 	ret = qcom_q6v5_prepare(&adsp->q6v5);
 	if (ret)
-		return ret;
+		goto exit_start;
 
 	if (!adsp->region_assign_shared ||
 			(adsp->region_assign_shared && !adsp->region_assigned)) {
@@ -643,7 +647,7 @@ static int adsp_start(struct rproc *rproc)
 		panic("Panicking, auth and reset failed for remoteproc %s\n", rproc->name);
 	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_auth_reset", "exit");
 
-	if (!timeout_disabled) {
+	if (!qcom_pil_timeouts_disabled()) {
 		ret = qcom_q6v5_wait_for_start(&adsp->q6v5, msecs_to_jiffies(5000));
 		if (rproc->recovery_disabled && ret)
 			panic("Panicking, remoteproc %s failed to bootup.\n", adsp->rproc->name);
@@ -662,7 +666,7 @@ static int adsp_start(struct rproc *rproc)
 	/* Remove pointer to the loaded firmware, only valid in adsp_load() & adsp_start() */
 	adsp->firmware = NULL;
 
-	return 0;
+	goto exit_start;
 
 release_pas_metadata:
 	qcom_scm_pas_metadata_release(&adsp->pas_metadata, dev);
@@ -685,7 +689,7 @@ disable_irqs:
 
 	/* Remove pointer to the loaded firmware, only valid in adsp_load() & adsp_start() */
 	adsp->firmware = NULL;
-
+exit_start:
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_start", "exit");
 	return ret;
 }
@@ -859,6 +863,8 @@ static int rproc_panic_handler(struct notifier_block *this,
 	struct qcom_adsp *adsp = container_of(this, struct qcom_adsp, panic_blk);
 	int ret;
 
+	if (!adsp)
+		return NOTIFY_DONE;
 	/* wake up SOCCP during panic to run error handlers on SOCCP */
 	dev_info(adsp->dev, "waking SOCCP from panic path\n");
 	ret = qcom_smem_state_update_bits(adsp->wake_state,
@@ -901,7 +907,7 @@ static int adsp_stop(struct rproc *rproc)
 {
 	struct qcom_adsp *adsp = rproc->priv;
 	int handover;
-	int ret;
+	int ret = 0;
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_stop", "enter");
 
@@ -1184,12 +1190,13 @@ out:
 	return ret;
 }
 
-static void android_vh_rproc_recovery_set(void *data, struct rproc *rproc)
+static void rproc_recovery_set(struct rproc *rproc)
 {
 	struct qcom_adsp *adsp = (struct qcom_adsp *)rproc->priv;
 
 	if (strnstr(rproc->name, "spss", sizeof(rproc->name)))
 		return;
+
 	adsp->subsys_recovery_disabled = rproc->recovery_disabled;
 }
 
@@ -1312,8 +1319,9 @@ static int adsp_probe(struct platform_device *pdev)
 		goto free_rproc;
 	adsp->proxy_pd_count = ret;
 
-	ret = qcom_q6v5_init(&adsp->q6v5, pdev, rproc, desc->crash_reason_smem, desc->load_state,
-			     qcom_pas_handover);
+	ret = qcom_q6v5_init(&adsp->q6v5, pdev, rproc, desc->crash_reason_smem,
+			     desc->crash_reason_stack, desc->smem_host_id,
+			     desc->load_state, qcom_pas_handover);
 	if (ret)
 		goto detach_proxy_pds;
 
@@ -1349,8 +1357,6 @@ static int adsp_probe(struct platform_device *pdev)
 	adsp->sysmon = qcom_add_sysmon_subdev(rproc,
 					      desc->sysmon_name,
 					      desc->ssctl_id);
-	timeout_disabled = qcom_pil_timeouts_disabled();
-
 	if (IS_ERR(adsp->sysmon)) {
 		ret = PTR_ERR(adsp->sysmon);
 		goto detach_proxy_pds;
@@ -1370,20 +1376,16 @@ static int adsp_probe(struct platform_device *pdev)
 	if (ret)
 		goto destroy_minidump_dev;
 
-	if (!recovery_set_cb) {
-		ret = register_trace_android_vh_rproc_recovery_set(android_vh_rproc_recovery_set,
-											NULL);
-		if (ret) {
-			dev_err(&pdev->dev, "Unable to register with rproc_recovery_set trace hook\n");
-			goto remove_rproc;
-		}
-		recovery_set_cb = true;
-	}
+	/*
+	 * Concurrent stores can happen on the same global variable with
+	 * different subsystem probe, however, as it is happening with
+	 * same value at max, compiler can do is to optimize it away with
+	 * single store compared to multiple store on worst case, so be it.
+	 */
+	rproc_recovery_set_fn = rproc_recovery_set;
 
 	return 0;
 
-remove_rproc:
-	rproc_del(rproc);
 destroy_minidump_dev:
 	if (adsp->minidump_dev)
 		qcom_destroy_ramdump_device(adsp->minidump_dev);
@@ -1404,7 +1406,6 @@ static void adsp_remove(struct platform_device *pdev)
 {
 	struct qcom_adsp *adsp = platform_get_drvdata(pdev);
 
-	unregister_trace_android_vh_rproc_recovery_set(android_vh_rproc_recovery_set, NULL);
 	rproc_del(adsp->rproc);
 	qcom_q6v5_deinit(&adsp->q6v5);
 	if (adsp->minidump_dev)
@@ -1808,6 +1809,8 @@ static const struct adsp_data sun_adsp_resource = {
 	.ssctl_id = 0x14,
 	.uses_elf64 = true,
 	.auto_boot = true,
+	.crash_reason_stack = 660,
+	.smem_host_id = 2,
 };
 
 static const struct adsp_data sun_cdsp_resource = {
@@ -1827,6 +1830,8 @@ static const struct adsp_data sun_cdsp_resource = {
 	.region_assign_shared = true,
 	.region_assign_vmid = QCOM_SCM_VMID_CDSP,
 	.auto_boot = true,
+	.crash_reason_stack = 660,
+	.smem_host_id = 5,
 };
 
 static const struct adsp_data sun_mpss_resource = {

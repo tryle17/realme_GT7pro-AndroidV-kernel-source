@@ -31,6 +31,7 @@ qnoc-sm8450-objs			:= sm8450.o
 qnoc-sun-objs                        	:= sun.o
 qnoc-pineapple-objs                     := pineapple.o
 qnoc-sm8550-objs			:= sm8550.o
+qnoc-parrot-objs			:= parrot.o
 icc-smd-rpm-objs			:= smd-rpm.o icc-rpm.o icc-rpm-clocks.o
 qnoc-qos-obj				:= qnoc-qos.o
 
@@ -62,6 +63,7 @@ obj-$(CONFIG_INTERCONNECT_QCOM_SM8450) += qnoc-sm8450.o
 obj-$(CONFIG_INTERCONNECT_QCOM_SUN) += qnoc-sun.o
 obj-$(CONFIG_INTERCONNECT_QCOM_PINEAPPLE) += qnoc-pineapple.o
 obj-$(CONFIG_INTERCONNECT_QCOM_SM8550) += qnoc-sm8550.o
+obj-$(CONFIG_INTERCONNECT_QCOM_PARROT) += qnoc-parrot.o
 obj-$(CONFIG_INTERCONNECT_QCOM_SMD_RPM) += icc-smd-rpm.o
 obj-$(CONFIG_INTERCONNECT_QCOM_QOS) += qnoc-qos.o
 obj-$(CONFIG_INTERCONNECT_QCOM_DEBUG) += icc-debug.o

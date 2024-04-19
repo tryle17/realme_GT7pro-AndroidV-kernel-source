@@ -268,6 +268,14 @@ config ARCH_SUN
 	  chipset. If you do not wish to build a kernel that runs on this
 	  chipset or if you are unsure, say 'N' here.
 
+config ARCH_TUNA
+	bool "Enable support for Qualcomm Technologies, Inc. Tuna"
+	depends on ARCH_QCOM
+	help
+	  This enables support for Qualcomm Technologies, Inc. Tuna
+	  chipset. If you do not wish to build a kernel that runs on this
+	  chipset or if you are unsure, say 'N' here.
+
 config ARCH_PINEAPPLE
 	bool "Enable support for Qualcomm Technologies, Inc. Pineapple"
 	depends on ARCH_QCOM
@@ -275,6 +283,14 @@ config ARCH_PINEAPPLE
 	  This enables support for Qualcomm Technologies, Inc. Pineapple
 	  chipset. If you do not wish to build a kernel that runs on this
 	  chipset or if you are unsure, say 'N' here.
+
+config ARCH_X1E80100
+        bool "Enable Support for Qualcomm Technologies, Inc. X1E80100"
+        depends on ARCH_QCOM
+        help
+          This enables support for the Qualcomm Technologies, Inc.'s
+          X1E80100 chipset. If you do not wish to build a kernel that
+          runs on this chipset or if you are unsure, say 'N' here.
 
 config ARCH_PARROT
 	bool "Enable Support for Qualcomm Technologies, Inc. PARROT"
@@ -290,6 +306,13 @@ config ARCH_RAVELIN
         help
           This enables support for the Qualcomm Technologies, Inc.'s
           RAVELIN chipset. If you do not wish to build a kernel that
+
+config ARCH_MONACO
+        bool "Enable Support for Qualcomm Technologies, Inc. MONACO"
+        depends on ARCH_QCOM
+        help
+          This enables support for the Qualcomm Technologies, Inc.'s
+          MONACO chipset. If you do not wish to build a kernel that
           runs on this chipset or if you are unsure, say 'N' here.
 
 config ARCH_REALTEK

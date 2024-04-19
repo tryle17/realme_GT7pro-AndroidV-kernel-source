@@ -131,10 +131,9 @@ static int walt_proc_group_thresholds_handler(struct ctl_table *table, int write
 	 * which will disable colocation.
 	 */
 	if (data == &sysctl_sched_group_upmigrate_pct) {
-		if (sysctl_sched_group_downmigrate_pct != 0 && val <= 0) {
-			ret = -EINVAL;
-			goto unlock_mutex;
-		} else if (val <= sysctl_sched_group_downmigrate_pct && val != 0) {
+		if (val < 0 ||
+			(sysctl_sched_group_downmigrate_pct != 0 && val == 0) ||
+			(val <= sysctl_sched_group_downmigrate_pct && val != 0)) {
 			ret = -EINVAL;
 			goto unlock_mutex;
 		}
@@ -370,11 +369,11 @@ static int sched_task_handler(struct ctl_table *table, int write,
 			break;
 		case LOW_LATENCY:
 			pid_and_val[1] = wts->low_latency &
-					 WALT_LOW_LATENCY_PROCFS;
+					 WALT_LOW_LATENCY_PROCFS_BIT;
 			break;
 		case PIPELINE:
 			pid_and_val[1] = wts->low_latency &
-					 WALT_LOW_LATENCY_PIPELINE;
+					 WALT_LOW_LATENCY_PIPELINE_BIT;
 			break;
 		case LOAD_BOOST:
 			pid_and_val[1] = wts->load_boost;
@@ -446,9 +445,9 @@ static int sched_task_handler(struct ctl_table *table, int write,
 		break;
 	case LOW_LATENCY:
 		if (val)
-			wts->low_latency |= WALT_LOW_LATENCY_PROCFS;
+			wts->low_latency |= WALT_LOW_LATENCY_PROCFS_BIT;
 		else
-			wts->low_latency &= ~WALT_LOW_LATENCY_PROCFS;
+			wts->low_latency &= ~WALT_LOW_LATENCY_PROCFS_BIT;
 		break;
 	case PIPELINE:
 		rq = task_rq_lock(task, &rf);
@@ -463,9 +462,9 @@ static int sched_task_handler(struct ctl_table *table, int write,
 				task_rq_unlock(rq, task, &rf);
 				goto put_task;
 			}
-			wts->low_latency |= WALT_LOW_LATENCY_PIPELINE;
+			wts->low_latency |= WALT_LOW_LATENCY_PIPELINE_BIT;
 		} else {
-			wts->low_latency &= ~WALT_LOW_LATENCY_PIPELINE;
+			wts->low_latency &= ~WALT_LOW_LATENCY_PIPELINE_BIT;
 			remove_pipeline(wts);
 		}
 		task_rq_unlock(rq, task, &rf);

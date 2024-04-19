@@ -67,6 +67,9 @@ static bool lpm_disallowed(s64 sleep_ns, int cpu)
 	uint64_t bias_time = 0;
 #endif
 
+	if (suspend_in_progress)
+		return true;
+
 	if (!check_cpu_isactive(cpu))
 		return false;
 
@@ -330,7 +333,7 @@ void clear_cpu_predict_history(void)
 		return;
 
 	for_each_possible_cpu(cpu) {
-		cpu_gov = this_cpu_ptr(&lpm_cpu_data);
+		cpu_gov = per_cpu_ptr(&lpm_cpu_data, cpu);
 		lpm_history = &cpu_gov->lpm_history;
 		for (i = 0; i < MAXSAMPLES; i++) {
 			lpm_history->resi[i]  = 0;
@@ -542,7 +545,7 @@ static int start_prediction_timer(struct lpm_cpu *cpu_gov, int duration_us)
 	if (cpu_gov->next_wakeup > cpu_gov->next_pred_time)
 		cpu_gov->next_wakeup = cpu_gov->next_pred_time;
 
-	s = &cpu_gov->drv->states[cpu_gov->last_idx];
+	s = &cpu_gov->drv->states[0];
 	max_residency  = s[cpu_gov->last_idx + 1].target_residency - 1;
 	htime = cpu_gov->predicted + PRED_TIMER_ADD;
 
@@ -801,14 +804,22 @@ static void lpm_disable_device(struct cpuidle_driver *drv,
 static void qcom_lpm_suspend_trace(void *unused, const char *action,
 				   int event, bool start)
 {
+	int cpu;
+
 	if (start && !strcmp("dpm_suspend_late", action)) {
 		suspend_in_progress = true;
 
+		for_each_online_cpu(cpu)
+			wake_up_if_idle(cpu);
 		return;
 	}
 
-	if (!start && !strcmp("dpm_resume_early", action))
+	if (!start && !strcmp("dpm_resume_early", action)) {
 		suspend_in_progress = false;
+
+		for_each_online_cpu(cpu)
+			wake_up_if_idle(cpu);
+	}
 }
 
 static struct cpuidle_governor lpm_governor = {

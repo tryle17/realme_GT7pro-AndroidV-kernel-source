@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+sdhci-msm.ko
+arm_smmu.ko
+mem_buf.ko
+mem_buf_dev.ko
+qcom_dma_heaps.ko
+qcom-scm.ko
+cqhci.ko
+qcom-spmi-pmic.ko
+clk-qcom.ko
+qcom_ipc_logging.ko
+pinctrl-msm.ko
+qcom_iommu_util.ko
+clk-dummy.ko
+qcom_ice.ko
+qcom_hwspinlock.ko
+phy-qcom-ufs.ko
+debug_symbol.ko
+qcom-reboot-reason.ko
+qcom_wdt_core.ko
+qcom_aoss.ko
+qcom-dload-mode.ko
+cpu_phys_log_map.ko
+qcom_cpu_vendor_hooks.ko

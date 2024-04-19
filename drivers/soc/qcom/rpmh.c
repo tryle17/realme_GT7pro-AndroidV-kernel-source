@@ -496,6 +496,7 @@ int rpmh_flush(struct rpmh_ctrlr *ctrlr, int ch)
 {
 	struct cache_req *p;
 	int ret = 0;
+	unsigned long flags;
 
 	if (rpmh_standalone)
 		return 0;
@@ -513,13 +514,8 @@ int rpmh_flush(struct rpmh_ctrlr *ctrlr, int ch)
 	 */
 	if (!(ctrlr->flags & SOLVER_PRESENT))
 		lockdep_assert_irqs_disabled();
-	/*
-	 * Currently rpmh_flush() is only called when we think we're running
-	 * on the last processor.  If the lock is busy it means another
-	 * processor is up and it's better to abort than spin.
-	 */
-	if (!spin_trylock(&ctrlr->cache_lock))
-		return -EBUSY;
+
+	spin_lock_irqsave(&ctrlr->cache_lock, flags);
 
 	if (!ctrlr->dirty) {
 		pr_debug("Skipping flush, TCS has latest data.\n");
@@ -555,7 +551,7 @@ int rpmh_flush(struct rpmh_ctrlr *ctrlr, int ch)
 write_next_wakeup:
 	rpmh_rsc_write_next_wakeup(ctrlr_to_drv(ctrlr));
 exit:
-	spin_unlock(&ctrlr->cache_lock);
+	spin_unlock_irqrestore(&ctrlr->cache_lock, flags);
 	return ret;
 }
 
@@ -602,14 +598,23 @@ int rpmh_write_sleep_and_wake_no_child(const struct device *dev)
 	int ch, ret;
 
 	ch = rpmh_rsc_get_channel(ctrlr_to_drv(ctrlr));
-	if (ch < 0)
+	if (ch < 0) {
+		rpmh_rsc_debug_channel_busy(ctrlr_to_drv(ctrlr));
+		BUG_ON(1);
 		return ch;
+	}
 
 	ret = rpmh_flush(ctrlr, ch);
 	if (ret || !(ctrlr->flags & HW_CHANNEL_PRESENT))
 		return ret;
 
-	return rpmh_rsc_switch_channel(ctrlr_to_drv(ctrlr), ch);
+	ret = rpmh_rsc_switch_channel(ctrlr_to_drv(ctrlr), ch);
+	if (ret) {
+		rpmh_rsc_debug_channel_busy(ctrlr_to_drv(ctrlr));
+		BUG_ON(1);
+	}
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(rpmh_write_sleep_and_wake_no_child);
 
@@ -792,11 +797,18 @@ EXPORT_SYMBOL(rpmh_get_device);
 int rpmh_drv_start(const struct device *dev)
 {
 	struct rpmh_ctrlr *ctrlr = get_rpmh_ctrlr_no_child(dev);
+	int ret;
 
 	if (rpmh_standalone)
 		return 0;
 
-	return rpmh_rsc_drv_enable(ctrlr_to_drv(ctrlr), true);
+	ret = rpmh_rsc_drv_enable(ctrlr_to_drv(ctrlr), true);
+	if (ret) {
+		rpmh_rsc_debug_channel_busy(ctrlr_to_drv(ctrlr));
+		BUG_ON(1);
+	}
+
+	return ret;
 }
 EXPORT_SYMBOL(rpmh_drv_start);
 
@@ -812,10 +824,17 @@ EXPORT_SYMBOL(rpmh_drv_start);
 int rpmh_drv_stop(const struct device *dev)
 {
 	struct rpmh_ctrlr *ctrlr = get_rpmh_ctrlr_no_child(dev);
+	int ret;
 
 	if (rpmh_standalone)
 		return 0;
 
-	return rpmh_rsc_drv_enable(ctrlr_to_drv(ctrlr), false);
+	ret = rpmh_rsc_drv_enable(ctrlr_to_drv(ctrlr), false);
+	if (ret) {
+		rpmh_rsc_debug_channel_busy(ctrlr_to_drv(ctrlr));
+		BUG_ON(1);
+	}
+
+	return ret;
 }
 EXPORT_SYMBOL(rpmh_drv_stop);
