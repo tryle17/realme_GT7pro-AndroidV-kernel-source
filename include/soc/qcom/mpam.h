@@ -20,6 +20,21 @@
 #define PARTID_MAX			64
 #define PARTID_AVAILABLE	(PARTID_MAX - PARTID_RESERVED)
 
+#define MSMON_CFG_MON_SEL	0x0800
+#define MSMON_CFG_CSU_FLT	0x0810
+#define MSMON_CFG_CSU_CTL	0x0818
+#define MSMON_CFG_MBWU_FLT	0x0820
+#define MSMON_CFG_MBWU_CTL	0x0828
+#define MSMON_CSU			0x0840
+#define MSMON_MBWU			0x0860
+#define MSMON_MBWU_L		0x0880
+
+#define MAX_MONITOR_INSTANCES			16 /* Reserved 12:15 */
+#define MAX_MONITOR_INSTANCES_SHARED	12
+#define MONITOR_MAX		MAX_MONITOR_INSTANCES_SHARED
+
+#define MPAM_MAX_RETRY		5000
+
 enum msc_id {
 	MSC_0 = 0,
 	MSC_1,
@@ -88,11 +103,22 @@ struct mpam_slice_val {
 	uint32_t dspri;
 } __packed;
 
+struct monitors_value {
+	uint32_t capture_in_progress;
+	uint32_t msc_id;
+	uint32_t csu_mon_enable_map[MAX_MONITOR_INSTANCES];
+	uint32_t csu_mon_value[MAX_MONITOR_INSTANCES];
+	uint32_t mbw_mon_enable_map[MAX_MONITOR_INSTANCES];
+	uint64_t mbw_mon_value[MAX_MONITOR_INSTANCES];
+	uint64_t last_capture_time;
+} __packed;
+
 #if IS_ENABLED(CONFIG_QTI_MPAM)
 int qcom_mpam_set_cache_portion(struct mpam_set_cache_partition *msg);
 int qcom_mpam_get_version(struct mpam_ver_ret *ver);
 int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
 						struct mpam_slice_val *val);
+int qcom_mpam_config_monitor(struct mpam_monitor_configuration *param);
 #else
 static inline int qcom_mpam_set_cache_portion(struct mpam_set_cache_partition *msg)
 {
@@ -106,6 +132,11 @@ static inline int qcom_mpam_get_version(struct mpam_ver_ret *ver)
 
 static inline int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
 						struct mpam_slice_val *val)
+{
+	return 0;
+}
+
+static inline int qcom_mpam_config_monitor(struct mpam_monitor_configuration *param)
 {
 	return 0;
 }
