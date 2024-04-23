@@ -310,6 +310,10 @@ static int gh_vcpu_ioctl_run(struct gh_vcpu *vcpu)
 
 	gh_notify_clients(vm, GH_VM_BEFORE_POWERUP);
 
+	ret = gh_rm_vm_set_time_base(vm->vmid);
+	if (ret)
+		pr_err("Failed to set time base for VM:%d %d\n", vm->vmid, ret);
+
 	ret = gh_vm_start(vm, GH_RM_VM_STATUS_RUNNING);
 	if (ret) {
 		pr_err("Failed to start VM:%d %d\n", vm->vmid, ret);
