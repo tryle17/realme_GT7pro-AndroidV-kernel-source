@@ -23,7 +23,6 @@ def define_monaco():
         "drivers/iommu/qcom_iommu_debug.ko",
         "drivers/iommu/qcom_iommu_util.ko",
         "drivers/irqchip/msm_show_resume_irq.ko",
-        "drivers/irqchip/qcom-pdc.ko",
         "drivers/mfd/qcom-i2c-pmic.ko",
         "drivers/mfd/qcom-spmi-pmic.ko",
         "drivers/misc/qseecom_proxy.ko",
