@@ -79,6 +79,7 @@ def define_monaco():
         "drivers/usb/gadget/function/usb_f_cdev.ko",
         "drivers/usb/gadget/function/usb_f_gsi.ko",
         "drivers/usb/gadget/function/usb_f_qdss.ko",
+        "drivers/usb/phy/phy-generic.ko",
         "drivers/usb/phy/phy-msm-snps-hs.ko",
         "kernel/msm_sysstats.ko",
         "kernel/trace/qcom_ipc_logging.ko",
