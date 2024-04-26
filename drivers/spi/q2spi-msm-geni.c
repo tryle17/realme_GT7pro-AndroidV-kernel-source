@@ -19,6 +19,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/reboot.h>
 #include <linux/uaccess.h>
 #include "q2spi-msm.h"
 #include "q2spi-slave-reg.h"
@@ -4220,6 +4221,29 @@ void q2spi_destroy_workqueue(struct q2spi_geni *q2spi)
 }
 
 /**
+ * q2spi_geni_restart_cb - callback routine for reboot notifier
+ * @nb: pointer to reboot notifier block chain
+ * @action: value passed unmodified to notifier function
+ * @data: pointer passed unmodified to notifier function
+ *
+ * Returns 0 for success and non-zero for failure.
+ */
+static int q2spi_geni_restart_cb(struct notifier_block *nb,
+				 unsigned long action, void *data)
+{
+	struct q2spi_geni *q2spi = container_of(nb, struct q2spi_geni, restart_handler);
+
+	if (!q2spi) {
+		Q2SPI_ERROR(q2spi, "%s Err q2spi is NULL, PID=%d\n", __func__, current->pid);
+		return -EINVAL;
+	}
+	Q2SPI_INFO(q2spi, "%s PID=%d\n", __func__, current->pid);
+	q2spi_sys_restart = true;
+
+	return 0;
+}
+
+/**
  * q2spi_geni_probe - Q2SPI interface driver probe function
  * @pdev: Q2SPI Serial Engine to probe.
  *
@@ -4422,6 +4446,14 @@ static int q2spi_geni_probe(struct platform_device *pdev)
 		goto free_buf;
 	}
 
+	q2spi->restart_handler.notifier_call = q2spi_geni_restart_cb;
+	ret = register_reboot_notifier(&q2spi->restart_handler);
+	if (ret) {
+		Q2SPI_ERROR(q2spi, "%s: Err failed to register reboot notifier, ret:%d\n",
+			    __func__, ret);
+		goto free_buf;
+	}
+
 	Q2SPI_INFO(q2spi, "%s Q2SPI GENI SE Driver probe\n", __func__);
 	pr_info("boot_kpi: M - DRIVER GENI_Q2SPI Ready\n");
 	return 0;
@@ -4458,6 +4490,7 @@ static int q2spi_geni_remove(struct platform_device *pdev)
 	if (!q2spi || !q2spi->base)
 		return 0;
 
+	unregister_reboot_notifier(&q2spi->restart_handler);
 	device_remove_file(&pdev->dev, &dev_attr_max_dump_size);
 
 	destroy_workqueue(q2spi->sleep_wq);
