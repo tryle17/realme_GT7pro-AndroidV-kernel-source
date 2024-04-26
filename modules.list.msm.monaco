@@ -2,6 +2,8 @@
 # Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
 sdhci-msm.ko
 arm_smmu.ko
+qcom-mpm.ko
+rpm-smd.ko
 mem_buf.ko
 mem_buf_dev.ko
 qcom_dma_heaps.ko
