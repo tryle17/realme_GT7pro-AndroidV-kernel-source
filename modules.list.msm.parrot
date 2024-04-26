@@ -9,10 +9,11 @@ clk-dummy.ko
 clk-rpmh.ko
 clk-qcom.ko
 gdsc-regulator.ko
+gcc-parrot.ko
+dispcc-parrot.ko
 sched-walt.ko
 sched-walt-debug.ko
 qcom_wdt_core.ko
-icc-rpmh.ko
 qcom_cpucp.ko
 qcom_ipc_logging.ko
 qcom-pdc.ko
@@ -23,8 +24,11 @@ arm_smmu.ko
 cmd-db.ko
 gh_msgq.ko
 gh_rm_drv.ko
+icc-rpmh.ko
 icc-bcm-voter.ko
 icc-debug.ko
+qnoc-qos.ko
+qnoc-parrot.ko
 iommu-logger.ko
 mem_buf_dev.ko
 mem_buf.ko
@@ -39,7 +43,6 @@ qcom_hwspinlock.ko
 qcom_iommu_util.ko
 qcom_rpmh.ko
 qcom-scm.ko
-qnoc-qos.ko
 qrtr.ko
 secure_buffer.ko
 smem.ko
