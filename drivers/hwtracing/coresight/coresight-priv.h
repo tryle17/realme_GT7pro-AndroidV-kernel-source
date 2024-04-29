@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2011-2012, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CORESIGHT_PRIV_H
@@ -74,6 +74,12 @@ extern ssize_t coresight_simple_show_pair(struct device *_dev,
 
 extern const u32 coresight_barrier_pkt[4];
 #define CORESIGHT_BARRIER_PKT_SIZE (sizeof(coresight_barrier_pkt))
+
+struct delay_probe_arg {
+	struct amba_device	*adev;
+	struct cpumask		*cpumask;
+	struct list_head	link;
+};
 
 enum etm_addr_type {
 	ETM_ADDR_TYPE_NONE,
