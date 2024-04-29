@@ -2,7 +2,7 @@
 /*
  * Copyright(C) 2015 Linaro Limited. All rights reserved.
  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CORESIGHT_TMC_H
@@ -203,6 +203,14 @@ struct etr_buf {
  * @idr_mutex:	Access serialisation for idr.
  * @sysfs_buf:	SYSFS buffer for ETR.
  * @perf_buf:	PERF buffer for ETR.
+ * @byte_cntr:	byte_cntr for ETR.
+ * @coresight_csr：CSR for ETR.
+ * @csr_name:	name for CSR.
+ * @atid_offset: atid register offset for CSR.
+ * @out_mode:	out mode for ETR.
+ * @usb_data:	usb data for ETR.
+ * @stop_on_flush: flag of stop_on_flush for ETR.
+ * @delayed:	parameter for delayed probe.
  */
 struct tmc_drvdata {
 	void __iomem		*base;
@@ -236,6 +244,7 @@ struct tmc_drvdata {
 	enum tmc_etr_out_mode	out_mode;
 	struct tmc_usb_data	*usb_data;
 	bool			stop_on_flush;
+	struct delay_probe_arg	*delayed;
 };
 
 struct etr_buf_operations {
