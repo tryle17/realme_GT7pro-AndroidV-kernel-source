@@ -69,7 +69,6 @@ rtc-pm8xxx.ko
 ufshcd-crypto-qti.ko
 bcl_pmic5.ko
 cpu_phys_log_map.ko
-qcom_scmi_client.ko
 gunyah_platform_hooks.ko
 gunyah_hypercall.ko
 gunyah-msgq.ko
