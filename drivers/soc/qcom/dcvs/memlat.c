@@ -71,6 +71,8 @@ enum scmi_memlat_protocol_cmd {
 	MEMLAT_START_TIMER,
 	MEMLAT_STOP_TIMER,
 	MEMLAT_GET_TIMESTAMP,
+	MEMLAT_SET_EFFECTIVE_FREQ_METHOD,
+	MEMLAT_ADAPTIVE_LEVEL_1,
 	MEMLAT_MAX_MSG
 };
 
@@ -204,6 +206,7 @@ struct memlat_group {
 	u32				adaptive_cur_freq;
 	u32				adaptive_high_freq;
 	u32				adaptive_low_freq;
+	u32				adaptive_level_1;
 	bool				fp_voting_enabled;
 	u32				fp_freq;
 	u32				*fp_votes;
@@ -660,6 +663,8 @@ show_grp_attr(adaptive_high_freq);
 store_grp_attr(adaptive_high_freq, 0U, 8000000U, MEMLAT_ADAPTIVE_HIGH_FREQ);
 show_grp_attr(adaptive_low_freq);
 store_grp_attr(adaptive_low_freq, 0U, 8000000U, MEMLAT_ADAPTIVE_LOW_FREQ);
+show_grp_attr(adaptive_level_1);
+store_grp_attr(adaptive_level_1, 0U, 8000000U, MEMLAT_ADAPTIVE_LEVEL_1);
 
 show_attr(min_freq);
 show_attr(max_freq);
@@ -690,6 +695,7 @@ MEMLAT_ATTR_RO(sampling_cur_freq);
 MEMLAT_ATTR_RO(adaptive_cur_freq);
 MEMLAT_ATTR_RW(adaptive_low_freq);
 MEMLAT_ATTR_RW(adaptive_high_freq);
+MEMLAT_ATTR_RW(adaptive_level_1);
 
 MEMLAT_ATTR_RW(min_freq);
 MEMLAT_ATTR_RW(max_freq);
@@ -719,6 +725,7 @@ static struct attribute *memlat_grp_attrs[] = {
 	&adaptive_cur_freq.attr,
 	&adaptive_high_freq.attr,
 	&adaptive_low_freq.attr,
+	&adaptive_level_1.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(memlat_grp);
@@ -941,7 +948,10 @@ static inline void apply_adaptive_freq(struct memlat_group *memlat_grp,
 {
 	u32 prev_freq = memlat_grp->adaptive_cur_freq;
 
-	if (*max_freq < memlat_grp->adaptive_low_freq) {
+	if (*max_freq < memlat_grp->adaptive_level_1) {
+		*max_freq = memlat_grp->adaptive_level_1;
+		memlat_grp->adaptive_cur_freq = memlat_grp->adaptive_level_1;
+	} else if (*max_freq < memlat_grp->adaptive_low_freq) {
 		*max_freq = memlat_grp->adaptive_low_freq;
 		memlat_grp->adaptive_cur_freq = memlat_grp->adaptive_low_freq;
 	} else if (*max_freq < memlat_grp->adaptive_high_freq) {
@@ -1089,6 +1099,7 @@ static void memlat_update_work(struct work_struct *work)
 		}
 		if (memlat_grp->adaptive_high_freq ||
 				memlat_grp->adaptive_low_freq ||
+				memlat_grp->adaptive_level_1 ||
 				memlat_grp->adaptive_cur_freq)
 			apply_adaptive_freq(memlat_grp, &max_freqs[grp]);
 	}
@@ -1397,7 +1408,6 @@ static int configure_cpucp_grp(struct memlat_group *grp)
 {
 	struct node_msg msg;
 	struct ev_map_msg ev_msg;
-	struct scalar_param_msg scaler_msg;
 	const struct qcom_scmi_vendor_ops *ops = memlat_data->ops;
 	int ret = 0, i, j = 0;
 	struct device_node *of_node = grp->dev->of_node;
@@ -1434,24 +1444,6 @@ static int configure_cpucp_grp(struct memlat_group *grp)
 							of_node->name);
 		return ret;
 	}
-	scaler_msg.hw_type = grp->hw_type;
-	scaler_msg.mon_idx = 0;
-	scaler_msg.val = grp->adaptive_low_freq;
-	ret = ops->set_param(memlat_data->ph, &scaler_msg,
-			MEMLAT_ALGO_STR, MEMLAT_ADAPTIVE_LOW_FREQ, sizeof(scaler_msg));
-	if (ret < 0) {
-		pr_err("Failed to configure grp adaptive low freq for mem grp %s\n",
-								of_node->name);
-		return ret;
-	}
-	scaler_msg.hw_type = grp->hw_type;
-	scaler_msg.mon_idx = 0;
-	scaler_msg.val = grp->adaptive_high_freq;
-	ret = ops->set_param(memlat_data->ph, &scaler_msg,
-			MEMLAT_ALGO_STR, MEMLAT_ADAPTIVE_HIGH_FREQ, sizeof(scaler_msg));
-	if (ret < 0)
-		pr_err("Failed to configure grp adaptive high freq for mem grp %s\n",
-									of_node->name);
 	return ret;
 }
 
