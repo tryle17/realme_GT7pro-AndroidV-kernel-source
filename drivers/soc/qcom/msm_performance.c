@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -565,6 +565,9 @@ static int set_event(struct event_data *ev, int cpu)
 static void free_pmu_counters(unsigned int cpu)
 {
 	int i = 0;
+
+	if (!cpu_possible(cpu))
+		return;
 
 	for (i = 0; i < NO_OF_EVENT; i++) {
 		pmu_events[i][cpu].prev_count = 0;
