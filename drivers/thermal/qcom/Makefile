@@ -28,3 +28,4 @@ obj-$(CONFIG_QTI_DEVFREQ_CDEV) += qti_devfreq_cdev.o
 obj-$(CONFIG_MAX31760_FAN_CONTROLLER) += max31760_fan.o
 obj-$(CONFIG_QTI_GPU_DUMP_SKIP_COOLING_DEVICE) += gpu_dump_skip_cdev.o
 obj-$(CONFIG_QTI_BCL_OFF_COOLING_DEVICE) += bcl_off_cdev.o
+obj-$(CONFIG_QTI_LMH_CPU_VDD_COOLING_DEVICE) += lmh_cpu_vdd_cdev.o
