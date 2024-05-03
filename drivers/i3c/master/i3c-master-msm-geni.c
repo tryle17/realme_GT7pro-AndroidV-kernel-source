@@ -3636,6 +3636,19 @@ static int geni_i3c_probe(struct platform_device *pdev)
 			    tx_depth, gi3c->se_mode);
 	}
 
+	geni_ios = geni_read_reg(gi3c->se.base, SE_GENI_IOS);
+	if ((geni_ios & 0x3) != 0x3) { //SCL:b'1, SDA:b'0
+		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
+			    "%s: IO lines:0x%x, Ensure bus power up\n", __func__, geni_ios);
+	}
+
+	geni_se_common_clks_off(gi3c->se.clk, gi3c->i3c_rsc.m_ahb_clk,
+				gi3c->i3c_rsc.s_ahb_clk);
+	ret = geni_icc_disable(&gi3c->se);
+	if (ret)
+		I3C_LOG_ERR(gi3c->ipcl, true, gi3c->se.dev,
+			    "%s: geni_icc_disable failed%d\n", __func__, ret);
+
 	if (!gi3c->pm_ctrl_client) {
 		//For NAON case (driver controlled PM) go for autosuspend.
 		pm_runtime_set_suspended(gi3c->se.dev);
@@ -3643,12 +3656,6 @@ static int geni_i3c_probe(struct platform_device *pdev)
 		pm_runtime_use_autosuspend(gi3c->se.dev);
 	}
 	pm_runtime_enable(gi3c->se.dev);
-
-	geni_ios = geni_read_reg(gi3c->se.base, SE_GENI_IOS);
-	if ((geni_ios & 0x3) != 0x3) { //SCL:b'1, SDA:b'0
-		I3C_LOG_ERR(gi3c->ipcl, false, gi3c->se.dev,
-		"%s: IO lines:0x%x, Ensure bus power up\n", __func__, geni_ios);
-	}
 
 	ret = i3c_master_register(&gi3c->ctrlr, &pdev->dev,
 		&geni_i3c_master_ops, false);
@@ -3835,7 +3842,7 @@ static int geni_i3c_runtime_suspend(struct device *dev)
 	}
 
 	/* resources_off = geni_se_common_clks_off + pinctrl_select_state(sleep) */
-	geni_se_common_clks_off(gi3c->i3c_rsc.se_clk, gi3c->i3c_rsc.m_ahb_clk,
+	geni_se_common_clks_off(gi3c->se.clk, gi3c->i3c_rsc.m_ahb_clk,
 				gi3c->i3c_rsc.s_ahb_clk);
 	ret = geni_icc_disable(&gi3c->se);
 	if (ret)
