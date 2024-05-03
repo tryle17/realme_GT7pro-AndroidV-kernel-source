@@ -30,3 +30,5 @@ obj-$(CONFIG_QTI_GPU_DUMP_SKIP_COOLING_DEVICE) += gpu_dump_skip_cdev.o
 obj-$(CONFIG_QTI_BCL_OFF_COOLING_DEVICE) += bcl_off_cdev.o
 obj-$(CONFIG_QTI_LMH_CPU_VDD_COOLING_DEVICE) += lmh_cpu_vdd_cdev.o
 obj-$(CONFIG_REGULATOR_COOLING_DEVICE) += regulator_cdev.o
+obj-$(CONFIG_QTI_QMI_SENSOR) += qti_qmi_sensor.o
+qti_qmi_sensor-y += thermal_sensor_service_v01.o qmi_sensors.o
