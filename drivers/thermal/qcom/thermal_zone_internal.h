@@ -34,6 +34,22 @@ static inline __maybe_unused int qti_tz_change_mode(struct thermal_zone_device *
 	return 0;
 }
 
+static inline __maybe_unused int qti_update_tz_ops(struct thermal_zone_device *tz, bool enable)
+{
+	if (!tz || !tz->ops)
+		return -EINVAL;
+
+	mutex_lock(&tz->lock);
+	if (enable) {
+		if (!tz->ops->change_mode)
+			tz->ops->change_mode = qti_tz_change_mode;
+	} else {
+		tz->ops->change_mode = NULL;
+	}
+	mutex_unlock(&tz->lock);
+	return 0;
+}
+
 /* Generic helpers for thermal zone -> get_trend ops */
 static __maybe_unused inline int qti_tz_get_trend(
 				struct thermal_zone_device *tz,
