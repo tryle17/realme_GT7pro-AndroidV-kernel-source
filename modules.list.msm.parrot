@@ -54,6 +54,8 @@ cqhci.ko
 sdhci-msm.ko
 phy-qcom-ufs.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
+ufs-qcom.ko
+phy-qcom-ufs-qmp-v4-waipio.ko
 debug-regulator.ko
 gh_arm_drv.ko
 gh_dbl.ko
