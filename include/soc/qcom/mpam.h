@@ -89,12 +89,12 @@ struct mpam_slice_val {
 } __packed;
 
 #if IS_ENABLED(CONFIG_QTI_MPAM)
-int qcom_mpam_set_cache_portion(struct mpam_set_cache_partition *msg);
+int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param);
 int qcom_mpam_get_version(struct mpam_ver_ret *ver);
 int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
 						struct mpam_slice_val *val);
 #else
-static inline int qcom_mpam_set_cache_portion(struct mpam_set_cache_partition *msg)
+static inline int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param)
 {
 	return 0;
 }
