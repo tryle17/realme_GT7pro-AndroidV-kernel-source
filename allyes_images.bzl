@@ -2,11 +2,11 @@ load(":avb_boot_img.bzl", "avb_sign_boot_image")
 
 def gen_allyes_files(le_target, target):
     """"Build empty vendor_boot/init_boot/ for allyes config."""
-    rule_name = "{}_dummy_files".format(le_target)
+    rule_name = "{}_dummy_files".format(target)
     native.genrule(
         name = rule_name,
         srcs = [],
-        outs = ["vendor_boot.img", "init_boot.img"],
+        outs = ["{}_vendor_boot.img".format(target), "{}_init_boot.img".format(target)],
         cmd = """touch $(OUTS)
                  echo 'empty_file' | tee $(OUTS)""",
     )

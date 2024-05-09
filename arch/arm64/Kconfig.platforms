@@ -260,6 +260,15 @@ config ARCH_QTI_VM
          require VM support or if you are unsure,
          say 'N' here.
 
+config ARCH_SDXKOVA
+        bool "Enable support for Qualcomm Technologies, Inc. SDXKOVA"
+        depends on ARCH_QCOM
+        help
+          This enables support for Qualcomm Technologies, Inc.
+          SDXKOVA chipset. Say 'Y' for SDXPINN chipset. If you do not
+          wish to build a kernel that runs on this chipset or if you
+          are unsure, say 'N' here.
+
 config ARCH_SUN
 	bool "Enable support for Qualcomm Technologies, Inc. Sun"
 	depends on ARCH_QCOM
