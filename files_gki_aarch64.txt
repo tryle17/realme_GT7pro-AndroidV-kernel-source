@@ -2970,7 +2970,6 @@ include/linux/gpio/driver.h
 include/linux/gpio/machine.h
 include/linux/gpio_keys.h
 include/linux/group_cpus.h
-include/linux/gzvm_drv.h
 include/linux/hardirq.h
 include/linux/hash.h
 include/linux/hashtable.h
@@ -3647,6 +3646,7 @@ include/linux/slub_def.h
 include/linux/smp.h
 include/linux/smp_types.h
 include/linux/smpboot.h
+include/linux/soc/mediatek/gzvm_drv.h
 include/linux/soc/qcom/geni-se.h
 include/linux/soc/qcom/smem_state.h
 include/linux/soc/sunxi/sunxi_sram.h
