@@ -119,6 +119,9 @@ struct hwmon_node {
 	unsigned int		guard_band_mbps;
 	unsigned int		decay_rate;
 	unsigned int		io_percent;
+	unsigned int		use_sched_boost;
+	bool			cur_sched_boost;
+	u32			sched_boost_freq;
 	unsigned int		bw_step;
 	unsigned int		sample_ms;
 	unsigned int		up_scale;
