@@ -2,7 +2,6 @@
 # Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
 gh_virt_wdt.ko
 qcom-pmu-lib.ko
-qcom_wdt_core.ko
 dcvs_fp.ko
 qcom-dcvs.ko
 clk-dummy.ko
@@ -83,3 +82,5 @@ debug_symbol.ko
 mem_buf_msgq.ko
 gunyah.ko
 mdt_loader.ko
+qcom-ipcc.ko
+nvmem_qfprom.ko
