@@ -34,6 +34,7 @@ qnoc-sm8550-objs			:= sm8550.o
 qnoc-parrot-objs			:= parrot.o
 qnoc-ravelin-objs			:= ravelin.o
 icc-smd-rpm-objs			:= smd-rpm.o icc-rpm.o icc-rpm-clocks.o
+qnoc-qos-rpm-obj			:= qnoc-qos-rpm.o
 qnoc-qos-obj				:= qnoc-qos.o
 
 obj-$(CONFIG_INTERCONNECT_QCOM_BCM_VOTER) += icc-bcm-voter.o
@@ -68,4 +69,5 @@ obj-$(CONFIG_INTERCONNECT_QCOM_PARROT) += qnoc-parrot.o
 obj-$(CONFIG_INTERCONNECT_QCOM_RAVELIN) += qnoc-ravelin.o
 obj-$(CONFIG_INTERCONNECT_QCOM_SMD_RPM) += icc-smd-rpm.o
 obj-$(CONFIG_INTERCONNECT_QCOM_QOS) += qnoc-qos.o
+obj-$(CONFIG_INTERCONNECT_QCOM_QOS_RPM) += qnoc-qos-rpm.o
 obj-$(CONFIG_INTERCONNECT_QCOM_DEBUG) += icc-debug.o
