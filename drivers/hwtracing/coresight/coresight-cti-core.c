@@ -1137,7 +1137,7 @@ static int cti_probe(struct amba_device *adev, const struct amba_id *id)
 
 	drvdata->extended_cti = is_extended_cti(dev);
 	/* all done - dec pm refcount */
-	pm_runtime_put(&adev->dev);
+	pm_runtime_put_sync(&adev->dev);
 	dev_info(&drvdata->csdev->dev, "CTI initialized\n");
 	return 0;
 
