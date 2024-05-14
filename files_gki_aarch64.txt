@@ -452,6 +452,7 @@ arch/arm64/lib/strrchr.S
 arch/arm64/lib/tishift.S
 arch/arm64/mm/cache.S
 arch/arm64/mm/context.c
+arch/arm64/mm/contpte.c
 arch/arm64/mm/copypage.c
 arch/arm64/mm/dma-mapping.c
 arch/arm64/mm/extable.c
@@ -518,6 +519,7 @@ block/blk-settings.c
 block/blk-stat.c
 block/blk-stat.h
 block/blk-sysfs.c
+block/blk-throttle.c
 block/blk-throttle.h
 block/blk-timeout.c
 block/blk-wbt.c
@@ -635,6 +637,7 @@ crypto/xctr.c
 crypto/xts.c
 crypto/zstd.c
 drivers/amba/bus.c
+drivers/android/android_debug_symbols.c
 drivers/android/binder.c
 drivers/android/binder_alloc.c
 drivers/android/binder_alloc.h
@@ -2660,6 +2663,7 @@ include/linux/alarmtimer.h
 include/linux/align.h
 include/linux/amba/bus.h
 include/linux/amba/serial.h
+include/linux/android_debug_symbols.h
 include/linux/android_kabi.h
 include/linux/android_vendor.h
 include/linux/anon_inodes.h
@@ -3408,6 +3412,7 @@ include/linux/perf_regs.h
 include/linux/personality.h
 include/linux/pfn.h
 include/linux/pfn_t.h
+include/linux/pgsize_migration.h
 include/linux/pgtable.h
 include/linux/pgtable_api.h
 include/linux/phonet.h
@@ -3921,6 +3926,9 @@ include/media/videobuf2-memops.h
 include/media/videobuf2-v4l2.h
 include/media/videobuf2-vmalloc.h
 include/net/6lowpan.h
+include/net/9p/9p.h
+include/net/9p/client.h
+include/net/9p/transport.h
 include/net/act_api.h
 include/net/addrconf.h
 include/net/af_ieee802154.h
@@ -4228,6 +4236,7 @@ include/sound/tlv.h
 include/sound/ump.h
 include/trace/bpf_probe.h
 include/trace/define_trace.h
+include/trace/events/9p.h
 include/trace/events/alarmtimer.h
 include/trace/events/asoc.h
 include/trace/events/avc.h
@@ -4327,6 +4336,7 @@ include/trace/hooks/avc.h
 include/trace/hooks/binder.h
 include/trace/hooks/bug.h
 include/trace/hooks/cgroup.h
+include/trace/hooks/compaction.h
 include/trace/hooks/cpufreq.h
 include/trace/hooks/cpuidle.h
 include/trace/hooks/cpuidle_psci.h
@@ -4358,6 +4368,7 @@ include/trace/hooks/regmap.h
 include/trace/hooks/remoteproc.h
 include/trace/hooks/rwsem.h
 include/trace/hooks/sched.h
+include/trace/hooks/sd.h
 include/trace/hooks/selinux.h
 include/trace/hooks/signal.h
 include/trace/hooks/softlockup.h
@@ -5665,6 +5676,7 @@ mm/percpu-internal.h
 mm/percpu-vm.c
 mm/percpu.c
 mm/pgalloc-track.h
+mm/pgsize_migration.c
 mm/pgtable-generic.c
 mm/process_vm_access.c
 mm/ptdump.c
@@ -5720,9 +5732,15 @@ net/8021q/vlan_dev.c
 net/8021q/vlan_netlink.c
 net/8021q/vlanproc.c
 net/8021q/vlanproc.h
-net/bluetooth/a2mp.h
+net/9p/client.c
+net/9p/error.c
+net/9p/mod.c
+net/9p/protocol.c
+net/9p/protocol.h
+net/9p/trans_common.c
+net/9p/trans_common.h
+net/9p/trans_fd.c
 net/bluetooth/af_bluetooth.c
-net/bluetooth/amp.h
 net/bluetooth/aosp.h
 net/bluetooth/coredump.c
 net/bluetooth/ecdh_helper.c
@@ -6397,6 +6415,7 @@ scripts/mod/mk_elfconfig.c
 scripts/mod/modpost.c
 scripts/mod/modpost.h
 scripts/mod/sumversion.c
+scripts/mod/symsearch.c
 scripts/module.lds.S
 scripts/selinux/genheaders/genheaders.c
 scripts/selinux/mdp/mdp.c
@@ -6550,8 +6569,8 @@ sound/usb/mixer_s1810c.c
 sound/usb/mixer_s1810c.h
 sound/usb/mixer_scarlett.c
 sound/usb/mixer_scarlett.h
-sound/usb/mixer_scarlett_gen2.c
-sound/usb/mixer_scarlett_gen2.h
+sound/usb/mixer_scarlett2.c
+sound/usb/mixer_scarlett2.h
 sound/usb/mixer_us16x08.c
 sound/usb/mixer_us16x08.h
 sound/usb/pcm.c
