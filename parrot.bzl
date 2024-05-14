@@ -100,6 +100,7 @@ def define_parrot():
         "drivers/phy/qualcomm/phy-qcom-ufs-qrbtc-sdm845.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-parrot.ko",
+        "drivers/pinctrl/qcom/pinctrl-ravelin.ko",
         "drivers/pinctrl/qcom/pinctrl-spmi-gpio.ko",
         "drivers/pinctrl/qcom/pinctrl-spmi-mpp.ko",
         "drivers/power/reset/qcom-dload-mode.ko",
