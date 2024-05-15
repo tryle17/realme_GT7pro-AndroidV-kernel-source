@@ -2001,6 +2001,24 @@ int qcom_scm_camera_protect_phy_lanes(bool protect, u64 regmask)
 }
 EXPORT_SYMBOL(qcom_scm_camera_protect_phy_lanes);
 
+int qcom_scm_tsens_reinit(int *tsens_ret)
+{
+	unsigned int ret;
+	struct qcom_scm_desc desc = {
+		.svc = QCOM_SCM_SVC_TSENS,
+		.cmd = QCOM_SCM_TSENS_INIT_ID,
+		.owner = ARM_SMCCC_OWNER_SIP
+	};
+	struct qcom_scm_res res;
+
+	ret = qcom_scm_call(__scm->dev, &desc, &res);
+	if (tsens_ret)
+		*tsens_ret = res.result[0];
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(qcom_scm_tsens_reinit);
+
 static int qcom_scm_reboot(struct device *dev)
 {
 	struct qcom_scm_desc desc = {
@@ -2691,4 +2709,4 @@ module_exit(qcom_scm_exit);
 #endif
 
 MODULE_DESCRIPTION("Qualcomm Technologies, Inc. SCM driver");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");
