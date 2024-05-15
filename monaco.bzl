@@ -96,6 +96,7 @@ def define_monaco():
         "drivers/usb/gadget/function/usb_f_qdss.ko",
         "drivers/usb/phy/phy-msm-snps-hs.ko",
         "kernel/msm_sysstats.ko",
+        "kernel/sched/walt/sched-walt.ko",
         "kernel/trace/qcom_ipc_logging.ko",
     ]
 
@@ -104,6 +105,7 @@ def define_monaco():
         "drivers/misc/lkdtm/lkdtm.ko",
         "kernel/locking/locktorture.ko",
         "kernel/rcu/rcutorture.ko",
+        "kernel/sched/walt/sched-walt-debug.ko",
         "kernel/torture.ko",
         "lib/atomic64_test.ko",
         "lib/test_user_copy.ko",
