@@ -2,6 +2,7 @@
 # Qualcomm pin control drivers
 obj-$(CONFIG_PINCTRL_MSM)	+= pinctrl-msm.o
 obj-$(CONFIG_PINCTRL_TUNA)	+= pinctrl-tuna.o
+obj-$(CONFIG_PINCTRL_KERA)	+= pinctrl-kera.o
 obj-$(CONFIG_PINCTRL_SUN)	+= pinctrl-sun.o
 obj-$(CONFIG_PINCTRL_RAVELIN) += pinctrl-ravelin.o
 obj-$(CONFIG_PINCTRL_PINEAPPLE) += pinctrl-pineapple.o
