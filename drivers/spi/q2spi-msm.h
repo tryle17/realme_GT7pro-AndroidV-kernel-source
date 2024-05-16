@@ -14,6 +14,7 @@
 #include <linux/poll.h>
 #include <linux/soc/qcom/geni-se.h>
 #include <linux/qcom-geni-se-common.h>
+#include <linux/timer.h>
 #include <linux/types.h>
 #include <uapi/linux/q2spi/q2spi.h>
 #include "q2spi-gsi.h"
@@ -165,7 +166,9 @@
 #define CR_EXTENSION_DATA_BYTES		5 /* 1 for EXTID + 4 Bytes for one 1DW */
 
 #define Q2SPI_HRF_SLEEP_CMD		0x100
-#define Q2SPI_AUTOSUSPEND_DELAY		(XFER_TIMEOUT_OFFSET + 3000)
+#define Q2SPI_AUTOSUSPEND_DELAY		(XFER_TIMEOUT_OFFSET + 50)
+#define Q2SPI_SLAVE_SLEEP_TIME_MSECS	100
+
 #define PINCTRL_DEFAULT		"default"
 #define PINCTRL_ACTIVE		"active"
 #define PINCTRL_SLEEP		"sleep"
@@ -458,7 +461,7 @@ struct q2spi_dma_transfer {
  * @rx_cb: completion for rx dma
  * @db_rx_cb: completion for doobell rx dma
  * @wait_for_ext_cr: completion for extension cr
- * @rx_avail: used to notify the client for avaialble rx data
+ * @rx_avail: used to notify the client for available rx data
  * @tid_idr: tid id allocator
  * @readq: waitqueue for rx data
  * @hrf_flow: flag to indicate HRF flow
@@ -482,9 +485,11 @@ struct q2spi_dma_transfer {
  * @sma_wait: completion for SMA
  * @ipc: pointer for ipc
  * @q2spi_doorbell_work: work to queue for doorbell process
- * @doorbell_wq: workqueue pointer fir doorbell
+ * @doorbell_wq: workqueue pointer for doorbell
  * @q2spi_wakeup_work: work to queue for wakeup process
  * @wakeup_wq: workqueue pointer for wakeup
+ * @q2spi_sleep_work: work to queue for client sleep
+ * @sleep_wq: workqueue pointer for client_sleep
  * @hw_state_is_bad: used when HW is in un-recoverable state
  * @max_dump_data_size: max size of data to be dumped as part of dump_ipc function
  * @doorbell_pending: Set when independent doorbell CR received
@@ -499,6 +504,8 @@ struct q2spi_dma_transfer {
  * @doorbell_irq: doorbell irq
  * @wake_clk_gpio: GPIO for clk pin
  * @wake_mosi_gpio: GPIO for mosi pin
+ * @slave_sleep_timer: used for initiating sleep command to slave
+ * @slave_in_sleep: reflects sleep command sent to slave
  */
 struct q2spi_geni {
 	struct device *wrapper_dev;
@@ -578,6 +585,8 @@ struct q2spi_geni {
 	struct workqueue_struct *doorbell_wq;
 	struct work_struct q2spi_wakeup_work;
 	struct workqueue_struct *wakeup_wq;
+	struct work_struct q2spi_sleep_work;
+	struct workqueue_struct *sleep_wq;
 	bool doorbell_setup;
 	struct qup_q2spi_cr_header_event q2spi_cr_hdr_event;
 	wait_queue_head_t read_wq;
@@ -597,6 +606,8 @@ struct q2spi_geni {
 	int doorbell_irq;
 	int wake_clk_gpio;
 	int wake_mosi_gpio;
+	struct timer_list slave_sleep_timer;
+	atomic_t slave_in_sleep;
 };
 
 /**
@@ -721,8 +732,9 @@ void q2spi_dump_client_error_regs(struct q2spi_geni *q2spi);
 int q2spi_geni_resources_on(struct q2spi_geni *q2spi);
 void q2spi_geni_resources_off(struct q2spi_geni *q2spi);
 int __q2spi_send_messages(struct q2spi_geni *q2spi, void *ptr);
-int q2spi_wakeup_hw_through_gpio(struct q2spi_geni *q2spi);
+int q2spi_wakeup_slave_through_gpio(struct q2spi_geni *q2spi);
 int q2spi_process_hrf_flow_after_lra(struct q2spi_geni *q2spi, struct q2spi_packet *q2spi_pkt);
 void q2spi_transfer_soft_reset(struct q2spi_geni *q2spi);
+int q2spi_put_slave_to_sleep(struct q2spi_geni *q2spi);
 
 #endif /* _SPI_Q2SPI_MSM_H_ */

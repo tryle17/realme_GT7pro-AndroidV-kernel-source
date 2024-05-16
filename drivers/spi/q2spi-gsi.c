@@ -706,8 +706,6 @@ void q2spi_gsi_ch_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb, void *
 		break;
 	}
 
-	if (cb->cb_event == MSM_GPI_QUP_FW_ERROR) {
-		q2spi_geni_se_dump_regs(q2spi);
-		Q2SPI_ERROR(q2spi, "%s dump GSI regs\n", __func__);
-	}
+	if (q2spi->gsi->qup_gsi_err)
+		Q2SPI_ERROR(q2spi, "%s set qup_gsi_err\n", __func__);
 }
