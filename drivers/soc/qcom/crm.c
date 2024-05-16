@@ -91,7 +91,7 @@
 #define MAX_SW_DRV_PWR_STATES		3
 
 /* Time out for ACTIVE Only PWR STATE completion IRQ */
-#define CRM_TIMEOUT_MS			msecs_to_jiffies(1000)
+#define CRM_TIMEOUT_MS			msecs_to_jiffies(2000)
 
 #define CH0				0
 #define CH0_CHN_BUSY			BIT(0)
