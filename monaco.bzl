@@ -51,6 +51,7 @@ def define_monaco():
         "drivers/regulator/qcom-amoled-regulator.ko",
         "drivers/regulator/qti-fixed-regulator.ko",
         "drivers/regulator/qti-ocp-notifier.ko",
+        "drivers/regulator/rpm-smd-regulator.ko",
         "drivers/regulator/stub-regulator.ko",
         "drivers/rpmsg/qcom_glink.ko",
         "drivers/rpmsg/qcom_glink_rpm.ko",
