@@ -506,6 +506,7 @@ struct q2spi_dma_transfer {
  * @wake_mosi_gpio: GPIO for mosi pin
  * @slave_sleep_timer: used for initiating sleep command to slave
  * @slave_in_sleep: reflects sleep command sent to slave
+ * @sys_mem_read_in_progress: reflects system memory read request is in progress
  */
 struct q2spi_geni {
 	struct device *wrapper_dev;
@@ -608,6 +609,7 @@ struct q2spi_geni {
 	int wake_mosi_gpio;
 	struct timer_list slave_sleep_timer;
 	atomic_t slave_in_sleep;
+	bool sys_mem_read_in_progress;
 };
 
 /**
