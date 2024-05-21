@@ -53,8 +53,12 @@ def define_monaco():
         "drivers/regulator/qti-ocp-notifier.ko",
         "drivers/regulator/rpm-smd-regulator.ko",
         "drivers/regulator/stub-regulator.ko",
+        "drivers/rpmsg/glink_pkt.ko",
         "drivers/rpmsg/qcom_glink.ko",
         "drivers/rpmsg/qcom_glink_rpm.ko",
+        "drivers/rpmsg/qcom_glink_smem.ko",
+        "drivers/rpmsg/qcom_glink_spss.ko",
+        "drivers/rpmsg/qcom_smd.ko",
         "drivers/rpmsg/rpm-smd.ko",
         "drivers/rtc/rtc-pm8xxx.ko",
         "drivers/soc/qcom/boot_stats.ko",
@@ -83,6 +87,7 @@ def define_monaco():
         "drivers/soc/qcom/qsee_ipc_irq_bridge.ko",
         "drivers/soc/qcom/secure_buffer.ko",
         "drivers/soc/qcom/smem.ko",
+        "drivers/soc/qcom/smp2p.ko",
         "drivers/soc/qcom/socinfo.ko",
         "drivers/soc/qcom/wcd_usbss_i2c.ko",
         "drivers/spi/q2spi-geni.ko",
@@ -102,6 +107,8 @@ def define_monaco():
         "drivers/usb/phy/phy-msm-snps-hs.ko",
         "kernel/msm_sysstats.ko",
         "kernel/trace/qcom_ipc_logging.ko",
+        "net/qrtr/qrtr.ko",
+        "net/qrtr/qrtr-smd.ko",
     ]
 
     _monaco_consolidate_in_tree_modules = _monaco_in_tree_modules + [
