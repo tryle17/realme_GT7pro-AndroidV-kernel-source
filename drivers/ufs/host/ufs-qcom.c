@@ -276,6 +276,15 @@ static int ufs_qcom_ber_duration_set(const char *val, const struct kernel_param 
 }
 
 /**
+ * Checks if the populated CPUs are the same as the SoC's max CPUs.
+ * Return: 1 if some CPUs are not populated (partial); 0 otherwise.
+ */
+static inline bool ufs_qcom_partial_cpu_found(struct ufs_qcom_host *host)
+{
+	return cpumask_weight(cpu_possible_mask) != host->max_cpus;
+}
+
+/**
  * ufs_qcom_save_regs - read register value and save to memory for specified domain.
  * If it is a new domain which never been saved, allocate memory for it and add to list.
  * @host - ufs_qcom_host
@@ -2966,6 +2975,19 @@ static void ufs_qcom_qos_init(struct ufs_hba *hba)
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 
 	host->cpufreq_dis = true;
+	/*
+	 * In a system where CPUs are partially populated, the cpu mapping
+	 * would be rearranged. Disable the QoS and CPU frequency scaling
+	 * in that case. The UFS performance may be impacted.
+	 * Check sys/devices/system/cpu/possible for possible cause of
+	 * performance degradation.
+	 */
+	if (ufs_qcom_partial_cpu_found(host)) {
+		dev_err(hba->dev, "%s: QoS disabled. Check partial CPUs\n",
+			__func__);
+		return;
+	}
+
 	qr = kzalloc(sizeof(*qr), GFP_KERNEL);
 	if (!qr)
 		return;
@@ -3042,6 +3064,16 @@ static void ufs_qcom_parse_irq_affinity(struct ufs_hba *hba)
 	struct device_node *np = dev->of_node;
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	int mask = 0;
+
+	/*
+	 * In a system where CPUs are partially populated, the cpu mapping
+	 * would be rearranged. Disable irq affinity in that case.
+	 * The UFS performance may be impacted.
+	 * Check sys/devices/system/cpu/possible for possible cause of
+	 * performance degradation.
+	 */
+	if (ufs_qcom_partial_cpu_found(host))
+		return;
 
 	if (np) {
 		of_property_read_u32(np, "qcom,prime-mask", &mask);
@@ -3476,6 +3508,23 @@ static void ufs_qcom_parse_pbl_rst_workaround_flag(struct ufs_qcom_host *host)
 }
 
 /*
+ * ufs_qcom_parse_max_cpus - read "qcom,max-cpus" entry from DT
+ */
+static void ufs_qcom_parse_max_cpus(struct ufs_qcom_host *host)
+{
+	struct device_node *np = host->hba->dev->of_node;
+
+	if (!np)
+		return;
+
+	of_property_read_u32(np, "qcom,max-cpus", &host->max_cpus);
+	if (!host->max_cpus) {
+		dev_err(host->hba->dev, "%s: missing max-cpus DT.\n", __func__);
+		host->max_cpus = 8;
+	}
+}
+
+/*
  * ufs_qcom_parse_borken_ahit_workaround_flag - read broken-ahit-wa entry from DT
  */
 static void ufs_qcom_parse_broken_ahit_workaround_flag(struct ufs_qcom_host *host)
@@ -3659,6 +3708,7 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 
 	ufs_qcom_parse_wb(host);
 	ufs_qcom_parse_pbl_rst_workaround_flag(host);
+	ufs_qcom_parse_max_cpus(host);
 	ufs_qcom_parse_broken_ahit_workaround_flag(host);
 	ufs_qcom_set_caps(hba);
 	ufs_qcom_advertise_quirks(hba);
@@ -5321,6 +5371,9 @@ static ssize_t irq_affinity_support_store(struct device *dev,
 	if (!host->perf_mask.bits[0])
 		goto out;
 
+	if (ufs_qcom_partial_cpu_found(host))
+		goto out;
+
 	host->irq_affinity_support = !!value;
 	/* Reset cpu affinity accordingly */
 	if (host->irq_affinity_support)
@@ -5717,13 +5770,15 @@ static int ufs_qcom_remove(struct platform_device *pdev)
 
 	hba =  platform_get_drvdata(pdev);
 	host = ufshcd_get_variant(hba);
-	r = host->ufs_qos;
-	qcg = r->qcg;
 
-	pm_runtime_get_sync(&(pdev)->dev);
-	for (i = 0; i < r->num_groups; i++, qcg++)
-		remove_group_qos(qcg);
+	if (host->ufs_qos) {
+		r = host->ufs_qos;
+		qcg = r->qcg;
 
+		pm_runtime_get_sync(&(pdev)->dev);
+		for (i = 0; i < r->num_groups; i++, qcg++)
+			remove_group_qos(qcg);
+	}
 	if (msm_minidump_enabled())
 		atomic_notifier_chain_unregister(&panic_notifier_list,
 				&host->ufs_qcom_panic_nb);
