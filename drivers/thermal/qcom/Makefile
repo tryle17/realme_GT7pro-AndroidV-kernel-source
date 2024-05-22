@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
+obj-$(CONFIG_QTI_THERMAL_VENDOR_HOOK) += qti_thermal_vendor_hooks.o
 obj-$(CONFIG_QCOM_TSENS)	+= qcom_tsens.o
 
 qcom_tsens-y			+= tsens.o tsens-v2.o tsens-v1.o tsens-v0_1.o \
@@ -27,3 +28,8 @@ obj-$(CONFIG_QTI_CPU_PAUSE_COOLING_DEVICE) += thermal_pause.o
 obj-$(CONFIG_QTI_DEVFREQ_CDEV) += qti_devfreq_cdev.o
 obj-$(CONFIG_MAX31760_FAN_CONTROLLER) += max31760_fan.o
 obj-$(CONFIG_QTI_GPU_DUMP_SKIP_COOLING_DEVICE) += gpu_dump_skip_cdev.o
+obj-$(CONFIG_QTI_BCL_OFF_COOLING_DEVICE) += bcl_off_cdev.o
+obj-$(CONFIG_QTI_LMH_CPU_VDD_COOLING_DEVICE) += lmh_cpu_vdd_cdev.o
+obj-$(CONFIG_REGULATOR_COOLING_DEVICE) += regulator_cdev.o
+obj-$(CONFIG_QTI_QMI_SENSOR) += qti_qmi_sensor.o
+qti_qmi_sensor-y += thermal_sensor_service_v01.o qmi_sensors.o

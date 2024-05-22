@@ -1,6 +1,7 @@
 targets = [
     # keep sorted
     "monaco",
+    "parrot",
     "pineapple",
     "sun",
 ]

@@ -935,9 +935,24 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 		goto out;
 	}
 
+	reenable_intr = hba->is_irq_enabled;
+	disable_irq(hba->irq);
+	hba->is_irq_enabled = false;
+
 	/*
-	 * Power on the PHY before resetting the UFS host controller
-	 * and the UFS PHY. Without power, the PHY reset may not work properly.
+	 * Refer to the PHY programming guide.
+	 * 1. Assert the BCR reset.
+	 * 2. Power on the PHY regulators and GDSC.
+	 * 3. Release the BCR reset.
+	 */
+	ret = reset_control_assert(host->core_reset);
+	if (ret) {
+		dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
+				 __func__, ret);
+		goto out;
+	}
+
+	/*
 	 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
 	 * would be a nop because the flag is_phy_pwr_on would be true.
 	 */
@@ -945,17 +960,6 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 	if (ret) {
 		dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
 			__func__, ret);
-		goto out;
-	}
-
-	reenable_intr = hba->is_irq_enabled;
-	disable_irq(hba->irq);
-	hba->is_irq_enabled = false;
-
-	ret = reset_control_assert(host->core_reset);
-	if (ret) {
-		dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
-				 __func__, ret);
 		goto out;
 	}
 
@@ -4745,22 +4749,24 @@ static int ufs_qcom_device_reset(struct ufs_hba *hba)
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	int ret = 0;
 
-	/* Reset UFS Host Controller and PHY */
-	ret = ufs_qcom_host_reset(hba);
-	if (ret)
-		dev_warn(hba->dev, "%s: host reset returned %d\n",
-				 __func__, ret);
-
 	/* reset gpio is optional */
 	if (!host->device_reset)
 		return -EOPNOTSUPP;
 
 	/*
-	 * The UFS device shall detect reset pulses of 1us, sleep for 10us to
-	 * be on the safe side.
+	 * The UFS device shall detect reset pulses of 1us,
+	 * sleep for 10us to be on the safe side.
+	 * Hold the device in reset while doing the host and
+	 * PHY power-on and reset sequence. Then release the device reset.
 	 */
 	ufs_qcom_device_reset_ctrl(hba, true);
 	usleep_range(10, 15);
+
+	/* Reset UFS Host Controller and PHY */
+	ret = ufs_qcom_host_reset(hba);
+	if (ret)
+		dev_warn(hba->dev, "%s: host reset returned %d\n",
+				 __func__, ret);
 
 	ufs_qcom_device_reset_ctrl(hba, false);
 	usleep_range(10, 15);

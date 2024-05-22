@@ -1892,6 +1892,54 @@ dma_unprep:
 
 }
 
+/**
+ * spi_geni_check_gsi_transfer_completion: Wait for completion of data transfer for GSI mode.
+ *
+ * @mas: structure to spi geni master.
+ * xfer_timeout: transfer timeout value.
+ *
+ * Return: 0 on success, error code on failure.
+ */
+static int spi_geni_check_gsi_transfer_completion(struct spi_geni_master *mas,
+						  unsigned long xfer_timeout)
+{
+	int i, ret = 0;
+	unsigned long timeout;
+	bool error = false;
+
+	for (i = 0; i < mas->num_tx_eot; i++) {
+		timeout = wait_for_completion_timeout(&mas->tx_cb, xfer_timeout);
+		if (!timeout) {
+			SPI_LOG_ERR(mas->ipc, true, mas->dev,
+				    "Tx[%d] timeout%lu\n", i, timeout);
+			ret = -ETIMEDOUT;
+			error = true;
+			break;
+		}
+	}
+
+	for (i = 0; i < mas->num_rx_eot; i++) {
+		timeout = wait_for_completion_timeout(&mas->rx_cb, xfer_timeout);
+		if (!timeout) {
+			SPI_LOG_ERR(mas->ipc, true, mas->dev,
+				    "Rx[%d] timeout%lu\n", i, timeout);
+			ret = -ETIMEDOUT;
+			error = true;
+			break;
+		}
+	}
+
+	if (error)
+		return ret;
+
+	if (mas->qn_err) {
+		ret = -EIO;
+		mas->qn_err = false;
+	}
+
+	return ret;
+}
+
 static int spi_geni_transfer_one(struct spi_master *spi,
 				struct spi_device *slv,
 				struct spi_transfer *xfer)
@@ -1991,39 +2039,10 @@ static int spi_geni_transfer_one(struct spi_master *spi,
 			mas->cur_xfer = NULL;
 			goto err_gsi_geni_transfer_one;
 		}
-		if ((mas->num_xfers >= NUM_SPI_XFER) ||
-			(list_is_last(&xfer->transfer_list,
-					&spi->cur_msg->transfers))) {
-			int i;
 
-			for (i = 0 ; i < mas->num_tx_eot; i++) {
-				timeout =
-				wait_for_completion_timeout(
-					&mas->tx_cb, xfer_timeout);
-				if (timeout <= 0) {
-					SPI_LOG_ERR(mas->ipc, true, mas->dev,
-					"Tx[%d] timeout%lu\n", i, timeout);
-					ret = -ETIMEDOUT;
-					goto err_gsi_geni_transfer_one;
-				}
-			}
-			for (i = 0 ; i < mas->num_rx_eot; i++) {
-				timeout =
-				wait_for_completion_timeout(
-					&mas->rx_cb, xfer_timeout);
-				if (timeout <= 0) {
-					SPI_LOG_ERR(mas->ipc, true, mas->dev,
-					 "Rx[%d] timeout%lu\n", i, timeout);
-					ret = -ETIMEDOUT;
-					goto err_gsi_geni_transfer_one;
-				}
-			}
-			if (mas->qn_err) {
-				ret = -EIO;
-				mas->qn_err = false;
-				goto err_gsi_geni_transfer_one;
-			}
-		}
+		ret = spi_geni_check_gsi_transfer_completion(mas, xfer_timeout);
+		if (ret)
+			goto err_gsi_geni_transfer_one;
 	}
 
 	geni_capture_stop_time(&mas->spi_rsc, mas->ipc_log_kpi, __func__,
@@ -2798,7 +2817,18 @@ static int spi_geni_suspend(struct device *dev)
 		SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev,
 			    "%s System suspend not allowed while xfer in progress=%d\n",
 			    __func__, ret);
-		return ret;
+		return -EBUSY;
+	}
+
+	if (geni_mas->is_le_vm || geni_mas->is_la_vm) {
+		if (!pm_runtime_status_suspended(dev)) {
+			SPI_LOG_ERR(geni_mas->ipc, true, geni_mas->dev,
+				    ":%s: Client managed runtime PM is active\n", __func__);
+			return -EBUSY;
+		}
+		SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev,
+			    "%s: System suspend bypassed due to le/la vm\n", __func__);
+		return 0;
 	}
 
 	if (!pm_runtime_status_suspended(dev)) {

@@ -107,6 +107,7 @@ def define_sun():
         "drivers/pinctrl/qcom/pinctrl-spmi-gpio.ko",
         "drivers/pinctrl/qcom/pinctrl-spmi-mpp.ko",
         "drivers/pinctrl/qcom/pinctrl-sun.ko",
+        "drivers/pinctrl/qcom/pinctrl-tuna.ko",
         "drivers/power/reset/qcom-dload-mode.ko",
         "drivers/power/reset/qcom-pon.ko",
         "drivers/power/reset/qcom-reboot-reason.ko",
@@ -145,6 +146,7 @@ def define_sun():
         "drivers/soc/qcom/crm-v2.ko",
         "drivers/soc/qcom/dcc_v2.ko",
         "drivers/soc/qcom/dcvs/bwmon.ko",
+        "drivers/soc/qcom/dcvs/cpufreq_stats_scmi_v3.ko",
         "drivers/soc/qcom/dcvs/dcvs_fp.ko",
         "drivers/soc/qcom/dcvs/memlat.ko",
         "drivers/soc/qcom/dcvs/mpam.ko",
@@ -217,6 +219,7 @@ def define_sun():
         "drivers/thermal/qcom/qti_devfreq_cdev.ko",
         "drivers/thermal/qcom/qti_qmi_cdev.ko",
         "drivers/thermal/qcom/qti_qmi_sensor_v2.ko",
+        "drivers/thermal/qcom/qti_thermal_vendor_hooks.ko",
         "drivers/thermal/qcom/qti_userspace_cdev.ko",
         "drivers/thermal/qcom/thermal_config.ko",
         "drivers/thermal/qcom/thermal_pause.ko",
@@ -259,11 +262,13 @@ def define_sun():
         "kernel/msm_sysstats.ko",
         "kernel/sched/walt/sched-walt.ko",
         "kernel/trace/qcom_ipc_logging.ko",
+        "net/mac80211/mac80211.ko",
         "net/qrtr/qrtr.ko",
         "net/qrtr/qrtr-gunyah.ko",
         "net/qrtr/qrtr-mhi.ko",
         "net/qrtr/qrtr-smd.ko",
         "net/qrtr/qrtr-tun.ko",
+        "net/wireless/cfg80211.ko",
     ]
 
     _sun_consolidate_in_tree_modules = _sun_in_tree_modules + [

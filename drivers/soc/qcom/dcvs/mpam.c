@@ -9,6 +9,7 @@
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/errno.h>
+#include <linux/io.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/configfs.h>
@@ -38,6 +39,7 @@ enum mpam_get_param_ids {
 struct qcom_mpam_partition {
 	struct config_group group;
 	int part_id;
+	int monitor_id;
 	struct mpam_slice_val val[MSC_MAX];
 };
 
@@ -45,7 +47,9 @@ static struct scmi_protocol_handle *ph;
 static const struct qcom_scmi_vendor_ops *ops;
 static struct scmi_device *sdev;
 static unsigned long *part_id_free_bitmap;
+static unsigned long *monitor_free_bitmap;
 static struct mpam_slice_val mpam_default_val;
+struct monitors_value *mpam_mon_base;
 
 int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param)
 {
@@ -95,6 +99,20 @@ int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
 }
 EXPORT_SYMBOL_GPL(qcom_mpam_get_cache_partition);
 
+int qcom_mpam_config_monitor(struct mpam_monitor_configuration *param)
+{
+	int ret = -EPERM;
+
+	if (ops) {
+		ret = ops->set_param(ph, param, MPAM_ALGO_STR,
+				PARAM_SET_CONFIG_MONITOR,
+				sizeof(struct mpam_monitor_configuration));
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(qcom_mpam_config_monitor);
+
 static inline struct qcom_mpam_partition *to_partition(
 					   struct config_item *item)
 {
@@ -107,10 +125,21 @@ static inline int get_part_id(struct config_item *item)
 	return to_partition(item)->part_id;
 }
 
+static inline int get_monitor_id(struct config_item *item)
+{
+	return to_partition(item)->monitor_id;
+}
+
 static inline void set_part_id(struct config_item *item,
 				int part_id)
 {
 	to_partition(item)->part_id = part_id;
+}
+
+static inline void set_monitor_id(struct config_item *item,
+				int monitor_id)
+{
+	to_partition(item)->monitor_id = monitor_id;
 }
 
 static void qcom_mpam_partition_transfer(int old, int new)
@@ -147,6 +176,7 @@ static void qcom_mpam_set_schemata(struct config_item *item,
 {
 	int ret;
 	uint32_t input;
+	bool bypass_cache = false;
 	char *token, *param_name;
 	struct mpam_set_cache_partition mpam_param;
 	struct qcom_mpam_partition *partition = to_partition(item);
@@ -175,11 +205,26 @@ static void qcom_mpam_set_schemata(struct config_item *item,
 			mpam_param.dspri = input;
 	}
 
+	/*
+	 * If cpbm_mask set from userspace is 0, it means the least allocation
+	 * for MPAM is needed. For the current hardware, the least allocation
+	 * is cpbm_mask==1, cache_capacity == 0. And when cpbm_mask == 0,
+	 * cache_capacity will always limit to 0.
+	 */
+	if (mpam_param.cpbm_mask == 0) {
+		bypass_cache = true;
+		mpam_param.cpbm_mask = 0x1;
+		mpam_param.cache_capacity = 0;
+	}
+
 	ret = qcom_mpam_set_cache_partition(&mpam_param);
 	if (!ret) {
 		partition->val[mscid].capacity = mpam_param.cache_capacity;
-		partition->val[mscid].cpbm = mpam_param.cpbm_mask;
 		partition->val[mscid].dspri = mpam_param.dspri;
+		if (unlikely(bypass_cache))
+			partition->val[mscid].cpbm = 0;
+		else
+			partition->val[mscid].cpbm = mpam_param.cpbm_mask;
 	} else
 		pr_err("set msc mpam settings failed, ret = %d\n", ret);
 }
@@ -273,11 +318,127 @@ err:
 }
 CONFIGFS_ATTR(qcom_mpam_, tasks);
 
+static void qcom_mpam_enable_monitor(int monitor_id, int part_id,
+		enum mpam_monitor_type type)
+{
+	struct mpam_monitor_configuration monitor_param;
+
+	monitor_param.part_id = part_id + PARTID_RESERVED;
+	monitor_param.msc_id = MSC_0;
+	monitor_param.mon_instance = monitor_id;
+	monitor_param.mon_type = type;
+	monitor_param.mpam_config_ctrl = 1;
+	qcom_mpam_config_monitor(&monitor_param);
+
+	monitor_param.msc_id = MSC_1;
+	qcom_mpam_config_monitor(&monitor_param);
+}
+
+static void qcom_mpam_disable_monitor(int monitor_id,
+		enum mpam_monitor_type type)
+{
+	struct mpam_monitor_configuration monitor_param;
+
+	monitor_param.msc_id = MSC_0;
+	monitor_param.mon_instance = monitor_id;
+	monitor_param.mon_type = type;
+	monitor_param.mpam_config_ctrl = 0;
+	qcom_mpam_config_monitor(&monitor_param);
+
+	monitor_param.msc_id = MSC_1;
+	qcom_mpam_config_monitor(&monitor_param);
+}
+
+static ssize_t qcom_mpam_enable_monitor_show(struct config_item *item,
+		char *page)
+{
+	int monitor_id;
+
+	monitor_id = get_monitor_id(item);
+	return scnprintf(page, PAGE_SIZE, "%s\n", (monitor_id == INT_MAX) ?
+		"disabled" : "enabled");
+}
+
+static ssize_t qcom_mpam_enable_monitor_store(struct config_item *item,
+		const char *page, size_t count)
+{
+	int ret, input, monitor_id, part_id;
+
+	part_id = get_part_id(item);
+	monitor_id = get_monitor_id(item);
+
+	ret = kstrtoint(page, 10, &input);
+	if (ret || (input != 0 && input != 1)) {
+		pr_err("invalid param\n");
+		goto exit;
+	}
+
+	if (input == 0 && monitor_id != INT_MAX) {
+		bitmap_clear(monitor_free_bitmap, monitor_id, 1);
+		set_monitor_id(item, INT_MAX);
+		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_CSU_MONITOR);
+		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_MBW_MONITOR);
+	} else if (input == 1 && monitor_id == INT_MAX) {
+		monitor_id = bitmap_find_next_zero_area(monitor_free_bitmap,
+				MONITOR_MAX, 0, 1, 0);
+		if (monitor_id > MONITOR_MAX) {
+			pr_err("no available monitor\n");
+			goto exit;
+		}
+
+		bitmap_set(monitor_free_bitmap, monitor_id, 1);
+		set_monitor_id(item, monitor_id);
+		qcom_mpam_enable_monitor(monitor_id, part_id,
+				MPAM_TYPE_CSU_MONITOR);
+		qcom_mpam_enable_monitor(monitor_id, part_id,
+				MPAM_TYPE_MBW_MONITOR);
+	}
+
+exit:
+	return count;
+}
+CONFIGFS_ATTR(qcom_mpam_, enable_monitor);
+
+static ssize_t qcom_mpam_monitor_data_show(struct config_item *item,
+		char *page)
+{
+	int i, monitor_id;
+	int retry_cnt = 0;
+	ssize_t len = 0;
+	uint64_t timestamp;
+	uint32_t csu_value;
+	uint64_t mbw_value;
+	struct monitors_value *mpam_mon_data;
+
+	monitor_id = get_monitor_id(item);
+	if (monitor_id != INT_MAX) {
+		for (i = 0; i < MSC_MAX; i++) {
+			mpam_mon_data = &mpam_mon_base[i];
+			do {
+				timestamp = mpam_mon_data->last_capture_time;
+				while (unlikely(mpam_mon_data->capture_in_progress) &&
+						(retry_cnt < MPAM_MAX_RETRY))
+					retry_cnt++;
+				csu_value = mpam_mon_data->csu_mon_value[monitor_id];
+				mbw_value = mpam_mon_data->mbw_mon_value[monitor_id];
+			} while (timestamp != mpam_mon_data->last_capture_time);
+			len += scnprintf(page + len, PAGE_SIZE - len,
+			"msc%d:timestamp=%llu,csu=%u,mbwu=%llu\n",
+			mpam_mon_data->msc_id, timestamp, csu_value, mbw_value);
+		}
+		return len;
+	} else
+		return scnprintf(page, PAGE_SIZE, "monitor not enabled\n");
+}
+CONFIGFS_ATTR_RO(qcom_mpam_, monitor_data);
+
 static struct configfs_attribute *qcom_mpam_attrs[] = {
 	&qcom_mpam_attr_part_id,
 	&qcom_mpam_attr_schemata_0,
 	&qcom_mpam_attr_schemata_1,
 	&qcom_mpam_attr_tasks,
+	&qcom_mpam_attr_enable_monitor,
+	&qcom_mpam_attr_monitor_data,
 	NULL,
 };
 
@@ -285,26 +446,33 @@ static void qcom_mpam_reset_param(int part_id)
 {
 	struct mpam_set_cache_partition mpam_param;
 
-	mpam_param.part_id = part_id;
-	mpam_param.msc_id = 0;
+	mpam_param.part_id = part_id + PARTID_RESERVED;
+	mpam_param.msc_id = MSC_0;
 	mpam_param.dspri = mpam_default_val.dspri;
 	mpam_param.cpbm_mask = mpam_default_val.cpbm;
 	mpam_param.cache_capacity = mpam_default_val.capacity;
+	mpam_param.mpam_config_ctrl = SET_CACHE_CAPACITY_AND_CPBM_AND_DSPRI;
 	qcom_mpam_set_cache_partition(&mpam_param);
 
-	mpam_param.msc_id = 1;
+	mpam_param.msc_id = MSC_1;
 	qcom_mpam_set_cache_partition(&mpam_param);
 }
 
 static void qcom_mpam_drop_item(struct config_group *group,
 		struct config_item *item)
 {
-	int part_id;
+	int part_id, monitor_id;
 
 	part_id = get_part_id(item);
+	monitor_id = get_monitor_id(item);
 
 	qcom_mpam_partition_transfer(part_id, PARTID_DEFAULT);
 	bitmap_clear(part_id_free_bitmap, part_id, 1);
+	if (monitor_id != INT_MAX) {
+		bitmap_clear(monitor_free_bitmap, monitor_id, 1);
+		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_CSU_MONITOR);
+		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_MBW_MONITOR);
+	}
 	qcom_mpam_reset_param(part_id);
 
 	kfree(to_partition(item));
@@ -332,6 +500,7 @@ static struct config_group *qcom_mpam_make_group(
 
 	bitmap_set(part_id_free_bitmap, part_id, 1);
 	partition->part_id = part_id;
+	partition->monitor_id = INT_MAX;
 	for (i = 0; i < MSC_MAX; i++)
 		memcpy(&(partition->val[i]), &mpam_default_val, sizeof(struct mpam_slice_val));
 	qcom_mpam_reset_param(part_id);
@@ -387,6 +556,7 @@ static int qcom_mpam_configfs_init(void)
 	struct config_group *default_group;
 
 	part_id_free_bitmap = bitmap_zalloc(PARTID_AVAILABLE, GFP_KERNEL);
+	monitor_free_bitmap = bitmap_zalloc(MONITOR_MAX, GFP_KERNEL);
 	if (!part_id_free_bitmap) {
 		pr_err("Error alloc bitmap\n");
 		return -ENOMEM;
@@ -419,6 +589,7 @@ static void qcom_mpam_configfs_remove(void)
 static int qcom_mpam_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+	struct resource *res;
 	struct mpam_read_cache_portion mpam_param;
 
 	sdev = get_qcom_scmi_device();
@@ -439,9 +610,19 @@ static int qcom_mpam_probe(struct platform_device *pdev)
 	mpam_param.msc_id = 0;
 	mpam_param.part_id = PARTID_MAX - 1;
 	ret = qcom_mpam_get_cache_partition(&mpam_param, &mpam_default_val);
-	if (ret)
+	if (ret) {
 		dev_err(&pdev->dev, "Error getting default value %d\n", ret);
+		mpam_default_val.cpbm = UINT_MAX;
+	}
 	mpam_default_val.capacity = 100;
+	mpam_default_val.dspri = 0;
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mon-base");
+	mpam_mon_base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR_OR_NULL(mpam_mon_base)) {
+		dev_err(&pdev->dev, "Error ioremap mpam_mon_base\n");
+		return -ENODEV;
+	}
 
 	if (IS_ENABLED(CONFIG_QTI_MPAM_CONFIGFS)) {
 		ret = qcom_mpam_configfs_init();

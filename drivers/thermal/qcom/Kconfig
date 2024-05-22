@@ -195,3 +195,60 @@ config QTI_GPU_DUMP_SKIP_COOLING_DEVICE
 	  the feature to update a PMIC SDAM and a SOC cookie which will be checked in
 	  SDI path to disable GFX rail and skip GPU Scan dump when ambient temperature
 	  is more than the recommended threshold.
+
+config QTI_THERMAL_VENDOR_HOOK
+	tristate "QTI thermal vendor hook driver"
+	depends on THERMAL
+	help
+	   This is a placeholder driver for all thermal vendor hook register.
+	   It registers for thermal cooling device stats vendor hook and
+	   disables cooling stats for different thermal cooling devices
+	   selectively.
+
+config QTI_BCL_OFF_COOLING_DEVICE
+	tristate "QTI Ibat threshold update cooling devices"
+	depends on SPMI && THERMAL
+	help
+	   This enables the bcl off cooling devices. These cooling devices will
+	   be used to disable bcl whenever RF calibration is performed using
+	   external power supply. When external power supply is used for RF
+	   calibration, iBat current can cross the battery specs that can trigger
+	   batfet issues. So pmic bcl should be disabled as it is for protection
+	   for battery not external power supply.
+
+config QTI_LMH_CPU_VDD_COOLING_DEVICE
+	tristate "QTI CPU LMH VDD Voltage cooling devices"
+	depends on THERMAL && THERMAL_OF
+	help
+	   This enables the QTI limits hardware CPU VDD cooling devices.
+	   These cooling devices will be used by QTI chipset to place a
+	   request to limits hardware for a minimum CPU railway voltage
+	   corner at cold temperature condition.
+
+config QTI_THERMAL_LIMITS_DCVS
+	tristate "QTI LMH DCVS Driver"
+	depends on THERMAL && CPU_THERMAL
+	help
+	  This enables the driver for Limits Management Hardware - DCVS block
+	  for the application processors. The h/w block that is available for
+	  each cluster can be used to perform quick thermal mitigations by
+	  tracking temperatures of the CPUs and taking thermal action in the
+	  hardware without s/w intervention.
+
+config REGULATOR_COOLING_DEVICE
+	tristate "Regulator voltage floor cooling device"
+	depends on REGULATOR && THERMAL_OF
+	help
+	  This implements a mitigation device to place a minimum voltage floor
+	  on a particular regulator. This mitigation device will be used by low
+	  temperature reliability rules to mitigate a regulator at nominal
+	  voltage.
+
+config QTI_QMI_SENSOR
+	tristate "QTI QMI sensor driver"
+	depends on QCOM_QMI_HELPERS && THERMAL
+	help
+	   This enables to list the QTI remote subsystem temperature sensors.
+	   This driver can read the temperature of the remote sensor.
+	   These sensors can take thresholds and notify the thermal
+	   framework when the threshold is reached.

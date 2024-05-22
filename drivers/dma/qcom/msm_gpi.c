@@ -486,6 +486,7 @@ struct gpi_dev {
 	u32 klog_lvl;
 	struct dentry *dentry;
 	bool is_le_vm;
+	struct mutex qup_se_lock; /* qup SE instance lock */
 };
 
 static struct gpi_dev *gpi_dev_dbg[5];
@@ -1063,6 +1064,7 @@ static void gpi_disable_interrupts(struct gpii *gpii)
 				    default_reg[i].shift,
 				    default_reg[i].val);
 	gpii->cntxt_type_irq_msk = 0;
+	free_irq(gpii->irq, gpii);
 	gpii->configured_irq = false;
 }
 
@@ -1177,9 +1179,8 @@ static int gpi_config_interrupts(struct gpii *gpii,
 		  (mask) ? 'T' : 'F');
 
 	if (!gpii->configured_irq) {
-		ret = devm_request_irq(gpii->gpi_dev->dev, gpii->irq,
-				       gpi_handle_irq, IRQF_TRIGGER_HIGH,
-				       gpii->label, gpii);
+		ret = request_irq(gpii->irq, gpi_handle_irq, IRQF_TRIGGER_HIGH,
+				  gpii->label, gpii);
 		if (ret < 0) {
 			GPII_CRITIC(gpii, GPI_DBG_COMMON,
 				    "error request irq:%d ret:%d\n",
@@ -2443,12 +2444,12 @@ gpi_process_xfer_q2spi_cr_header(struct gpii_chan *gpii_chan,
 	GPII_VERB(gpii_ptr, gpii_chan->chid,
 		  "code:0x%x type:0x%x hdr_0:0x%x hrd_1:0x%x hrd_2:0x%x hdr3:0x%x\n",
 		  q2spi_cr_header_event->code, q2spi_cr_header_event->type,
-		  q2spi_cr_header_event->cr_hdr_0, q2spi_cr_header_event->cr_hdr_1,
-		  q2spi_cr_header_event->cr_hdr_2, q2spi_cr_header_event->cr_hdr_3);
+		  q2spi_cr_header_event->cr_hdr[0], q2spi_cr_header_event->cr_hdr[1],
+		  q2spi_cr_header_event->cr_hdr[2], q2spi_cr_header_event->cr_hdr[3]);
 	GPII_VERB(gpii_ptr, gpii_chan->chid,
 		  "cr_byte_0:0x%x cr_byte_1:0x%x cr_byte_2:0x%x cr_byte_3h:0x%x\n",
-		  q2spi_cr_header_event->cr_ed_byte_0, q2spi_cr_header_event->cr_ed_byte_1,
-		  q2spi_cr_header_event->cr_ed_byte_2, q2spi_cr_header_event->cr_ed_byte_3);
+		  q2spi_cr_header_event->cr_ed_byte[0], q2spi_cr_header_event->cr_ed_byte[1],
+		  q2spi_cr_header_event->cr_ed_byte[2], q2spi_cr_header_event->cr_ed_byte[3]);
 	GPII_VERB(gpii_ptr, gpii_chan->chid, "code:0x%x\n", q2spi_cr_header_event->code);
 	GPII_VERB(gpii_ptr, gpii_chan->chid,
 		  "cr_byte_0_len:0x%x cr_byte_0_err:0x%x type:0x%x ch_id:0x%x\n",
@@ -3721,6 +3722,7 @@ static struct dma_chan *gpi_of_dma_xlate(struct of_phandle_args *args,
 	u32 seid, chid;
 	int gpii, static_gpii_no;
 	struct gpii_chan *gpii_chan;
+	struct dma_chan *dma_chan;
 
 	if (args->args_count < REQ_OF_DMA_ARGS) {
 		GPI_ERR(gpi_dev,
@@ -3735,6 +3737,7 @@ static struct dma_chan *gpi_of_dma_xlate(struct of_phandle_args *args,
 		return NULL;
 	}
 
+	mutex_lock(&gpi_dev->qup_se_lock);
 	seid = args->args[1];
 	static_gpii_no = (args->args[4] & STATIC_GPII_BMSK) >> STATIC_GPII_SHFT;
 
@@ -3745,6 +3748,7 @@ static struct dma_chan *gpi_of_dma_xlate(struct of_phandle_args *args,
 
 	if (gpii < 0) {
 		GPI_ERR(gpi_dev, "no available gpii instances\n");
+		mutex_unlock(&gpi_dev->qup_se_lock);
 		return NULL;
 	}
 
@@ -3752,6 +3756,7 @@ static struct dma_chan *gpi_of_dma_xlate(struct of_phandle_args *args,
 	if (gpii_chan->vc.chan.client_count) {
 		GPI_ERR(gpi_dev, "gpii:%d chid:%d seid:%d already configured\n",
 			gpii, chid, gpii_chan->seid);
+		mutex_unlock(&gpi_dev->qup_se_lock);
 		return NULL;
 	}
 
@@ -3767,8 +3772,9 @@ static struct dma_chan *gpi_of_dma_xlate(struct of_phandle_args *args,
 		"client req gpii:%u chid:%u #_tre:%u prio:%u proto:%u SE:%d init_config:%d\n",
 		gpii, chid, gpii_chan->req_tres, gpii_chan->priority,
 		gpii_chan->protocol, gpii_chan->seid, gpii_chan->init_config);
-
-	return dma_get_slave_channel(&gpii_chan->vc.chan);
+	dma_chan = dma_get_slave_channel(&gpii_chan->vc.chan);
+	mutex_unlock(&gpi_dev->qup_se_lock);
+	return dma_chan;
 }
 
 /* gpi_setup_debug - setup debug capabilities */
@@ -3904,6 +3910,7 @@ static int gpi_probe(struct platform_device *pdev)
 	if (!gpi_dev->gpiis)
 		return -ENOMEM;
 
+	mutex_init(&gpi_dev->qup_se_lock);
 	gpi_dev->is_le_vm = of_property_read_bool(pdev->dev.of_node, "qcom,le-vm");
 	if (gpi_dev->is_le_vm)
 		GPI_LOG(gpi_dev, "LE-VM usecase\n");

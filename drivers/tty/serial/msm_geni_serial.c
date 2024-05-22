@@ -3517,7 +3517,7 @@ static bool handle_rx_dma_xfer(u32 s_irq_status, struct uart_port *uport)
 				     dma_rx_status);
 			msm_geni_update_uart_error_code(msm_port,
 							UART_ERROR_RX_SBE_ERROR);
-			WARN_ON(1);
+			WARN_ON_ONCE(1);
 		}
 
 		if (dma_rx_status & (RX_EOT | RX_GENI_CANCEL_IRQ | RX_DMA_DONE))
@@ -3596,7 +3596,7 @@ static void msm_geni_serial_handle_isr(struct uart_port *uport,
 				 __func__, s_irq_status, m_irq_status);
 		else {
 			msm_geni_update_uart_error_code(msm_port, UART_ERROR_ILLEGAL_INTERRUPT);
-			WARN_ON(1);
+			WARN_ON_ONCE(1);
 		}
 		goto exit_geni_serial_isr;
 	}
@@ -5268,6 +5268,10 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 	ret = uart_add_one_port(drv, uport);
 	if (ret)
 		dev_err(&pdev->dev, "Failed to register uart_port: %d\n", ret);
+
+	/* Ignore dependencies on children by runtime PM framework */
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,suspend-ignore-children"))
+		pm_suspend_ignore_children(uport->dev, true);
 
 	if (is_console)
 		pr_info("boot_kpi: M - DRIVER GENI_CONSOLE_%d Ready\n", line);

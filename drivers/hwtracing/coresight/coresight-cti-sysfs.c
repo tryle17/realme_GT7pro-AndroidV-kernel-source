@@ -114,11 +114,11 @@ static ssize_t enable_store(struct device *dev,
 			return ret;
 		ret = cti_enable(drvdata->csdev, CS_MODE_SYSFS, NULL);
 		if (ret)
-			pm_runtime_put(dev->parent);
+			pm_runtime_put_sync(dev->parent);
 	} else {
 		ret = cti_disable(drvdata->csdev, NULL);
 		if (!ret)
-			pm_runtime_put(dev->parent);
+			pm_runtime_put_sync(dev->parent);
 	}
 
 	if (ret)
@@ -179,8 +179,11 @@ static ssize_t coresight_cti_reg_show(struct device *dev,
 	struct cti_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct cs_off_attribute *cti_attr = container_of(attr, struct cs_off_attribute, attr);
 	u32 val = 0;
+	int ret;
 
-	pm_runtime_get_sync(dev->parent);
+	ret = pm_runtime_resume_and_get(dev->parent);
+	if (ret < 0)
+		return ret;
 	spin_lock(&drvdata->spinlock);
 	if (drvdata->config.hw_powered)
 		val = readl_relaxed(drvdata->base + cti_attr->off);
@@ -197,11 +200,14 @@ static __maybe_unused ssize_t coresight_cti_reg_store(struct device *dev,
 	struct cti_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct cs_off_attribute *cti_attr = container_of(attr, struct cs_off_attribute, attr);
 	unsigned long val = 0;
+	int ret;
 
 	if (kstrtoul(buf, 0, &val))
 		return -EINVAL;
 
-	pm_runtime_get_sync(dev->parent);
+	ret = pm_runtime_resume_and_get(dev->parent);
+	if (ret < 0)
+		return ret;
 	spin_lock(&drvdata->spinlock);
 	if (drvdata->config.hw_powered)
 		cti_write_single_reg(drvdata, cti_attr->off, val);
@@ -605,11 +611,9 @@ static ssize_t triginstatus_show(struct device *dev,
 	ssize_t len = 0;
 	int ret;
 
-	ret = pm_runtime_get_sync(dev->parent);
-	if (ret < 0) {
-		pm_runtime_put_noidle(dev->parent);
+	ret = pm_runtime_resume_and_get(dev->parent);
+	if (ret < 0)
 		return ret;
-	}
 
 	spin_lock(&drvdata->spinlock);
 	if (drvdata->config.hw_powered) {
@@ -643,11 +647,9 @@ static ssize_t trigoutstatus_show(struct device *dev,
 	ssize_t len = 0;
 	int ret;
 
-	ret = pm_runtime_get_sync(dev->parent);
-	if (ret < 0) {
-		pm_runtime_put_noidle(dev->parent);
+	ret = pm_runtime_resume_and_get(dev->parent);
+	if (ret < 0)
 		return ret;
-	}
 
 	spin_lock(&drvdata->spinlock);
 	if (drvdata->config.hw_powered) {
@@ -678,11 +680,9 @@ static ssize_t chinstatus_show(struct device *dev,
 	u32 val = 0;
 	int ret;
 
-	ret = pm_runtime_get_sync(dev->parent);
-	if (ret < 0) {
-		pm_runtime_put_noidle(dev->parent);
+	ret = pm_runtime_resume_and_get(dev->parent);
+	if (ret < 0)
 		return ret;
-	}
 
 	spin_lock(&drvdata->spinlock);
 	if (drvdata->config.hw_powered) {
@@ -705,11 +705,9 @@ static ssize_t choutstatus_show(struct device *dev,
 	u32 val = 0;
 	int ret;
 
-	ret = pm_runtime_get_sync(dev->parent);
-	if (ret < 0) {
-		pm_runtime_put_noidle(dev->parent);
+	ret = pm_runtime_resume_and_get(dev->parent);
+	if (ret < 0)
 		return ret;
-	}
 
 	spin_lock(&drvdata->spinlock);
 	if (drvdata->config.hw_powered) {

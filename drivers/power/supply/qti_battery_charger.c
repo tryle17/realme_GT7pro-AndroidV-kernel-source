@@ -100,6 +100,7 @@ enum battery_property_id {
 	BATT_CHG_CTRL_START_THR,
 	BATT_CHG_CTRL_END_THR,
 	BATT_CURR_AVG,
+	BATT_PARALLEL_CELL_COUNT,
 	BATT_PROP_MAX,
 };
 
@@ -1369,12 +1370,6 @@ static int battery_psy_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TEMP:
 		pval->intval = DIV_ROUND_CLOSEST((int)pst->prop[prop_id], 10);
 		break;
-	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT:
-		pval->intval = bcdev->curr_thermal_level;
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX:
-		pval->intval = bcdev->num_thermal_levels;
-		break;
 	default:
 		pval->intval = pst->prop[prop_id];
 		break;
@@ -1390,8 +1385,6 @@ static int battery_psy_set_prop(struct power_supply *psy,
 	struct battery_chg_dev *bcdev = power_supply_get_drvdata(psy);
 
 	switch (prop) {
-	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT:
-		return battery_psy_set_charge_current(bcdev, pval->intval);
 	case POWER_SUPPLY_PROP_CHARGE_CONTROL_START_THRESHOLD:
 		return battery_psy_set_charge_start_threshold(bcdev,
 								pval->intval);
@@ -1409,7 +1402,6 @@ static int battery_psy_prop_is_writeable(struct power_supply *psy,
 		enum power_supply_property prop)
 {
 	switch (prop) {
-	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT:
 	case POWER_SUPPLY_PROP_CHARGE_CONTROL_START_THRESHOLD:
 	case POWER_SUPPLY_PROP_CHARGE_CONTROL_END_THRESHOLD:
 		return 1;
@@ -2178,6 +2170,26 @@ static ssize_t ship_mode_en_show(const struct class *c,
 }
 static CLASS_ATTR_RW(ship_mode_en);
 
+#define BATT_PARALLEL_CELL_AVAIL_COUNT(val)		FIELD_GET(GENMASK(15, 8), val)
+#define BATT_PARALLEL_CELL_TOTAL_COUNT(val)		FIELD_GET(GENMASK(7, 0), val)
+
+static ssize_t battery_parallel_cell_count_show(const struct class *c,
+			const struct class_attribute *attr, char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev, battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_BATTERY];
+	int rc;
+
+	rc = read_property_id(bcdev, pst, BATT_PARALLEL_CELL_COUNT);
+	if (rc < 0)
+		return rc;
+
+	return scnprintf(buf, PAGE_SIZE, "Parallel battery cell count (available/total): %lu/%lu\n",
+		BATT_PARALLEL_CELL_AVAIL_COUNT(pst->prop[BATT_PARALLEL_CELL_COUNT]),
+		BATT_PARALLEL_CELL_TOTAL_COUNT(pst->prop[BATT_PARALLEL_CELL_COUNT]));
+}
+static CLASS_ATTR_RO(battery_parallel_cell_count);
+
 static struct attribute *battery_class_attrs[] = {
 	&class_attr_soh.attr,
 	&class_attr_resistance.attr,
@@ -2197,6 +2209,7 @@ static struct attribute *battery_class_attrs[] = {
 	&class_attr_usb_real_type.attr,
 	&class_attr_usb_typec_compliant.attr,
 	&class_attr_charge_control_en.attr,
+	&class_attr_battery_parallel_cell_count.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(battery_class);

@@ -240,7 +240,6 @@ enum rt_fastpaths {
 	CLUSTER_PACKING_FASTPATH,
 };
 
-
 static void walt_select_task_rq_rt(void *unused, struct task_struct *task, int cpu,
 					int sd_flag, int wake_flags, int *new_cpu)
 {
@@ -250,6 +249,7 @@ static void walt_select_task_rq_rt(void *unused, struct task_struct *task, int c
 	bool sync = !!(wake_flags & WF_SYNC);
 	int ret, target = -1, this_cpu;
 	struct cpumask *lowest_mask = NULL;
+	int packing_cpu = -1;
 	int fastpath = NONE;
 	struct cpumask lowest_mask_reduced = { CPU_BITS_NONE };
 	struct walt_task_struct *wts;
@@ -301,7 +301,7 @@ static void walt_select_task_rq_rt(void *unused, struct task_struct *task, int c
 	 * requirement of the task - which is only important on heterogeneous
 	 * systems like big.LITTLE.
 	 */
-	may_not_preempt = task_may_not_preempt(curr, cpu);
+	may_not_preempt = cpu_busy_with_softirqs(cpu);
 
 	lowest_mask = this_cpu_cpumask_var_ptr(walt_local_cpu_mask);
 
@@ -311,6 +311,25 @@ static void walt_select_task_rq_rt(void *unused, struct task_struct *task, int c
 	 */
 	ret = cpupri_find_fitness(&task_rq(task)->rd->cpupri, task,
 				lowest_mask, walt_rt_task_fits_capacity);
+
+	packing_cpu = walt_find_and_choose_cluster_packing_cpu(0, task);
+	if (packing_cpu >= 0) {
+		while (packing_cpu < WALT_NR_CPUS) {
+			if (cpumask_test_cpu(packing_cpu, &wts->reduce_mask) &&
+				cpumask_test_cpu(packing_cpu, task->cpus_ptr) &&
+				cpu_active(packing_cpu) &&
+				!cpu_halted(packing_cpu) &&
+				(cpu_rq(packing_cpu)->rt.rt_nr_running <= 1))
+				break;
+			packing_cpu++;
+		}
+
+		if (packing_cpu < WALT_NR_CPUS) {
+			fastpath = CLUSTER_PACKING_FASTPATH;
+			*new_cpu = packing_cpu;
+			goto unlock;
+		}
+	}
 
 	cpumask_and(&lowest_mask_reduced, lowest_mask, &wts->reduce_mask);
 	if (!cpumask_empty(&lowest_mask_reduced))
@@ -338,6 +357,7 @@ static void walt_select_task_rq_rt(void *unused, struct task_struct *task, int c
 		if (target < nr_cpu_ids)
 			*new_cpu = target;
 	}
+unlock:
 	rcu_read_unlock();
 out:
 	trace_sched_select_task_rt(task, fastpath, *new_cpu, lowest_mask);
@@ -348,6 +368,7 @@ static void walt_rt_find_lowest_rq(void *unused, struct task_struct *task,
 				   struct cpumask *lowest_mask, int ret, int *best_cpu)
 
 {
+	int packing_cpu = -1;
 	int fastpath = 0;
 	struct walt_task_struct *wts;
 	struct cpumask lowest_mask_reduced = { CPU_BITS_NONE };
@@ -356,6 +377,25 @@ static void walt_rt_find_lowest_rq(void *unused, struct task_struct *task,
 		return;
 
 	wts = (struct walt_task_struct *) task->android_vendor_data1;
+
+	packing_cpu = walt_find_and_choose_cluster_packing_cpu(0, task);
+	if (packing_cpu >= 0) {
+		while (packing_cpu < WALT_NR_CPUS) {
+			if (cpumask_test_cpu(packing_cpu, &wts->reduce_mask) &&
+				cpumask_test_cpu(packing_cpu, task->cpus_ptr) &&
+				cpu_active(packing_cpu) &&
+				!cpu_halted(packing_cpu) &&
+				(cpu_rq(packing_cpu)->rt.rt_nr_running <= 2))
+				break;
+			packing_cpu++;
+		}
+
+		if (packing_cpu < WALT_NR_CPUS) {
+			fastpath = CLUSTER_PACKING_FASTPATH;
+			*best_cpu = packing_cpu;
+			goto out;
+		}
+	}
 
 	cpumask_and(&lowest_mask_reduced, lowest_mask, &wts->reduce_mask);
 	if (!cpumask_empty(&lowest_mask_reduced))
@@ -370,6 +410,7 @@ static void walt_rt_find_lowest_rq(void *unused, struct task_struct *task,
 	 */
 	if (*best_cpu == -1)
 		cpumask_andnot(lowest_mask, lowest_mask, cpu_halt_mask);
+out:
 	trace_sched_rt_find_lowest_rq(task, fastpath, *best_cpu, lowest_mask);
 }
 

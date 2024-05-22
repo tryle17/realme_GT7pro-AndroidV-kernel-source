@@ -315,6 +315,7 @@ enum {
 	PIPELINE,
 	LOAD_BOOST,
 	REDUCE_AFFINITY,
+	MPAM_PART_ID,
 };
 
 static int sched_task_handler(struct ctl_table *table, int write,
@@ -368,18 +369,21 @@ static int sched_task_handler(struct ctl_table *table, int write,
 					 1000000UL);
 			break;
 		case LOW_LATENCY:
-			pid_and_val[1] = wts->low_latency &
-					 WALT_LOW_LATENCY_PROCFS_BIT;
+			pid_and_val[1] = !!(wts->low_latency &
+					 WALT_LOW_LATENCY_PROCFS_BIT);
 			break;
 		case PIPELINE:
-			pid_and_val[1] = wts->low_latency &
-					 WALT_LOW_LATENCY_PIPELINE_BIT;
+			pid_and_val[1] = !!(wts->low_latency &
+					 WALT_LOW_LATENCY_PIPELINE_BIT);
 			break;
 		case LOAD_BOOST:
 			pid_and_val[1] = wts->load_boost;
 			break;
 		case REDUCE_AFFINITY:
 			pid_and_val[1] = cpumask_bits(&wts->reduce_mask)[0];
+			break;
+		case MPAM_PART_ID:
+			pid_and_val[1] = wts->mpam_part_id;
 			break;
 		default:
 			ret = -EINVAL;
@@ -1427,6 +1431,13 @@ static struct ctl_table walt_table[] = {
 		.maxlen		= sizeof(unsigned int) * MAX_CLUSTERS,
 		.mode		= 0644,
 		.proc_handler	= sched_fmax_cap_handler,
+	},
+	{
+		.procname	= "mpam_part_id",
+		.data		= (int *) MPAM_PART_ID,
+		.maxlen		= sizeof(unsigned int) * 2,
+		.mode		= 0644,
+		.proc_handler	= sched_task_handler,
 	},
 	{ }
 };

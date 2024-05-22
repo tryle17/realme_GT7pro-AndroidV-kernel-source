@@ -20,6 +20,8 @@ qcom_logbuf_boot_log.ko
 qcom-dload-mode.ko
 pinctrl-msm.ko
 pinctrl-sun.ko
+qti_thermal_vendor_hooks.ko
+pinctrl-tuna.ko
 qcom_tsens.ko
 qcom_dma_heaps.ko
 qcom_iommu_util.ko

@@ -841,6 +841,26 @@ static void geni_i2c_irq_handle_watermark(struct geni_i2c_dev *gi2c, u32 m_stat)
 	}
 }
 
+/*
+ * geni_i2c_check_addr_data_nack() - checks whether it is Address Nack or Data Nack
+ *
+ * @gi2c: I2C device handle
+ * @flags: gi2c cur flags
+ *
+ * Return: None
+ */
+
+static void geni_i2c_check_addr_data_nack(struct geni_i2c_dev *gi2c, __u16 flags)
+{
+	if (readl_relaxed(gi2c->base + SE_GENI_M_GP_LENGTH)) {
+		/* only process for write operation. */
+		if (!(flags & I2C_M_RD))
+			geni_i2c_err(gi2c, I2C_DATA_NACK);
+	} else {
+		geni_i2c_err(gi2c, I2C_ADDR_NACK);
+	}
+}
+
 static irqreturn_t geni_i2c_irq(int irq, void *dev)
 {
 	struct geni_i2c_dev *gi2c = dev;
@@ -874,12 +894,8 @@ static irqreturn_t geni_i2c_irq(int irq, void *dev)
 		(m_stat & M_GP_IRQ_1_EN) ||
 		(m_stat & M_GP_IRQ_3_EN) ||
 		(m_stat & M_GP_IRQ_4_EN)) {
-		if (m_stat & M_GP_IRQ_1_EN) {
-			if (readl_relaxed(gi2c->base + SE_GENI_M_GP_LENGTH))
-				geni_i2c_err(gi2c, I2C_DATA_NACK);
-			else
-				geni_i2c_err(gi2c, I2C_ADDR_NACK);
-		}
+		if (m_stat & M_GP_IRQ_1_EN)
+			geni_i2c_check_addr_data_nack(gi2c, gi2c->cur->flags);
 		if (m_stat & M_GP_IRQ_3_EN)
 			geni_i2c_err(gi2c, I2C_BUS_PROTO);
 		if (m_stat & M_GP_IRQ_4_EN)
@@ -969,12 +985,8 @@ static void gi2c_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb_str,
 		break;
 	case MSM_GPI_QUP_NOTIFY:
 	case MSM_GPI_QUP_CH_ERROR:
-		if (m_stat & M_GP_IRQ_1_EN) {
-			if (readl_relaxed(gi2c->base + SE_GENI_M_GP_LENGTH))
-				geni_i2c_err(gi2c, I2C_DATA_NACK);
-			else
-				geni_i2c_err(gi2c, I2C_ADDR_NACK);
-		}
+		if (m_stat & M_GP_IRQ_1_EN)
+			geni_i2c_check_addr_data_nack(gi2c, gi2c->cur->flags);
 		if (m_stat & M_GP_IRQ_3_EN)
 			geni_i2c_err(gi2c, I2C_BUS_PROTO);
 		if (m_stat & M_GP_IRQ_4_EN)
@@ -1003,12 +1015,8 @@ static void gi2c_gsi_cb_err(struct msm_gpi_dma_async_tx_cb_param *cb,
 		I2C_LOG_DBG(gi2c->ipcl, false, gi2c->dev,
 			    "%s TCE Unexpected Err, stat:0x%x\n",
 				xfer, cb->status);
-		if (cb->status & (BIT(GP_IRQ1) << 5)) {
-			if (readl_relaxed(gi2c->base + SE_GENI_M_GP_LENGTH))
-				geni_i2c_err(gi2c, I2C_DATA_NACK);
-			else
-				geni_i2c_err(gi2c, I2C_ADDR_NACK);
-		}
+		if (cb->status & (BIT(GP_IRQ1) << 5))
+			geni_i2c_check_addr_data_nack(gi2c, gi2c->cur->flags);
 		if (cb->status & (BIT(GP_IRQ3) << 5))
 			geni_i2c_err(gi2c, I2C_BUS_PROTO);
 		if (cb->status & (BIT(GP_IRQ4) << 5))
@@ -2230,8 +2238,8 @@ static int geni_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	if (gi2c->prev_cancel_pending) {
 		ret = do_pending_cancel(gi2c);
 		if (ret) {
-			/* for levm skip auto suspend timer */
-			if (!gi2c->is_le_vm) {
+			/* for levm and PM control clients, skip auto suspend timer */
+			if (!gi2c->is_le_vm && !gi2c->pm_ctrl_client) {
 				pm_runtime_mark_last_busy(gi2c->dev);
 				pm_runtime_put_autosuspend(gi2c->dev);
 			}
@@ -2244,8 +2252,8 @@ static int geni_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	if ((geni_ios & 0x3) != 0x3) { //SCL:b'1, SDA:b'0
 		I2C_LOG_ERR(gi2c->ipcl, false, gi2c->dev,
 			    "IO lines in bad state, Power the slave\n");
-		/* for levm skip auto suspend timer */
-		if (!gi2c->is_le_vm) {
+		/* for levm and PM control clients, skip auto suspend timer */
+		if (!gi2c->is_le_vm && !gi2c->pm_ctrl_client) {
 			pm_runtime_mark_last_busy(gi2c->dev);
 			pm_runtime_put_autosuspend(gi2c->dev);
 		}
@@ -2592,8 +2600,8 @@ static int geni_i2c_probe(struct platform_device *pdev)
 	strscpy(gi2c->adap.name, "Geni-I2C", sizeof(gi2c->adap.name));
 
 	pm_runtime_set_suspended(gi2c->dev);
-	/* for levm skip auto suspend timer */
-	if (!gi2c->is_le_vm) {
+	/* for levm and PM control clients skip auto suspend timer */
+	if (!gi2c->is_le_vm && !gi2c->pm_ctrl_client) {
 		pm_runtime_set_autosuspend_delay(gi2c->dev, I2C_AUTO_SUSPEND_DELAY);
 		pm_runtime_use_autosuspend(gi2c->dev);
 	}

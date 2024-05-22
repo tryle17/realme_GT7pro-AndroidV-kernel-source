@@ -42,6 +42,7 @@
 #include "remoteproc_internal.h"
 
 #define ADSP_DECRYPT_SHUTDOWN_DELAY_MS	100
+#define RPROC_HANDOVER_POLL_DELAY_MS	1
 
 #define MAX_ASSIGN_COUNT 2
 
@@ -575,6 +576,9 @@ static int adsp_start(struct rproc *rproc)
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_start", "enter");
 
+	if (adsp->check_status)
+		refcount_set(&adsp->current_users, 0);
+
 	if (adsp->dma_phys_below_32b)
 		dev = adsp->dev;
 
@@ -618,17 +622,19 @@ static int adsp_start(struct rproc *rproc)
 	if (ret)
 		goto disable_px_supply;
 
+	trace_rproc_qcom_event(dev_name(adsp->dev), "dtb_auth_reset", "enter");
+
 	if (adsp->dtb_pas_id) {
-		trace_rproc_qcom_event(dev_name(adsp->dev), "dtb_auth_reset", "enter");
 		ret = qcom_scm_pas_auth_and_reset(adsp->dtb_pas_id);
 		if (ret)
 			panic("Panicking, auth and reset failed for remoteproc %s dtb\n",
 				 rproc->name);
 	}
 
+	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_firmware_loading", "enter");
+
 	ret = qcom_mdt_pas_init(adsp->dev, adsp->firmware, rproc->firmware, adsp->pas_id,
 				adsp->mem_phys, &adsp->pas_metadata, adsp->dma_phys_below_32b);
-	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_firmware_loading", "enter");
 	if (ret)
 		goto disable_px_supply;
 
@@ -643,9 +649,10 @@ static int adsp_start(struct rproc *rproc)
 	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_auth_reset", "enter");
 
 	ret = qcom_scm_pas_auth_and_reset(adsp->pas_id);
+
+	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_auth_reset", "exit");
 	if (ret)
 		panic("Panicking, auth and reset failed for remoteproc %s\n", rproc->name);
-	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_auth_reset", "exit");
 
 	if (!qcom_pil_timeouts_disabled()) {
 		ret = qcom_q6v5_wait_for_start(&adsp->q6v5, msecs_to_jiffies(5000));
@@ -763,6 +770,16 @@ static int rproc_find_status_register(struct qcom_adsp *adsp)
 
 	return 0;
 }
+static bool rproc_poll_handover(struct qcom_adsp *adsp)
+{
+	unsigned int retry_num = 50;
+
+	do {
+		msleep(RPROC_HANDOVER_POLL_DELAY_MS);
+	} while (!adsp->q6v5.handover_issued && --retry_num);
+
+	return adsp->q6v5.handover_issued;
+}
 /*
  * rproc_set_state: Request the SOCCP to change state
  *
@@ -784,9 +801,15 @@ int rproc_set_state(struct rproc *rproc, bool state)
 		pr_err("no rproc or adsp\n");
 		return -EINVAL;
 	}
-	if (rproc->state != RPROC_RUNNING) {
+	if (!adsp->q6v5.running) {
 		dev_err(adsp->dev, "rproc is not running\n");
 		return -EINVAL;
+	} else if (!adsp->q6v5.handover_issued) {
+		dev_err(adsp->dev, "rproc is running but handover is not received\n");
+		if (!rproc_poll_handover(adsp)) {
+			dev_err(adsp->dev, "retry for handover timedout\n");
+			return -EINVAL;
+		}
 	}
 
 	mutex_lock(&adsp->adsp_lock);
@@ -1175,7 +1198,8 @@ static int adsp_setup_32b_dma_allocs(struct qcom_adsp *adsp)
 	if (!adsp->dma_phys_below_32b)
 		return 0;
 
-	ret = of_reserved_mem_device_init_by_idx(adsp->dev, adsp->dev->of_node, 2);
+	ret = of_reserved_mem_device_init_by_idx(adsp->dev, adsp->dev->of_node,
+			adsp->dtb_firmware_name ? 2 : 1);
 	if (ret) {
 		dev_err(adsp->dev,
 			"Unable to get the CMA area for performing dma_alloc_* calls\n");
@@ -1194,7 +1218,7 @@ static void rproc_recovery_set(struct rproc *rproc)
 {
 	struct qcom_adsp *adsp = (struct qcom_adsp *)rproc->priv;
 
-	if (strnstr(rproc->name, "spss", sizeof(rproc->name)))
+	if (strnstr(rproc->name, "spss", strlen(rproc->name)))
 		return;
 
 	adsp->subsys_recovery_disabled = rproc->recovery_disabled;
@@ -1917,6 +1941,99 @@ static const struct adsp_data pineapple_mpss_resource = {
 	.dma_phys_below_32b = true,
 };
 
+static const struct adsp_data parrot_adsp_resource = {
+	.crash_reason_smem = 423,
+	.firmware_name = "adsp.mdt",
+	.pas_id = 1,
+	.minidump_id = 5,
+	.load_state = "adsp",
+	.ssr_name = "lpass",
+	.sysmon_name = "adsp",
+	.ssctl_id = 0x14,
+	.uses_elf64 = true,
+	.auto_boot = false,
+};
+
+static const struct adsp_data parrot_cdsp_resource = {
+	.crash_reason_smem = 601,
+	.firmware_name = "cdsp.mdt",
+	.pas_id = 18,
+	.minidump_id = 7,
+	.load_state = "cdsp",
+	.uses_elf64 = true,
+	.auto_boot = false,
+	.ssr_name = "cdsp",
+	.sysmon_name = "cdsp",
+	.ssctl_id = 0x17,
+};
+
+static const struct adsp_data parrot_mpss_resource = {
+	.crash_reason_smem = 421,
+	.firmware_name = "modem.mdt",
+	.pas_id = 4,
+	.minidump_id = 3,
+	.load_state = "modem",
+	.uses_elf64 = true,
+	.auto_boot = false,
+	.ssr_name = "mpss",
+	.sysmon_name = "modem",
+	.ssctl_id = 0x12,
+	.dma_phys_below_32b = true,
+	.decrypt_shutdown = true,
+};
+
+static const struct adsp_data parrot_wpss_resource = {
+	.crash_reason_smem = 626,
+	.firmware_name = "wpss.mdt",
+	.pas_id = 6,
+	.minidump_id = 4,
+	.load_state = "wpss",
+	.uses_elf64 = true,
+	.ssr_name = "wpss",
+	.sysmon_name = "wpss",
+	.ssctl_id = 0x19,
+};
+
+static const struct adsp_data ravelin_adsp_resource = {
+	.crash_reason_smem = 423,
+	.firmware_name = "adsp.mdt",
+	.pas_id = 1,
+	.minidump_id = 5,
+	.load_state = "adsp",
+	.ssr_name = "lpass",
+	.sysmon_name = "adsp",
+	.ssctl_id = 0x14,
+	.uses_elf64 = true,
+	.auto_boot = false,
+};
+
+static const struct adsp_data ravelin_mpss_resource = {
+	.crash_reason_smem = 421,
+	.firmware_name = "modem.mdt",
+	.pas_id = 4,
+	.minidump_id = 3,
+	.load_state = "modem",
+	.uses_elf64 = true,
+	.auto_boot = false,
+	.ssr_name = "mpss",
+	.sysmon_name = "modem",
+	.ssctl_id = 0x12,
+	.dma_phys_below_32b = true,
+	.decrypt_shutdown = true,
+};
+
+static const struct adsp_data ravelin_wpss_resource = {
+	.crash_reason_smem = 626,
+	.firmware_name = "wpss.mdt",
+	.pas_id = 6,
+	.minidump_id = 4,
+	.load_state = "wpss",
+	.uses_elf64 = true,
+	.ssr_name = "wpss",
+	.sysmon_name = "wpss",
+	.ssctl_id = 0x19,
+};
+
 static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,msm8226-adsp-pil", .data = &adsp_resource_init},
 	{ .compatible = "qcom,msm8953-adsp-pil", .data = &msm8996_adsp_resource},
@@ -1972,6 +2089,13 @@ static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,sun-cdsp-pas", .data = &sun_cdsp_resource},
 	{ .compatible = "qcom,sun-modem-pas", .data = &sun_mpss_resource},
 	{ .compatible = "qcom,sun-soccp-pas", .data = &sun_soccp_resource},
+	{ .compatible = "qcom,parrot-adsp-pas", .data = &parrot_adsp_resource},
+	{ .compatible = "qcom,parrot-cdsp-pas", .data = &parrot_cdsp_resource},
+	{ .compatible = "qcom,parrot-modem-pas", .data = &parrot_mpss_resource},
+	{ .compatible = "qcom,parrot-wpss-pas", .data = &parrot_wpss_resource},
+	{ .compatible = "qcom,ravelin-adsp-pas", .data = &ravelin_adsp_resource},
+	{ .compatible = "qcom,ravelin-modem-pas", .data = &ravelin_mpss_resource},
+	{ .compatible = "qcom,ravelin-wpss-pas", .data = &ravelin_wpss_resource},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, adsp_of_match);

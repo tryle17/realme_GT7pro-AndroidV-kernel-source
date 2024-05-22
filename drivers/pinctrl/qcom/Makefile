@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Qualcomm pin control drivers
 obj-$(CONFIG_PINCTRL_MSM)	+= pinctrl-msm.o
+obj-$(CONFIG_PINCTRL_TUNA)	+= pinctrl-tuna.o
 obj-$(CONFIG_PINCTRL_SUN)	+= pinctrl-sun.o
 obj-$(CONFIG_PINCTRL_RAVELIN) += pinctrl-ravelin.o
 obj-$(CONFIG_PINCTRL_PINEAPPLE) += pinctrl-pineapple.o
@@ -64,3 +65,5 @@ obj-$(CONFIG_PINCTRL_SM8550) += pinctrl-sm8550.o
 obj-$(CONFIG_PINCTRL_SM8550_LPASS_LPI) += pinctrl-sm8550-lpass-lpi.o
 obj-$(CONFIG_PINCTRL_SC8280XP_LPASS_LPI) += pinctrl-sc8280xp-lpass-lpi.o
 obj-$(CONFIG_PINCTRL_LPASS_LPI) += pinctrl-lpass-lpi.o
+obj-$(CONFIG_PINCTRL_X1E80100) += pinctrl-x1e80100.o
+obj-$(CONFIG_PINCTRL_MONACO) += pinctrl-monaco.o

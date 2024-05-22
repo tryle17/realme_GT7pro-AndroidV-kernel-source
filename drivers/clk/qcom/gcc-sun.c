@@ -22,7 +22,6 @@
 #include "clk-regmap-divider.h"
 #include "clk-regmap-mux.h"
 #include "common.h"
-#include "gdsc.h"
 #include "reset.h"
 #include "vdd-level.h"
 
@@ -833,6 +832,22 @@ static struct clk_rcg2 gcc_qupv3_i2c_s9_clk_src = {
 };
 
 static const struct freq_tbl ftbl_gcc_qupv3_wrap1_qspi_ref_clk_src[] = {
+	F(7372800, P_GCC_GPLL0_OUT_EVEN, 1, 384, 15625),
+	F(14745600, P_GCC_GPLL0_OUT_EVEN, 1, 768, 15625),
+	F(19200000, P_BI_TCXO, 1, 0, 0),
+	F(29491200, P_GCC_GPLL0_OUT_EVEN, 1, 1536, 15625),
+	F(32000000, P_GCC_GPLL0_OUT_EVEN, 1, 8, 75),
+	F(48000000, P_GCC_GPLL0_OUT_EVEN, 1, 4, 25),
+	F(51200000, P_GCC_GPLL0_OUT_EVEN, 1, 64, 375),
+	F(64000000, P_GCC_GPLL0_OUT_EVEN, 1, 16, 75),
+	F(75000000, P_GCC_GPLL0_OUT_EVEN, 4, 0, 0),
+	F(80000000, P_GCC_GPLL0_OUT_EVEN, 1, 4, 15),
+	F(96000000, P_GCC_GPLL0_OUT_EVEN, 1, 8, 25),
+	F(100000000, P_GCC_GPLL0_OUT_MAIN, 6, 0, 0),
+	F(102400000, P_GCC_GPLL0_OUT_EVEN, 1, 128, 375),
+	F(112000000, P_GCC_GPLL0_OUT_EVEN, 1, 28, 75),
+	F(117964800, P_GCC_GPLL0_OUT_EVEN, 1, 6144, 15625),
+	F(120000000, P_GCC_GPLL0_OUT_MAIN, 5, 0, 0),
 	F(150000000, P_GCC_GPLL0_OUT_EVEN, 2, 0, 0),
 	F(250000000, P_GCC_GPLL7_OUT_MAIN, 2, 0, 0),
 	{ }
@@ -3414,36 +3429,6 @@ static struct clk_branch gcc_video_axi1_clk = {
 	},
 };
 
-static struct gdsc gcc_pcie_0_gdsc = {
-	.gdscr = 0x6b004,
-	.en_rest_wait_val = 0x2,
-	.en_few_wait_val = 0x2,
-	.clk_dis_wait_val = 0xf,
-	.collapse_ctrl = 0x5214c,
-	.collapse_mask = BIT(0),
-	.pd = {
-		.name = "gcc_pcie_0_gdsc",
-	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | VOTABLE,
-	.supply = "vdd_cx",
-};
-
-static struct gdsc gcc_pcie_0_phy_gdsc = {
-	.gdscr = 0x6c000,
-	.en_rest_wait_val = 0x2,
-	.en_few_wait_val = 0x2,
-	.clk_dis_wait_val = 0x2,
-	.collapse_ctrl = 0x5214c,
-	.collapse_mask = BIT(2),
-	.pd = {
-		.name = "gcc_pcie_0_phy_gdsc",
-	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE | VOTABLE,
-	.supply = "vdd_mx",
-};
-
 static struct clk_regmap *gcc_sun_clocks[] = {
 	[GCC_AGGRE_NOC_PCIE_AXI_CLK] = &gcc_aggre_noc_pcie_axi_clk.clkr,
 	[GCC_AGGRE_UFS_PHY_AXI_CLK] = &gcc_aggre_ufs_phy_axi_clk.clkr,
@@ -3607,11 +3592,6 @@ static struct clk_regmap *gcc_sun_clocks[] = {
 	[GCC_VIDEO_AXI1_CLK] = &gcc_video_axi1_clk.clkr,
 };
 
-static struct gdsc *gcc_sun_gdscs[] = {
-	[GCC_PCIE_0_GDSC] = &gcc_pcie_0_gdsc,
-	[GCC_PCIE_0_PHY_GDSC] = &gcc_pcie_0_phy_gdsc,
-};
-
 static const struct qcom_reset_map gcc_sun_resets[] = {
 	[GCC_CAMERA_BCR] = { 0x26000 },
 	[GCC_DISPLAY_BCR] = { 0x27000 },
@@ -3649,6 +3629,7 @@ static const struct qcom_reset_map gcc_sun_resets[] = {
 	[GCC_VIDEO_BCR] = { 0x32000 },
 };
 
+
 static const struct clk_rcg_dfs_data gcc_dfs_clocks[] = {
 	DEFINE_RCG_DFS(gcc_qupv3_wrap1_qspi_ref_clk_src),
 	DEFINE_RCG_DFS(gcc_qupv3_wrap1_s0_clk_src),
@@ -3684,8 +3665,6 @@ static const struct qcom_cc_desc gcc_sun_desc = {
 	.num_resets = ARRAY_SIZE(gcc_sun_resets),
 	.clk_regulators = gcc_sun_regulators,
 	.num_clk_regulators = ARRAY_SIZE(gcc_sun_regulators),
-	.gdscs = gcc_sun_gdscs,
-	.num_gdscs = ARRAY_SIZE(gcc_sun_gdscs),
 };
 
 static const struct of_device_id gcc_sun_match_table[] = {

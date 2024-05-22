@@ -83,7 +83,7 @@ enum freq_caps {
 #define	SOC_ENABLE_BOOST_TO_NEXT_CLUSTER_BIT		BIT(5)
 #define	SOC_ENABLE_SW_CYCLE_COUNTER_BIT			BIT(6)
 #define SOC_ENABLE_COLOCATION_PLACEMENT_BOOST_BIT	BIT(7)
-
+#define SOC_ENABLE_FT_BOOST_TO_ALL			BIT(8)
 
 #define WALT_FEAT_TRAILBLAZER_BIT	BIT_ULL(0)
 extern unsigned int trailblazer_floor_freq[MAX_CLUSTERS];
@@ -221,7 +221,8 @@ extern void fmax_uncap_checkpoint(int nr_big, u64 window_start, u32 wakeup_ctr_s
 extern void walt_fill_ta_data(struct core_ctl_notif_data *data);
 extern int sched_set_group_id(struct task_struct *p, unsigned int group_id);
 extern unsigned int sched_get_group_id(struct task_struct *p);
-extern void core_ctl_check(u64 wallclock, u32 wakeup_ctr_sum);
+extern void core_ctl_check(u64 wallclock, u32 wakeup_ctr_sum,
+		u32 prime_wakeup_ctr_sum);
 extern int core_ctl_set_cluster_boost(int idx, bool boost);
 extern int sched_set_boost(int enable);
 extern void walt_boost_init(void);
@@ -300,9 +301,11 @@ extern unsigned int sysctl_em_inflate_pct;
 extern unsigned int sysctl_em_inflate_thres;
 extern unsigned int sysctl_sched_heavy_nr;
 
-extern int cpufreq_walt_set_adaptive_freq(unsigned int cpu, unsigned int adaptive_low_freq,
+extern int cpufreq_walt_set_adaptive_freq(unsigned int cpu, unsigned int adaptive_level_1,
+					  unsigned int adaptive_low_freq,
 					  unsigned int adaptive_high_freq);
-extern int cpufreq_walt_get_adaptive_freq(unsigned int cpu, unsigned int *adaptive_low_freq,
+extern int cpufreq_walt_get_adaptive_freq(unsigned int cpu, unsigned int *adaptive_level_1,
+					  unsigned int *adaptive_low_freq,
 					  unsigned int *adaptive_high_freq);
 extern int cpufreq_walt_reset_adaptive_freq(unsigned int cpu);
 
@@ -431,6 +434,7 @@ extern cpumask_t cpus_for_pipeline;
 #define CPUFREQ_REASON_PARTIAL_HALT_CAP_BIT	BIT(14)
 #define CPUFREQ_REASON_TRAILBLAZER_STATE_BIT	BIT(15)
 #define CPUFREQ_REASON_TRAILBLAZER_CPU_BIT	BIT(16)
+#define CPUFREQ_REASON_ADAPTIVE_LVL_1_BIT	BIT(17)
 
 enum sched_boost_policy {
 	SCHED_BOOST_NONE,
@@ -1311,4 +1315,8 @@ static inline void walt_lockdep_assert(int cond, int cpu, struct task_struct *p)
 #define walt_lockdep_assert_rq(rq, p)			\
 	walt_lockdep_assert_held(&rq->__lock, cpu_of(rq), p)
 
+extern void pipeline_check(struct walt_rq *wrq);
+extern bool enable_load_sync(int cpu);
+extern unsigned int enable_pipeline_boost;
+extern struct walt_related_thread_group *lookup_related_thread_group(unsigned int group_id);
 #endif /* _WALT_H */

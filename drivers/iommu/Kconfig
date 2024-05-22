@@ -344,6 +344,15 @@ config ARM_SMMU
 	  Say Y here if your SoC includes an IOMMU device implementing
 	  the ARM SMMU architecture.
 
+config ARM_SMMU_CONTEXT_FAULT_RETRY
+        bool "Context fault retry sequence"
+        depends on ARM_SMMU && (ARCH_WAIPIO || ARCH_PARROT)
+        help
+          In some cases, issuing a tlb invalidate operation after a
+          context fault may cause a subsequent retry of the failing
+          address to succeed. Only applies to clients which have
+          stall-on-fault enabled, like display.
+
 config ARM_SMMU_LEGACY_DT_BINDINGS
 	bool "Support the legacy \"mmu-masters\" devicetree bindings"
 	depends on ARM_SMMU=y && OF
@@ -461,6 +470,15 @@ config ARM_SMMU_V3_SVA
 
 	  Say Y here if your system supports SVA extensions such as PCIe PASID
 	  and PRI.
+
+config ARM_SMMU_V3_PKVM
+	tristate "ARM SMMUv3 support for protected Virtual Machines"
+	depends on KVM && ARM64
+	help
+	  Enable a SMMUv3 driver in the KVM hypervisor, to protect VMs against
+	  memory accesses from devices owned by the host.
+
+	  Say Y here if you intend to enable KVM in protected mode.
 
 config S390_IOMMU
 	def_bool y if S390 && PCI

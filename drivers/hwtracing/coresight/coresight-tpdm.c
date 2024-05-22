@@ -4367,7 +4367,7 @@ static int tpdm_probe(struct amba_device *adev, const struct amba_id *id)
 	if (boot_enable)
 		coresight_enable(drvdata->csdev);
 
-	pm_runtime_put(&adev->dev);
+	pm_runtime_put_sync(&adev->dev);
 
 	return 0;
 }

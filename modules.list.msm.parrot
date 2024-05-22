@@ -2,17 +2,17 @@
 # Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
 gh_virt_wdt.ko
 qcom-pmu-lib.ko
-qcom_wdt_core.ko
 dcvs_fp.ko
 qcom-dcvs.ko
 clk-dummy.ko
 clk-rpmh.ko
 clk-qcom.ko
 gdsc-regulator.ko
+gcc-parrot.ko
+dispcc-parrot.ko
 sched-walt.ko
 sched-walt-debug.ko
 qcom_wdt_core.ko
-icc-rpmh.ko
 qcom_cpucp.ko
 qcom_ipc_logging.ko
 qcom-pdc.ko
@@ -23,8 +23,11 @@ arm_smmu.ko
 cmd-db.ko
 gh_msgq.ko
 gh_rm_drv.ko
+icc-rpmh.ko
 icc-bcm-voter.ko
 icc-debug.ko
+qnoc-qos.ko
+qnoc-parrot.ko
 iommu-logger.ko
 mem_buf_dev.ko
 mem_buf.ko
@@ -32,6 +35,7 @@ minidump.ko
 msm_dma_iommu_mapping.ko
 ns.ko
 pinctrl-msm.ko
+pinctrl-parrot.ko
 qcom_cpu_vendor_hooks.ko
 qcom-dload-mode.ko
 qcom_dma_heaps.ko
@@ -39,7 +43,6 @@ qcom_hwspinlock.ko
 qcom_iommu_util.ko
 qcom_rpmh.ko
 qcom-scm.ko
-qnoc-qos.ko
 qrtr.ko
 secure_buffer.ko
 smem.ko
@@ -51,6 +54,8 @@ cqhci.ko
 sdhci-msm.ko
 phy-qcom-ufs.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
+ufs-qcom.ko
+phy-qcom-ufs-qmp-v4-waipio.ko
 debug-regulator.ko
 gh_arm_drv.ko
 gh_dbl.ko
@@ -66,7 +71,6 @@ rtc-pm8xxx.ko
 ufshcd-crypto-qti.ko
 bcl_pmic5.ko
 cpu_phys_log_map.ko
-qcom_scmi_client.ko
 gunyah_platform_hooks.ko
 gunyah_hypercall.ko
 gunyah-msgq.ko
@@ -77,3 +81,5 @@ debug_symbol.ko
 mem_buf_msgq.ko
 gunyah.ko
 mdt_loader.ko
+qcom-ipcc.ko
+nvmem_qfprom.ko

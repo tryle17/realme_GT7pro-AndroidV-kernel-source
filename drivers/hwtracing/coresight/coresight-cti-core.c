@@ -497,6 +497,7 @@ int cti_channel_trig_op(struct device *dev, enum cti_chan_op op,
 	else
 		config->ctiouten[trigger_idx] = reg_value;
 
+	spin_unlock(&drvdata->spinlock);
 	if (op == CTI_CHAN_ATTACH) {
 		if (direction == CTI_TRIG_IN &&
 			drvdata->gpio_trigin->trig == trigger_idx)
@@ -512,6 +513,7 @@ int cti_channel_trig_op(struct device *dev, enum cti_chan_op op,
 			drvdata->gpio_trigout->trig == trigger_idx)
 			cti_trigout_gpio_disable(drvdata);
 	}
+	spin_lock(&drvdata->spinlock);
 
 	/* write through if enabled */
 	if (cti_active(config))
@@ -1135,7 +1137,7 @@ static int cti_probe(struct amba_device *adev, const struct amba_id *id)
 
 	drvdata->extended_cti = is_extended_cti(dev);
 	/* all done - dec pm refcount */
-	pm_runtime_put(&adev->dev);
+	pm_runtime_put_sync(&adev->dev);
 	dev_info(&drvdata->csdev->dev, "CTI initialized\n");
 	return 0;
 
