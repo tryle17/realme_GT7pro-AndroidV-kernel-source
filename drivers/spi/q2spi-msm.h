@@ -718,7 +718,7 @@ struct q2spi_packet {
 void q2spi_doorbell(struct q2spi_geni *q2spi, const struct qup_q2spi_cr_header_event *event);
 void q2spi_gsi_ch_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb, void *ptr);
 void q2spi_geni_se_dump_regs(struct q2spi_geni *q2spi);
-void q2spi_dump_ipc(struct q2spi_geni *q2spi, void *ipc_ctx, char *prefix, char *str, int size);
+void q2spi_dump_ipc(struct q2spi_geni *q2spi, char *prefix, char *str, int size);
 void q2spi_trace_log(struct device *dev, const char *fmt, ...);
 void dump_ipc(struct q2spi_geni *q2spi, void *ctx, char *prefix, char *str, int size);
 void *q2spi_kzalloc(struct q2spi_geni *q2spi, int size, int line);
