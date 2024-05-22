@@ -51,7 +51,6 @@ def define_parrot():
         "drivers/hwtracing/coresight/coresight-tmc-sec.ko",
         "drivers/hwtracing/coresight/coresight-tpda.ko",
         "drivers/hwtracing/coresight/coresight-tpdm.ko",
-        "drivers/hwtracing/coresight/coresight-trace-noc.ko",
         "drivers/hwtracing/stm/stm_console.ko",
         "drivers/hwtracing/stm/stm_core.ko",
         "drivers/hwtracing/stm/stm_ftrace.ko",
@@ -181,8 +180,6 @@ def define_parrot():
         "drivers/soc/qcom/sys_pm_vx.ko",
         "drivers/soc/qcom/sysmon_subsystem_stats.ko",
         "drivers/soc/qcom/tmecom/tmecom-intf.ko",
-        "drivers/soc/qcom/wcd_usbss_i2c.ko",
-        "drivers/spi/q2spi-geni.ko",
         "drivers/spi/spi-msm-geni.ko",
         "drivers/spmi/spmi-pmic-arb.ko",
         "drivers/spmi/spmi-pmic-arb-debug.ko",
@@ -237,7 +234,6 @@ def define_parrot():
         "net/qrtr/qrtr-gunyah.ko",
         "net/qrtr/qrtr-mhi.ko",
         "net/qrtr/qrtr-smd.ko",
-        "net/qrtr/qrtr-tun.ko",
     ]
 
     _parrot_consolidate_in_tree_modules = _parrot_in_tree_modules + [
