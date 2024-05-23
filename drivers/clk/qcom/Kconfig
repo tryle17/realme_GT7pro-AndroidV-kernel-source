@@ -1313,4 +1313,13 @@ config SM_GCC_TUNA
 	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
 	  USB, SD/UFS, PCIe etc.
 
+config SM_TCSRCC_TUNA
+	tristate "Tuna Top-Level CSR Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the TCSR clock controller on Qualcomm Technologies, Inc
+	  Tuna devices.
+	  Say Y if you want to support miscellaneous top-level clocks
+	  such as for the PHY references.
+
 endif

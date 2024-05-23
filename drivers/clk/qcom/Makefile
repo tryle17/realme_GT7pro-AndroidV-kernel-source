@@ -138,6 +138,7 @@ obj-$(CONFIG_SM_DISPCC_PINEAPPLE) += dispcc-pineapple.o
 obj-$(CONFIG_SM_DEBUGCC_PINEAPPLE) += debugcc-pineapple.o
 obj-$(CONFIG_SM_GPUCC_PINEAPPLE) += gpucc-pineapple.o
 obj-$(CONFIG_SM_TCSRCC_PINEAPPLE) += tcsrcc-pineapple.o
+obj-$(CONFIG_SM_TCSRCC_TUNA) += tcsrcc-tuna.o
 obj-$(CONFIG_SM_CAMCC_SUN) += camcc-sun.o
 obj-$(CONFIG_SM_EVACC_SUN) += evacc-sun.o
 obj-$(CONFIG_SM_GPUCC_SUN) += gpucc-sun.o
