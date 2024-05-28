@@ -1443,4 +1443,22 @@ config SM_GCC_KERA
 	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
 	  USB, SD/UFS, PCIe etc.
 
+config SM_CAMCC_TUNA
+        tristate "TUNA Camera Clock Controller"
+        depends on SM_GCC_TUNA
+        help
+          Support for the camera clock controller on Qualcomm Technologies, Inc
+          Tuna devices.
+          Say Y if you want to support camera devices and functionality such as
+          capturing pictures.
+
+config SM_CAMBISTMCLKCC_TUNA
+	tristate "TUNA CAMBISTMCLK Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the CAMBISTMCLK clock controller on Qualcomm Technologies,
+	  Inc Tuna devices.
+	  Say Y if you want to support camera devices for a better low-latency
+	  clock.
+
 endif
