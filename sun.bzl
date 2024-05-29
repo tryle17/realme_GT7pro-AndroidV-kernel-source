@@ -27,6 +27,7 @@ def define_sun():
         "drivers/clk/qcom/gcc-tuna.ko",
         "drivers/clk/qcom/gdsc-regulator.ko",
         "drivers/clk/qcom/gpucc-sun.ko",
+        "drivers/clk/qcom/gpucc-tuna.ko",
         "drivers/clk/qcom/tcsrcc-sun.ko",
         "drivers/clk/qcom/tcsrcc-tuna.ko",
         "drivers/clk/qcom/videocc-sun.ko",
