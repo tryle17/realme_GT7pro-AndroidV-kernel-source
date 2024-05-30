@@ -1323,6 +1323,7 @@ out:
 	return ret;
 }
 
+bool now_is_sbt;
 /**
  * sbt_ctl_check
  *
@@ -1336,7 +1337,7 @@ out:
 void sbt_ctl_check(u32 prime_wakeup_ctr_sum)
 {
 	static int prev_is_sbt_windows;
-	bool now_is_sbt = core_ctl_is_sbt(prev_is_sbt_windows, prime_wakeup_ctr_sum);
+	now_is_sbt = core_ctl_is_sbt(prev_is_sbt_windows, prime_wakeup_ctr_sum);
 	cpumask_t local_cpus;
 
 	/* if there are cpus to adjust */
@@ -1345,11 +1346,11 @@ void sbt_ctl_check(u32 prime_wakeup_ctr_sum)
 		if (prev_is_sbt == now_is_sbt) {
 			if (prev_is_sbt_windows < sysctl_sched_sbt_delay_windows)
 				prev_is_sbt_windows = sysctl_sched_sbt_delay_windows;
-			return;
+			goto out;
 		}
 
 		if (now_is_sbt && prev_is_sbt_windows-- > 0)
-			return;
+			goto out;
 
 		cpumask_copy(&local_cpus, &cpus_for_sbt_pause);
 
@@ -1363,6 +1364,8 @@ void sbt_ctl_check(u32 prime_wakeup_ctr_sum)
 		prev_is_sbt_windows = sysctl_sched_sbt_delay_windows;
 	}
 	prev_is_sbt = now_is_sbt;
+out:
+	core_ctl_set_cluster_boost(num_sched_clusters - 1, is_obet);
 }
 
 /*

@@ -4665,6 +4665,70 @@ static void android_rvh_tick_entry(void *unused, struct rq *rq)
 		waltgov_run_callback(rq, WALT_CPUFREQ_EARLY_DET_BIT);
 }
 
+bool is_sbt_or_oscillate(void)
+{
+	return now_is_sbt || (oscillate_cpu != -1);
+}
+
+bool should_boost_bus_dcvs(void)
+{
+	trace_sched_boost_bus_dcvs(oscillate_cpu);
+
+	return (oscillate_cpu != -1) || is_storage_boost();
+}
+EXPORT_SYMBOL_GPL(should_boost_bus_dcvs);
+
+/*
+ * oscillate_cpu = {-1, cpu} tells if system is currently rotating a big
+ * task between Prime CPUs and on which CPU the big task is currently
+ * executing.
+ * If it is -1, no big task oscillation is occurring.
+ */
+int oscillate_cpu = -1;
+static struct hrtimer walt_oscillate_timer;
+
+bool should_oscillate(void)
+{
+	int cpu;
+	int is_only_one_cpu_active = 0;
+	int this_cpu = raw_smp_processor_id();
+	int thermal_pressure = arch_scale_thermal_pressure(this_cpu);
+
+	if (!thermal_pressure)
+		return false;
+
+	if (!is_obet)
+		return false;
+
+	if (!is_max_possible_cluster_cpu(this_cpu))
+		return false;
+
+	if (cpumask_weight(&cpu_array[0][num_sched_clusters - 1]) == 1)
+		return false;
+
+	for_each_cpu(cpu, &cpu_array[0][num_sched_clusters - 1]) {
+		is_only_one_cpu_active += !available_idle_cpu(cpu);
+	}
+	if (is_only_one_cpu_active != 1)
+		return false;
+
+	return true;
+}
+
+static void should_oscillate_tick(void)
+{
+	int this_cpu = raw_smp_processor_id();
+
+	if (should_oscillate()) {
+		if (oscillate_cpu == -1) {
+			hrtimer_start(&walt_oscillate_timer,
+					ns_to_ktime(oscillate_period_ns),
+				HRTIMER_MODE_REL_PINNED_HARD);
+			oscillate_cpu = this_cpu;
+		}
+	}
+}
+
 static void android_vh_scheduler_tick(void *unused, struct rq *rq)
 {
 	struct walt_related_thread_group *grp;
@@ -4693,6 +4757,9 @@ static void android_vh_scheduler_tick(void *unused, struct rq *rq)
 	rcu_read_unlock();
 
 	walt_lb_tick(rq);
+
+	if (soc_feat(SOC_ENABLE_OSCILLATE_ON_THERMALS))
+		should_oscillate_tick();
 }
 
 static void android_rvh_schedule(void *unused, struct task_struct *prev,
@@ -4711,6 +4778,18 @@ static void android_rvh_schedule(void *unused, struct task_struct *prev,
 			wts->last_sleep_ts = wallclock;
 		walt_update_task_ravg(prev, rq, PUT_PREV_TASK, wallclock, 0);
 		walt_update_task_ravg(next, rq, PICK_NEXT_TASK, wallclock, 0);
+		if (soc_feat(SOC_ENABLE_OSCILLATE_ON_THERMALS) &&
+				oscillate_cpu == raw_smp_processor_id()) {
+			if (should_oscillate()) {
+				if (!hrtimer_active(&walt_oscillate_timer)) {
+					hrtimer_start(&walt_oscillate_timer,
+						ns_to_ktime(oscillate_period_ns),
+						HRTIMER_MODE_REL_PINNED_HARD);
+				}
+			} else {
+				oscillate_cpu = -1;
+			}
+		}
 	} else {
 		walt_update_task_ravg(prev, rq, TASK_UPDATE, wallclock, 0);
 	}
@@ -5010,6 +5089,11 @@ static void walt_init(struct work_struct *work)
 	if (i >= 0) {
 		static_key_disable(&sched_feat_keys[i]);
 		sysctl_sched_features &= ~(1UL << i);
+	}
+
+	if (soc_feat(SOC_ENABLE_OSCILLATE_ON_THERMALS)) {
+		hrtimer_init(&walt_oscillate_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED_HARD);
+		walt_oscillate_timer.function = walt_oscillate_timer_cb;
 	}
 
 	topology_clear_scale_freq_source(SCALE_FREQ_SOURCE_ARCH, cpu_online_mask);
