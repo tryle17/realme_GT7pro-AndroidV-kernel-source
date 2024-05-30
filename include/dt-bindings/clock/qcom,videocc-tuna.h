@@ -30,7 +30,8 @@
 #define VIDEO_CC_INTERFACE_BCR					0
 #define VIDEO_CC_MVS0_BCR					1
 #define VIDEO_CC_MVS0C_BCR					2
-#define VIDEO_CC_MVS0C_CLK_ARES					3
-#define VIDEO_CC_XO_CLK_ARES					4
+#define VIDEO_CC_MVS0_CLK_ARES					3
+#define VIDEO_CC_MVS0C_CLK_ARES					4
+#define VIDEO_CC_XO_CLK_ARES					5
 
 #endif
