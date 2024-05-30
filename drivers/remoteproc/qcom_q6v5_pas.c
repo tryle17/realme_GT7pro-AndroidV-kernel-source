@@ -49,7 +49,7 @@
 #define to_rproc(d) container_of(d, struct rproc, dev)
 
 #define SOCCP_SLEEP_US  100
-#define SOCCP_TIMEOUT_US  10000
+#define SOCCP_TIMEOUT_US  50000
 #define SOCCP_STATE_MASK 0x600
 #define SOCCP_D0  0x2
 #define SOCCP_D1  0x4
