@@ -22,6 +22,7 @@ pinctrl-msm.ko
 pinctrl-sun.ko
 qti_thermal_vendor_hooks.ko
 pinctrl-tuna.ko
+pinctrl-kera.ko
 qcom_tsens.ko
 qcom_dma_heaps.ko
 qcom_iommu_util.ko
