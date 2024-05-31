@@ -86,6 +86,8 @@ enum freq_caps {
 #define SOC_ENABLE_FT_BOOST_TO_ALL			BIT(8)
 #define SOC_ENABLE_OSCILLATE_ON_THERMALS		BIT(9)
 
+extern int soc_sched_lib_name_capacity;
+
 #define WALT_FEAT_TRAILBLAZER_BIT	BIT_ULL(0)
 extern unsigned int trailblazer_floor_freq[MAX_CLUSTERS];
 
@@ -393,6 +395,7 @@ extern struct irq_work walt_migration_irq_work;
 #define LIB_PATH_LENGTH 512
 extern unsigned int cpuinfo_max_freq_cached;
 extern char sched_lib_name[LIB_PATH_LENGTH];
+extern char sched_lib_task[LIB_PATH_LENGTH];
 extern unsigned int sched_lib_mask_force;
 
 extern cpumask_t cpus_for_sbt_pause;
