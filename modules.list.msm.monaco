@@ -35,6 +35,7 @@ socinfo.ko
 ufshcd-crypto-qti.ko
 smem.ko
 rtc-pm8xxx.ko
+rpm-smd-regulator.ko
 proxy-consumer.ko
 stub-regulator.ko
 debug-regulator.ko
