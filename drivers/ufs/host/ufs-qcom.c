@@ -944,32 +944,56 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 		goto out;
 	}
 
-	reenable_intr = hba->is_irq_enabled;
-	disable_irq(hba->irq);
-	hba->is_irq_enabled = false;
+	if (host->hw_ver.major >= 0x6) {
+		reenable_intr = hba->is_irq_enabled;
+		disable_irq(hba->irq);
+		hba->is_irq_enabled = false;
 
-	/*
-	 * Refer to the PHY programming guide.
-	 * 1. Assert the BCR reset.
-	 * 2. Power on the PHY regulators and GDSC.
-	 * 3. Release the BCR reset.
-	 */
-	ret = reset_control_assert(host->core_reset);
-	if (ret) {
-		dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
-				 __func__, ret);
-		goto out;
-	}
+		/*
+		 * Refer to the PHY programming guide.
+		 * 1. Assert the BCR reset.
+		 * 2. Power on the PHY regulators and GDSC.
+		 * 3. Release the BCR reset.
+		 */
+		ret = reset_control_assert(host->core_reset);
+		if (ret) {
+			dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
+					 __func__, ret);
+			goto out;
+		}
 
-	/*
-	 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
-	 * would be a nop because the flag is_phy_pwr_on would be true.
-	 */
-	ret = ufs_qcom_phy_power_on(hba);
-	if (ret) {
-		dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
-			__func__, ret);
-		goto out;
+		/*
+		 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
+		 * would be a nop because the flag is_phy_pwr_on would be true.
+		 */
+		ret = ufs_qcom_phy_power_on(hba);
+		if (ret) {
+			dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
+				__func__, ret);
+			goto out;
+		}
+	} else {
+		/*
+		 * Power on the PHY before resetting the UFS host controller
+		 * and the UFS PHY. Without power, the PHY reset may not work properly.
+		 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
+		 * would be a nop because the flag is_phy_pwr_on would be true.
+		 */
+		ret = ufs_qcom_phy_power_on(hba);
+		if (ret) {
+			dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
+				__func__, ret);
+			goto out;
+		}
+		reenable_intr = hba->is_irq_enabled;
+		disable_irq(hba->irq);
+		hba->is_irq_enabled = false;
+		ret = reset_control_assert(host->core_reset);
+		if (ret) {
+			dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
+					 __func__, ret);
+			goto out;
+		}
 	}
 
 	/*
