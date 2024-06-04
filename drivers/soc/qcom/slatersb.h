@@ -17,8 +17,6 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/wait.h>
-#include <soc/qcom/subsystem_restart.h>
-#include <soc/qcom/subsystem_notif.h>
 #include "slatersb_rpmsg.h"
 
 #define	SLATERSB_GLINK_INTENT_SIZE	0x04

@@ -98,7 +98,7 @@ static int __init init_sce_dev(void)
 		pr_err("device registration failed\n");
 		return ret;
 	}
-	sce_class = class_create(THIS_MODULE, "sce_class");
+	sce_class = class_create("sce_class");
 	if (IS_ERR_OR_NULL(sce_class)) {
 		cdev_del(&sce_cdev);
 		unregister_chrdev_region(sce_dev, 1);

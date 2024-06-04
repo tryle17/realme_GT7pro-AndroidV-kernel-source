@@ -422,11 +422,15 @@ static int split_slate_work(struct slatersb_priv *dev, char *str)
 	switch (val) {
 	case SLATERSB_IN_TWM:
 		dev->is_in_twm = true;
+		queue_work(dev->slatersb_wq, &dev->rsb_down_work);
+		break;
 	case SLATERSB_POWER_DISABLE:
 		queue_work(dev->slatersb_wq, &dev->rsb_down_work);
 		break;
 	case SLATERSB_OUT_TWM:
 		dev->is_in_twm = false;
+		queue_work(dev->slatersb_wq, &dev->rsb_up_work);
+		break;
 	case SLATERSB_POWER_ENABLE:
 		queue_work(dev->slatersb_wq, &dev->rsb_up_work);
 		break;

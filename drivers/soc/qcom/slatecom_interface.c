@@ -326,7 +326,7 @@ static int send_state_change_cmd(uint64_t state)
 	}
 	ret = slatecom_tx_msg(dev, &msg_header.opcode, sizeof(msg_header.opcode));
 	if (ret < 0)
-		pr_err("MSM State transtion event:%d cmd failed\n", state);
+		pr_err("MSM State transtion event:%llu cmd failed\n", state);
 	return ret;
 }
 
@@ -849,13 +849,13 @@ static int send_debug_config(uint64_t config)
 		msg_header.opcode = GMI_MGR_DISABLE_QCLI;
 		break;
 	default:
-		pr_err("Invalid debug config cmd:%d\n", config);
+		pr_err("Invalid debug config cmd:%llu\n", config);
 		return -EINVAL;
 	}
 	ret = slatecom_tx_msg(dev, &msg_header.opcode, sizeof(msg_header.opcode));
 
 	if (ret < 0)
-		pr_err("failed to send debug config cmd:%d\n", config);
+		pr_err("failed to send debug config cmd:%llu\n", config);
 	return ret;
 }
 
@@ -1576,7 +1576,7 @@ static int __init init_slate_com_dev(void)
 		pr_err("device registration failed\n");
 		return ret;
 	}
-	slate_class = class_create(THIS_MODULE, SLATECOM);
+	slate_class = class_create(SLATECOM);
 	if (IS_ERR_OR_NULL(slate_class)) {
 		cdev_del(&slate_cdev);
 		unregister_chrdev_region(slate_dev, 1);
