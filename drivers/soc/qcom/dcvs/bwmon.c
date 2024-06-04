@@ -21,6 +21,7 @@
 #include <linux/spinlock.h>
 #include <linux/log2.h>
 #include <linux/sizes.h>
+#include <linux/sched/walt.h>
 #include <soc/qcom/dcvs.h>
 #include <trace/hooks/sched.h>
 #include "bwmon.h"
@@ -332,6 +333,12 @@ static BWMON_ATTR_RW(ab_scale);
 show_attr(second_ab_scale);
 store_attr(second_ab_scale, 0U, 100U);
 static BWMON_ATTR_RW(second_ab_scale);
+show_attr(use_sched_boost);
+store_attr(use_sched_boost, 0U, 1U);
+static BWMON_ATTR_RW(use_sched_boost);
+show_attr(sched_boost_freq);
+store_attr(sched_boost_freq, 0U, 8192000U);
+static BWMON_ATTR_RW(sched_boost_freq);
 show_list_attr(mbps_zones, NUM_MBPS_ZONES);
 store_list_attr(mbps_zones, NUM_MBPS_ZONES, 0U, UINT_MAX);
 static BWMON_ATTR_RW(mbps_zones);
@@ -360,6 +367,8 @@ static struct attribute *bwmon_attrs[] = {
 	&mbps_zones.attr,
 	&throttle_adj.attr,
 	&second_vote_limit.attr,
+	&use_sched_boost.attr,
+	&sched_boost_freq.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(bwmon);
@@ -747,6 +756,9 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 	new_freq.ib = MBPS_TO_KHZ(new_freq.ib, hw->dcvs_width);
 	new_freq.ib = max(new_freq.ib, node->min_freq);
 	new_freq.ib = min(new_freq.ib, node->max_freq);
+	/* sched_boost_freq is intentionally not limited by max_freq */
+	if (node->cur_sched_boost)
+		new_freq.ib = max(new_freq.ib, node->sched_boost_freq);
 	primary_mbps = KHZ_TO_MBPS(new_freq.ib, hw->dcvs_width);
 
 	if (new_freq.ib != node->cur_freqs[0].ib ||
@@ -762,7 +774,8 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 							hw->second_dcvs_width);
 			else
 				node->cur_freqs[1].ib = 0;
-			node->cur_freqs[1].ib = min(node->cur_freqs[1].ib,
+			if (!node->cur_sched_boost)
+				node->cur_freqs[1].ib = min(node->cur_freqs[1].ib,
 							hw->second_vote_limit);
 			node->cur_freqs[1].ab = mult_frac(new_freq.ab,
 							node->second_ab_scale, 100);
@@ -788,14 +801,26 @@ static void bwmon_jiffies_update_cb(void *unused, void *extra)
 	unsigned long flags;
 	ktime_t now = ktime_get();
 	s64 delta_ns;
+	bool sched_update = false;
+	int new_boost_state = -1;
 
 	spin_lock_irqsave(&list_lock, flags);
 	list_for_each_entry(node, &hwmon_list, list) {
 		hw = node->hw;
 		if (!hw->is_active)
 			continue;
+		if (node->use_sched_boost) {
+			if (new_boost_state == -1)
+				new_boost_state = should_boost_bus_dcvs();
+			if (new_boost_state != node->cur_sched_boost)
+				sched_update = true;
+			node->cur_sched_boost = new_boost_state;
+		} else {
+			node->cur_sched_boost = false;
+		}
 		delta_ns = now - hw->last_update_ts + HALF_TICK_NS;
-		if (delta_ns > ms_to_ktime(hw->node->window_ms)) {
+		if (delta_ns > ms_to_ktime(hw->node->window_ms)
+				|| sched_update) {
 			queue_work(bwmon_wq, &hw->work);
 			hw->last_update_ts = now;
 		}
