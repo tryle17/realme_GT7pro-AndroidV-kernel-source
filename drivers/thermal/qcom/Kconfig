@@ -252,3 +252,13 @@ config QTI_QMI_SENSOR
 	   This driver can read the temperature of the remote sensor.
 	   These sensors can take thresholds and notify the thermal
 	   framework when the threshold is reached.
+
+config THERMAL_TSENS_LEGACY
+	tristate "Qualcomm Technologies Inc. TSENS Temperature driver"
+	depends on THERMAL
+	help
+	  This enables the thermal sysfs driver for the TSENS device. It shows
+	  up in Sysfs as a thermal zone with multiple trip points. Also able
+	  to set threshold temperature for both warm and cool and update
+	  thermal userspace client when a threshold is reached. Warm/Cool
+	  temperature thresholds can be set independently for each sensor.

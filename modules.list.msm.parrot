@@ -36,6 +36,7 @@ msm_dma_iommu_mapping.ko
 ns.ko
 pinctrl-msm.ko
 pinctrl-parrot.ko
+pinctrl-ravelin.ko
 qcom_cpu_vendor_hooks.ko
 qcom-dload-mode.ko
 qcom_dma_heaps.ko

@@ -41,3 +41,8 @@ debug-regulator.ko
 qcom-apcs-ipc-mailbox.ko
 qcom_glink_rpm.ko
 qcom_glink.ko
+sched-walt.ko
+sched-walt-debug.ko
+qcom-dcvs.ko
+qcom_llcc_pmu.ko
+qcom-pmu-lib.ko

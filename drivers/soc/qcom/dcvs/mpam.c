@@ -40,7 +40,12 @@ struct qcom_mpam_partition {
 	struct config_group group;
 	int part_id;
 	int monitor_id;
-	struct mpam_slice_val val[MSC_MAX];
+	struct mpam_slice_val *val;
+};
+
+struct qcom_mpam_msc {
+	int msc_id;
+	const char *msc_name;
 };
 
 static struct scmi_protocol_handle *ph;
@@ -50,6 +55,8 @@ static unsigned long *part_id_free_bitmap;
 static unsigned long *monitor_free_bitmap;
 static struct mpam_slice_val mpam_default_val;
 struct monitors_value *mpam_mon_base;
+static struct qcom_mpam_msc *mpam_mscs;
+static int mpam_msc_cnt;
 
 int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param)
 {
@@ -165,19 +172,14 @@ static ssize_t qcom_mpam_part_id_show(struct config_item *item, char *page)
 }
 CONFIGFS_ATTR_RO(qcom_mpam_, part_id);
 
-/*
- * Schemata supports any combination of mpam parameter settings.
- * Each parameter is a key-value pair separated by equal sign,
- * and multiple parameters are separated by a comma.
- * E.g. cmax=50 / cmax=50,prio=0
- */
-static void qcom_mpam_set_schemata(struct config_item *item,
-		char *buf, enum msc_id mscid)
+static void qcom_mpam_set_param(struct config_item *item,
+		enum msc_id mscid, char *buf)
 {
 	int ret;
 	uint32_t input;
+	char temp[256];
 	bool bypass_cache = false;
-	char *token, *param_name;
+	char *token, *param_name, *param = temp;
 	struct mpam_set_cache_partition mpam_param;
 	struct qcom_mpam_partition *partition = to_partition(item);
 
@@ -188,7 +190,8 @@ static void qcom_mpam_set_schemata(struct config_item *item,
 	mpam_param.dspri = partition->val[mscid].dspri;
 	mpam_param.mpam_config_ctrl = SET_CACHE_CAPACITY_AND_CPBM_AND_DSPRI;
 
-	while ((token = strsep(&buf, ",")) != NULL) {
+	strscpy(temp, buf, sizeof(temp));
+	while ((token = strsep(&param, ",")) != NULL) {
 		param_name = strsep(&token, "=");
 		if (param_name == NULL || token == NULL)
 			continue;
@@ -229,41 +232,87 @@ static void qcom_mpam_set_schemata(struct config_item *item,
 		pr_err("set msc mpam settings failed, ret = %d\n", ret);
 }
 
-static ssize_t qcom_mpam_schemata_0_show(struct config_item *item,
+static void qcom_mpam_set_by_schemata(struct config_item *item,
+		char *msc_name, char *param)
+{
+	int i;
+
+	/*
+	 * Go through all MSCs, set specific MSC if msc_name exists, or
+	 * set all MSCs if msc_name not exists.
+	 */
+	for (i = 0; i < mpam_msc_cnt; i++)
+		if ((msc_name == NULL) || (!strcmp(msc_name,
+				mpam_mscs[i].msc_name)))
+			qcom_mpam_set_param(item, mpam_mscs[i].msc_id, param);
+}
+
+static ssize_t qcom_mpam_schemata_show(struct config_item *item,
 		char *page)
 {
+	int i, ret = 0;
+	u32 msc_id;
+	struct mpam_slice_val *mpam_val;
 	struct qcom_mpam_partition *partition = to_partition(item);
-	struct mpam_slice_val *mpam_val = &partition->val[MSC_0];
 
-	return scnprintf(page, PAGE_SIZE, "cmax=%d,cpbm=0x%x,prio=%d\n",
-		mpam_val->capacity, mpam_val->cpbm, mpam_val->dspri);
+	for (i = 0; i < mpam_msc_cnt; i++) {
+		msc_id = mpam_mscs[i].msc_id;
+		mpam_val = &partition->val[msc_id];
+		ret += scnprintf(page + ret, PAGE_SIZE,
+			"%s:cmax=%d,cpbm=0x%x,prio=%d\n",
+			mpam_mscs[i].msc_name, mpam_val->capacity,
+			mpam_val->cpbm, mpam_val->dspri);
+	}
+
+	return ret;
 }
 
-static ssize_t qcom_mpam_schemata_0_store(struct config_item *item,
+/*
+ * Schemata supports setting multiple parameters for multiple MSCs
+ * simultaneously.
+ * Each basic parameter consists of a key-value pair separated by an
+ * equal sign, and multiple parameters are delimited by commas.
+ *
+ *     <key1>=<value1>,<key2>=<value2>
+ *
+ * Parameters by default will be applied to all available MSCs. If you
+ * only need to apply them to a specific MSC, add the MSC name followed
+ * by a colon at the beginning.
+ *
+ *     <MSC_name>:<patameters>
+ *
+ * Multiple parameter lines need to be separated by semicolon.
+ *
+ *     <patameters line>;<patameters line>
+ *
+ * Exceptions for incorrectly passed parameters will be ignored.
+ *
+ * Example:
+ *
+ *     cmax=60,cpbm=0xf;L2_0:cmax=40,prio=1;L2_1:prio=2
+ *
+ * In the example above, the initial configuration sets cmax=60 and
+ * cpbm=0xf for all MSCs. Subsequently, it adjusts the parameters to
+ * cmax=40 and prio=1 for L2_0, and prio=2 for L2_1.
+ */
+
+static ssize_t qcom_mpam_schemata_store(struct config_item *item,
 		const char *page, size_t count)
 {
-	qcom_mpam_set_schemata(item, (char *)page, MSC_0);
+	char *token, *buf;
+
+	/* Separate multiple parameter lines */
+	while ((token = strsep((char **)&page, ";")) != NULL) {
+		buf = strsep(&token, ":");
+		if (token == NULL)
+			qcom_mpam_set_by_schemata(item, NULL, buf);
+		else
+			qcom_mpam_set_by_schemata(item, buf, token);
+	}
+
 	return count;
 }
-CONFIGFS_ATTR(qcom_mpam_, schemata_0);
-
-static ssize_t qcom_mpam_schemata_1_show(struct config_item *item,
-		char *page)
-{
-	struct qcom_mpam_partition *partition = to_partition(item);
-	struct mpam_slice_val *mpam_val = &partition->val[MSC_1];
-
-	return scnprintf(page, PAGE_SIZE, "cmax=%d,cpbm=0x%x,prio=%d\n",
-		mpam_val->capacity, mpam_val->cpbm, mpam_val->dspri);
-}
-
-static ssize_t qcom_mpam_schemata_1_store(struct config_item *item,
-		const char *page, size_t count)
-{
-	qcom_mpam_set_schemata(item, (char *)page, MSC_1);
-	return count;
-}
-CONFIGFS_ATTR(qcom_mpam_, schemata_1);
+CONFIGFS_ATTR(qcom_mpam_, schemata);
 
 static ssize_t qcom_mpam_tasks_show(struct config_item *item, char *page)
 {
@@ -321,32 +370,35 @@ CONFIGFS_ATTR(qcom_mpam_, tasks);
 static void qcom_mpam_enable_monitor(int monitor_id, int part_id,
 		enum mpam_monitor_type type)
 {
+	int i;
 	struct mpam_monitor_configuration monitor_param;
 
 	monitor_param.part_id = part_id + PARTID_RESERVED;
-	monitor_param.msc_id = MSC_0;
 	monitor_param.mon_instance = monitor_id;
 	monitor_param.mon_type = type;
 	monitor_param.mpam_config_ctrl = 1;
-	qcom_mpam_config_monitor(&monitor_param);
 
-	monitor_param.msc_id = MSC_1;
-	qcom_mpam_config_monitor(&monitor_param);
+
+	for (i = 0; i < mpam_msc_cnt; i++) {
+		monitor_param.msc_id = mpam_mscs[i].msc_id;
+		qcom_mpam_config_monitor(&monitor_param);
+	}
 }
 
 static void qcom_mpam_disable_monitor(int monitor_id,
 		enum mpam_monitor_type type)
 {
+	int i;
 	struct mpam_monitor_configuration monitor_param;
 
-	monitor_param.msc_id = MSC_0;
 	monitor_param.mon_instance = monitor_id;
 	monitor_param.mon_type = type;
 	monitor_param.mpam_config_ctrl = 0;
-	qcom_mpam_config_monitor(&monitor_param);
 
-	monitor_param.msc_id = MSC_1;
-	qcom_mpam_config_monitor(&monitor_param);
+	for (i = 0; i < mpam_msc_cnt; i++) {
+		monitor_param.msc_id = mpam_mscs[i].msc_id;
+		qcom_mpam_config_monitor(&monitor_param);
+	}
 }
 
 static ssize_t qcom_mpam_enable_monitor_show(struct config_item *item,
@@ -402,18 +454,17 @@ CONFIGFS_ATTR(qcom_mpam_, enable_monitor);
 static ssize_t qcom_mpam_monitor_data_show(struct config_item *item,
 		char *page)
 {
-	int i, monitor_id;
-	int retry_cnt = 0;
+	int i, monitor_id, retry_cnt = 0;
 	ssize_t len = 0;
-	uint64_t timestamp;
-	uint32_t csu_value;
-	uint64_t mbw_value;
+	uint32_t csu_value, mscid;
+	uint64_t mbw_value, timestamp;
 	struct monitors_value *mpam_mon_data;
 
 	monitor_id = get_monitor_id(item);
 	if (monitor_id != INT_MAX) {
-		for (i = 0; i < MSC_MAX; i++) {
-			mpam_mon_data = &mpam_mon_base[i];
+		for (i = 0; i < mpam_msc_cnt; i++) {
+			mscid = mpam_mscs[i].msc_id;
+			mpam_mon_data = &mpam_mon_base[mscid];
 			do {
 				timestamp = mpam_mon_data->last_capture_time;
 				while (unlikely(mpam_mon_data->capture_in_progress) &&
@@ -423,8 +474,9 @@ static ssize_t qcom_mpam_monitor_data_show(struct config_item *item,
 				mbw_value = mpam_mon_data->mbw_mon_value[monitor_id];
 			} while (timestamp != mpam_mon_data->last_capture_time);
 			len += scnprintf(page + len, PAGE_SIZE - len,
-			"msc%d:timestamp=%llu,csu=%u,mbwu=%llu\n",
-			mpam_mon_data->msc_id, timestamp, csu_value, mbw_value);
+			"%s:timestamp=%llu,csu=%u,mbwu=%llu\n",
+			mpam_mscs[i]. msc_name, timestamp,
+			csu_value, mbw_value);
 		}
 		return len;
 	} else
@@ -434,8 +486,7 @@ CONFIGFS_ATTR_RO(qcom_mpam_, monitor_data);
 
 static struct configfs_attribute *qcom_mpam_attrs[] = {
 	&qcom_mpam_attr_part_id,
-	&qcom_mpam_attr_schemata_0,
-	&qcom_mpam_attr_schemata_1,
+	&qcom_mpam_attr_schemata,
 	&qcom_mpam_attr_tasks,
 	&qcom_mpam_attr_enable_monitor,
 	&qcom_mpam_attr_monitor_data,
@@ -444,18 +495,19 @@ static struct configfs_attribute *qcom_mpam_attrs[] = {
 
 static void qcom_mpam_reset_param(int part_id)
 {
+	int i;
 	struct mpam_set_cache_partition mpam_param;
 
 	mpam_param.part_id = part_id + PARTID_RESERVED;
-	mpam_param.msc_id = MSC_0;
 	mpam_param.dspri = mpam_default_val.dspri;
 	mpam_param.cpbm_mask = mpam_default_val.cpbm;
 	mpam_param.cache_capacity = mpam_default_val.capacity;
 	mpam_param.mpam_config_ctrl = SET_CACHE_CAPACITY_AND_CPBM_AND_DSPRI;
-	qcom_mpam_set_cache_partition(&mpam_param);
 
-	mpam_param.msc_id = MSC_1;
-	qcom_mpam_set_cache_partition(&mpam_param);
+	for (i = 0; i < mpam_msc_cnt; i++) {
+		mpam_param.msc_id = mpam_mscs[i].msc_id;
+		qcom_mpam_set_cache_partition(&mpam_param);
+	}
 }
 
 static void qcom_mpam_drop_item(struct config_group *group,
@@ -475,6 +527,7 @@ static void qcom_mpam_drop_item(struct config_group *group,
 	}
 	qcom_mpam_reset_param(part_id);
 
+	kfree(to_partition(item)->val);
 	kfree(to_partition(item));
 }
 
@@ -501,8 +554,14 @@ static struct config_group *qcom_mpam_make_group(
 	bitmap_set(part_id_free_bitmap, part_id, 1);
 	partition->part_id = part_id;
 	partition->monitor_id = INT_MAX;
-	for (i = 0; i < MSC_MAX; i++)
+
+	partition->val = kcalloc(mpam_msc_cnt, sizeof(struct mpam_slice_val), GFP_KERNEL);
+	if (!partition->val)
+		return ERR_PTR(-ENOMEM);
+
+	for (i = 0; i < mpam_msc_cnt; i++)
 		memcpy(&(partition->val[i]), &mpam_default_val, sizeof(struct mpam_slice_val));
+
 	qcom_mpam_reset_param(part_id);
 
 	config_group_init_type_name(&partition->group, name,
@@ -588,9 +647,34 @@ static void qcom_mpam_configfs_remove(void)
 
 static int qcom_mpam_probe(struct platform_device *pdev)
 {
-	int ret = 0;
+	int i = 0, ret = 0;
+	uint32_t mscid;
 	struct resource *res;
+	struct device_node *node;
+	const char *msc_name_dt;
 	struct mpam_read_cache_portion mpam_param;
+
+	mpam_msc_cnt = of_get_child_count(pdev->dev.of_node);
+	if (!mpam_msc_cnt) {
+		dev_err(&pdev->dev, "No MSC found\n");
+		return -ENODEV;
+	}
+
+	mpam_mscs = devm_kcalloc(&pdev->dev, mpam_msc_cnt,
+		sizeof(struct qcom_mpam_msc), GFP_KERNEL);
+	if (!mpam_mscs)
+		return -ENOMEM;
+
+	for_each_child_of_node(pdev->dev.of_node, node) {
+		ret = of_property_read_u32(node, "qcom,msc-id", &mscid);
+		of_property_read_string(node, "qcom,msc-name", &msc_name_dt);
+		if (ret || mscid >= MSC_MAX || IS_ERR_OR_NULL(msc_name_dt))
+			continue;
+		mpam_mscs[i].msc_id = mscid;
+		mpam_mscs[i].msc_name = msc_name_dt;
+		i++;
+	}
+	mpam_msc_cnt = i;
 
 	sdev = get_qcom_scmi_device();
 	if (IS_ERR(sdev)) {
