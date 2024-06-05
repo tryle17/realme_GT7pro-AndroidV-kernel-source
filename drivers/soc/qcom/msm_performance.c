@@ -566,6 +566,9 @@ static void free_pmu_counters(unsigned int cpu)
 {
 	int i = 0;
 
+	if (!cpu_possible(cpu))
+		return;
+
 	for (i = 0; i < NO_OF_EVENT; i++) {
 		pmu_events[i][cpu].prev_count = 0;
 		pmu_events[i][cpu].cur_delta = 0;
@@ -1135,6 +1138,19 @@ static int __init msm_performance_init(void)
 		free_cpumask_var(limit_mask_min);
 		return -ENOMEM;
 	}
+
+	msm_perf_kset = kset_create_and_add("msm_performance", NULL, kernel_kobj);
+	if (!msm_perf_kset) {
+		free_cpumask_var(limit_mask_min);
+		free_cpumask_var(limit_mask_max);
+		return -ENOMEM;
+	}
+
+	add_module_params();
+	init_events_group();
+	init_notify_group();
+	init_pmu_counter();
+
 	cpus_read_lock();
 	for_each_possible_cpu(cpu) {
 		if (!cpumask_test_cpu(cpu, cpu_online_mask))
@@ -1147,19 +1163,6 @@ static int __init msm_performance_init(void)
 		hotplug_notify_down);
 
 	cpus_read_unlock();
-
-	msm_perf_kset = kset_create_and_add("msm_performance", NULL, kernel_kobj);
-	if (!msm_perf_kset) {
-		free_cpumask_var(limit_mask_min);
-		free_cpumask_var(limit_mask_max);
-		return -ENOMEM;
-	}
-
-	add_module_params();
-
-	init_events_group();
-	init_notify_group();
-	init_pmu_counter();
 
 	return 0;
 }
