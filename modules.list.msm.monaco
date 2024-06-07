@@ -22,6 +22,7 @@ qcom_hwspinlock.ko
 phy-qcom-ufs.ko
 debug_symbol.ko
 qcom-reboot-reason.ko
+qcom_soc_wdt.ko
 qcom_wdt_core.ko
 qcom_aoss.ko
 qcom-dload-mode.ko
