@@ -82,6 +82,8 @@ struct bw_hwmon {
 	u32			second_vote_limit;
 	char			second_dev_name[MAX_NAME_SIZE + 1];
 	struct bwmon_second_map	*second_map;
+	bool			low_power_supported;
+	u32			low_power_cpu;
 	struct hwmon_node	*node;
 	ktime_t			last_update_ts;
 	struct work_struct	work;
@@ -122,6 +124,9 @@ struct hwmon_node {
 	unsigned int		use_sched_boost;
 	bool			cur_sched_boost;
 	u32			sched_boost_freq;
+	unsigned int		low_power_io_percent;
+	u32			low_power_cpufreq_thres;
+	u32			cur_low_power_cpufreq;
 	unsigned int		bw_step;
 	unsigned int		sample_ms;
 	unsigned int		up_scale;
