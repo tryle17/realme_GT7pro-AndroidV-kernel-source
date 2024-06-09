@@ -7,6 +7,7 @@
 #define _QCOM_MPAM_H
 
 #include <linux/types.h>
+#include <linux/platform_device.h>
 
 #define SYS_MPAM0_EL1		sys_reg(3, 0, 10, 5, 1)
 #define SYS_MPAM1_EL1		sys_reg(3, 0, 10, 5, 0)
@@ -38,6 +39,8 @@
 enum msc_id {
 	MSC_0 = 0,
 	MSC_1,
+	MSC_2,
+	MSC_3,
 	MSC_MAX,
 };
 
@@ -48,13 +51,17 @@ enum mpam_config_mode {
 	SET_DSPRI,
 	SET_CACHE_CAPICITY_AND_CPBM,
 	SET_CACHE_CAPACITY_AND_CPBM_AND_DSPRI,
+	SET_SLC,
+	SET_ALL_CPU_TUNABLE,
 	MAX_MODE
 };
 
 /* Monitor type */
 enum mpam_monitor_type {
+	MPAM_INVALID_MONITOR = 0,
 	MPAM_TYPE_MBW_MONITOR = 1,
-	MPAM_TYPE_CSU_MONITOR = 2
+	MPAM_TYPE_CSU_MONITOR = 2,
+	MAX_MON_TYPE_SUPPORTED = 3
 };
 
 /* PARAM_SET_CACHE_PARTITION */
@@ -64,16 +71,19 @@ struct mpam_set_cache_partition {
 	uint32_t cpbm_mask;
 	uint32_t dspri;
 	/*
-	 * [0:8] - mode
+	 * [0:7] - mode
 	 * --[0x00] : set cache_capicity
 	 * --[0x01] : set cpbm
 	 * --[0x02] : set dspri
 	 * --[0x03] : set cache_capicity & cpbm
 	 * --[0x04] : set cache_capicity & cpbm & dspri
-	 * [9:63] - Reserved
+	 * --[0x05] : set slc_gear
+	 * --[0x06] : set all cpu tunable
+	 * [8:63] - Reserved
 	 */
 	uint64_t mpam_config_ctrl;
 	uint32_t msc_id;
+	uint32_t slc_partition_id;
 } __packed;
 
 /* Part ID and monitor Parameters */
@@ -97,10 +107,11 @@ struct mpam_read_cache_portion {
 	uint32_t part_id;
 } __packed;
 
-struct mpam_slice_val {
+struct mpam_config_val {
 	uint32_t cpbm;
 	uint32_t capacity;
 	uint32_t dspri;
+	uint32_t slc_partition_id;
 } __packed;
 
 struct monitors_value {
@@ -113,12 +124,58 @@ struct monitors_value {
 	uint64_t last_capture_time;
 } __packed;
 
+/* PARAM_SET_PLATFORM_BW_CTRL */
+struct platform_mpam_bw_ctrl_cfg {
+	uint32_t msc_id;
+	uint32_t client_id;
+	uint32_t platform_mpam_gear;
+	uint64_t config_ctrl;
+} __packed;
+
+/* PARAM_SET_PLATFORM_BW_MONITOR */
+struct platform_mpam_bw_monitor_cfg {
+	uint32_t msc_id;
+	uint32_t client_id;
+	uint32_t mon_instance;
+	uint32_t mon_type;
+	/*
+	 * [0:1] - control
+	 * --[0x0] : disable
+	 * --[0x1] : enable
+	 * [2:63] - Reserved
+	 */
+	uint64_t config_ctrl;
+} __packed;
+
+/* PARAM_GET_PLATFORM_BW_CTRL_CONFIG */
+struct platform_mpam_read_bw_ctrl {
+	uint32_t msc_id;
+	uint32_t client_id;
+} __packed;
+
+struct platform_mpam_bw_ctrl_config {
+	uint32_t platform_mpam_gear;
+} __packed;
+
+/* NOC Monitor structure in shared memory */
+struct platform_monitor_value {
+	uint32_t capture_in_progress;
+	uint32_t msc_id;
+	uint32_t client_id;
+	uint32_t bwmon_byte_count;
+	uint64_t last_capture_time;
+} __packed;
+
 #if IS_ENABLED(CONFIG_QTI_MPAM)
 int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param);
 int qcom_mpam_get_version(struct mpam_ver_ret *ver);
 int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
-						struct mpam_slice_val *val);
+						struct mpam_config_val *val);
 int qcom_mpam_config_monitor(struct mpam_monitor_configuration *param);
+int qcom_mpam_set_platform_bw_ctrl(struct platform_mpam_bw_ctrl_cfg *param);
+int qcom_mpam_get_platform_bw_ctrl(struct platform_mpam_read_bw_ctrl *param,
+						struct platform_mpam_bw_ctrl_config *val);
+int qcom_mpam_set_platform_bw_monitor(struct platform_mpam_bw_monitor_cfg *param);
 #else
 static inline int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param)
 {
@@ -131,12 +188,28 @@ static inline int qcom_mpam_get_version(struct mpam_ver_ret *ver)
 }
 
 static inline int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
-						struct mpam_slice_val *val)
+						struct mpam_config_val *val)
 {
 	return 0;
 }
 
 static inline int qcom_mpam_config_monitor(struct mpam_monitor_configuration *param)
+{
+	return 0;
+}
+
+static inline int qcom_mpam_set_platform_bw_ctrl(struct platform_mpam_bw_ctrl_cfg *param)
+{
+	return 0;
+}
+
+static inline int qcom_mpam_get_platform_bw_ctrl(struct platform_mpam_read_bw_ctrl *param,
+						struct platform_mpam_bw_ctrl_config *val)
+{
+	return 0;
+}
+
+static inline int qcom_mpam_set_platform_bw_monitor(struct platform_mpam_bw_monitor_cfg *param)
 {
 	return 0;
 }

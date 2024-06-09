@@ -2,129 +2,41 @@
 /*
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
- #define pr_fmt(fmt) "qcom_mpam: " fmt
+ #define pr_fmt(fmt) "cpu_mpam: " fmt
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/err.h>
-#include <linux/errno.h>
 #include <linux/io.h>
 #include <linux/of.h>
-#include <linux/platform_device.h>
 #include <linux/configfs.h>
 #include <linux/string.h>
 #include <linux/bitmap.h>
 #include <linux/sched/walt.h>
 #include <trace/hooks/mpam.h>
-#include <linux/scmi_protocol.h>
-#include <linux/qcom_scmi_vendor.h>
 #include <soc/qcom/mpam.h>
 
-#define MPAM_ALGO_STR	0x4D50414D4558544E  /* "MPAMEXTN" */
-
-/* Parameter IDs for SET */
-enum mpam_set_param_ids {
-	PARAM_SET_CACHE_PARTITION = 1,
-	PARAM_SET_CONFIG_MONITOR = 2,
-	PARAM_SET_CAPTURE_ALL_MONITOR = 3,
-};
-
-/* Parameter IDs for GET */
-enum mpam_get_param_ids {
-	PARAM_GET_MPAM_VERSION = 1,
-	PARAM_GET_CACHE_PARTITION = 2
-};
-
-struct qcom_mpam_partition {
+struct cpu_mpam_partition {
 	struct config_group group;
 	int part_id;
 	int monitor_id;
-	struct mpam_slice_val *val;
+	struct mpam_config_val *val;
 };
 
-struct qcom_mpam_msc {
+struct cpu_mpam_msc {
 	int msc_id;
 	const char *msc_name;
 };
 
-static struct scmi_protocol_handle *ph;
-static const struct qcom_scmi_vendor_ops *ops;
-static struct scmi_device *sdev;
 static unsigned long *part_id_free_bitmap;
 static unsigned long *monitor_free_bitmap;
-static struct mpam_slice_val mpam_default_val;
-struct monitors_value *mpam_mon_base;
-static struct qcom_mpam_msc *mpam_mscs;
+static struct mpam_config_val mpam_default_val;
+static struct monitors_value *mpam_mon_base;
+static struct cpu_mpam_msc *mpam_mscs;
 static int mpam_msc_cnt;
 
-int qcom_mpam_set_cache_partition(struct mpam_set_cache_partition *param)
-{
-	int ret = -EPERM;
-
-	if (ops)
-		ret = ops->set_param(ph, param, MPAM_ALGO_STR,
-				PARAM_SET_CACHE_PARTITION,
-				sizeof(struct mpam_set_cache_partition));
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(qcom_mpam_set_cache_partition);
-
-int qcom_mpam_get_version(struct mpam_ver_ret *ver)
-{
-	int ret = -EPERM;
-
-	if (ops) {
-		ret = ops->get_param(ph, ver, MPAM_ALGO_STR,
-				PARAM_GET_MPAM_VERSION, 0,
-				sizeof(struct mpam_ver_ret));
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(qcom_mpam_get_version);
-
-int qcom_mpam_get_cache_partition(struct mpam_read_cache_portion *param,
-						struct mpam_slice_val *val)
-{
-	int ret = -EPERM;
-	uint8_t buf[32];
-
-	if (ops) {
-		memcpy(buf, param, sizeof(struct mpam_read_cache_portion));
-		ret = ops->get_param(ph, buf, MPAM_ALGO_STR,
-				PARAM_GET_CACHE_PARTITION,
-				sizeof(struct mpam_read_cache_portion),
-				sizeof(struct mpam_slice_val));
-	}
-
-	if (!ret)
-		memcpy(val, buf, sizeof(struct mpam_slice_val));
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(qcom_mpam_get_cache_partition);
-
-int qcom_mpam_config_monitor(struct mpam_monitor_configuration *param)
-{
-	int ret = -EPERM;
-
-	if (ops) {
-		ret = ops->set_param(ph, param, MPAM_ALGO_STR,
-				PARAM_SET_CONFIG_MONITOR,
-				sizeof(struct mpam_monitor_configuration));
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(qcom_mpam_config_monitor);
-
-static inline struct qcom_mpam_partition *to_partition(
+static inline struct cpu_mpam_partition *to_partition(
 					   struct config_item *item)
 {
 	return container_of(to_config_group(item),
-				struct qcom_mpam_partition, group);
+				struct cpu_mpam_partition, group);
 }
 
 static inline int get_part_id(struct config_item *item)
@@ -149,7 +61,7 @@ static inline void set_monitor_id(struct config_item *item,
 	to_partition(item)->monitor_id = monitor_id;
 }
 
-static void qcom_mpam_partition_transfer(int old, int new)
+static void cpu_mpam_partition_transfer(int old, int new)
 {
 	struct task_struct *p, *t;
 	struct walt_task_struct *wts;
@@ -166,13 +78,13 @@ static void qcom_mpam_partition_transfer(int old, int new)
 	rcu_read_unlock();
 }
 
-static ssize_t qcom_mpam_part_id_show(struct config_item *item, char *page)
+static ssize_t cpu_mpam_part_id_show(struct config_item *item, char *page)
 {
 	return scnprintf(page, PAGE_SIZE, "%d\n", get_part_id(item));
 }
-CONFIGFS_ATTR_RO(qcom_mpam_, part_id);
+CONFIGFS_ATTR_RO(cpu_mpam_, part_id);
 
-static void qcom_mpam_set_param(struct config_item *item,
+static void cpu_mpam_set_param(struct config_item *item,
 		enum msc_id mscid, char *buf)
 {
 	int ret;
@@ -181,14 +93,15 @@ static void qcom_mpam_set_param(struct config_item *item,
 	bool bypass_cache = false;
 	char *token, *param_name, *param = temp;
 	struct mpam_set_cache_partition mpam_param;
-	struct qcom_mpam_partition *partition = to_partition(item);
+	struct cpu_mpam_partition *partition = to_partition(item);
 
 	mpam_param.msc_id = mscid;
 	mpam_param.part_id = get_part_id(item) + PARTID_RESERVED;
 	mpam_param.cache_capacity = partition->val[mscid].capacity;
 	mpam_param.cpbm_mask = partition->val[mscid].cpbm;
 	mpam_param.dspri = partition->val[mscid].dspri;
-	mpam_param.mpam_config_ctrl = SET_CACHE_CAPACITY_AND_CPBM_AND_DSPRI;
+	mpam_param.slc_partition_id = partition->val[mscid].slc_partition_id;
+	mpam_param.mpam_config_ctrl = SET_ALL_CPU_TUNABLE;
 
 	strscpy(temp, buf, sizeof(temp));
 	while ((token = strsep(&param, ",")) != NULL) {
@@ -206,6 +119,8 @@ static void qcom_mpam_set_param(struct config_item *item,
 			mpam_param.cpbm_mask = input;
 		else if (!strcmp("prio", param_name))
 			mpam_param.dspri = input;
+		else if (!strcmp("slc_partid", param_name))
+			mpam_param.slc_partition_id = input;
 	}
 
 	/*
@@ -224,6 +139,7 @@ static void qcom_mpam_set_param(struct config_item *item,
 	if (!ret) {
 		partition->val[mscid].capacity = mpam_param.cache_capacity;
 		partition->val[mscid].dspri = mpam_param.dspri;
+		partition->val[mscid].slc_partition_id = mpam_param.slc_partition_id;
 		if (unlikely(bypass_cache))
 			partition->val[mscid].cpbm = 0;
 		else
@@ -232,7 +148,7 @@ static void qcom_mpam_set_param(struct config_item *item,
 		pr_err("set msc mpam settings failed, ret = %d\n", ret);
 }
 
-static void qcom_mpam_set_by_schemata(struct config_item *item,
+static void cpu_mpam_set_by_schemata(struct config_item *item,
 		char *msc_name, char *param)
 {
 	int i;
@@ -244,24 +160,24 @@ static void qcom_mpam_set_by_schemata(struct config_item *item,
 	for (i = 0; i < mpam_msc_cnt; i++)
 		if ((msc_name == NULL) || (!strcmp(msc_name,
 				mpam_mscs[i].msc_name)))
-			qcom_mpam_set_param(item, mpam_mscs[i].msc_id, param);
+			cpu_mpam_set_param(item, mpam_mscs[i].msc_id, param);
 }
 
-static ssize_t qcom_mpam_schemata_show(struct config_item *item,
+static ssize_t cpu_mpam_schemata_show(struct config_item *item,
 		char *page)
 {
 	int i, ret = 0;
 	u32 msc_id;
-	struct mpam_slice_val *mpam_val;
-	struct qcom_mpam_partition *partition = to_partition(item);
+	struct mpam_config_val *mpam_val;
+	struct cpu_mpam_partition *partition = to_partition(item);
 
 	for (i = 0; i < mpam_msc_cnt; i++) {
 		msc_id = mpam_mscs[i].msc_id;
 		mpam_val = &partition->val[msc_id];
 		ret += scnprintf(page + ret, PAGE_SIZE,
-			"%s:cmax=%d,cpbm=0x%x,prio=%d\n",
+			"%s:cmax=%d,cpbm=0x%x,prio=%d,slc_partid=%d\n",
 			mpam_mscs[i].msc_name, mpam_val->capacity,
-			mpam_val->cpbm, mpam_val->dspri);
+			mpam_val->cpbm, mpam_val->dspri, mpam_val->slc_partition_id);
 	}
 
 	return ret;
@@ -296,7 +212,7 @@ static ssize_t qcom_mpam_schemata_show(struct config_item *item,
  * cmax=40 and prio=1 for L2_0, and prio=2 for L2_1.
  */
 
-static ssize_t qcom_mpam_schemata_store(struct config_item *item,
+static ssize_t cpu_mpam_schemata_store(struct config_item *item,
 		const char *page, size_t count)
 {
 	char *token, *buf;
@@ -305,16 +221,16 @@ static ssize_t qcom_mpam_schemata_store(struct config_item *item,
 	while ((token = strsep((char **)&page, ";")) != NULL) {
 		buf = strsep(&token, ":");
 		if (token == NULL)
-			qcom_mpam_set_by_schemata(item, NULL, buf);
+			cpu_mpam_set_by_schemata(item, NULL, buf);
 		else
-			qcom_mpam_set_by_schemata(item, buf, token);
+			cpu_mpam_set_by_schemata(item, buf, token);
 	}
 
 	return count;
 }
-CONFIGFS_ATTR(qcom_mpam_, schemata);
+CONFIGFS_ATTR(cpu_mpam_, schemata);
 
-static ssize_t qcom_mpam_tasks_show(struct config_item *item, char *page)
+static ssize_t cpu_mpam_tasks_show(struct config_item *item, char *page)
 {
 	int part_id;
 	ssize_t len = 0;
@@ -334,7 +250,7 @@ static ssize_t qcom_mpam_tasks_show(struct config_item *item, char *page)
 	return len;
 }
 
-static ssize_t qcom_mpam_tasks_store(struct config_item *item,
+static ssize_t cpu_mpam_tasks_store(struct config_item *item,
 		const char *page, size_t count)
 {
 	int ret, part_id;
@@ -365,9 +281,9 @@ static ssize_t qcom_mpam_tasks_store(struct config_item *item,
 err:
 	return count;
 }
-CONFIGFS_ATTR(qcom_mpam_, tasks);
+CONFIGFS_ATTR(cpu_mpam_, tasks);
 
-static void qcom_mpam_enable_monitor(int monitor_id, int part_id,
+static void cpu_mpam_enable_monitor(int monitor_id, int part_id,
 		enum mpam_monitor_type type)
 {
 	int i;
@@ -385,7 +301,7 @@ static void qcom_mpam_enable_monitor(int monitor_id, int part_id,
 	}
 }
 
-static void qcom_mpam_disable_monitor(int monitor_id,
+static void cpu_mpam_disable_monitor(int monitor_id,
 		enum mpam_monitor_type type)
 {
 	int i;
@@ -401,7 +317,7 @@ static void qcom_mpam_disable_monitor(int monitor_id,
 	}
 }
 
-static ssize_t qcom_mpam_enable_monitor_show(struct config_item *item,
+static ssize_t cpu_mpam_enable_monitor_show(struct config_item *item,
 		char *page)
 {
 	int monitor_id;
@@ -411,26 +327,27 @@ static ssize_t qcom_mpam_enable_monitor_show(struct config_item *item,
 		"disabled" : "enabled");
 }
 
-static ssize_t qcom_mpam_enable_monitor_store(struct config_item *item,
+static ssize_t cpu_mpam_enable_monitor_store(struct config_item *item,
 		const char *page, size_t count)
 {
-	int ret, input, monitor_id, part_id;
+	int ret, monitor_id, part_id;
+	bool input;
 
 	part_id = get_part_id(item);
 	monitor_id = get_monitor_id(item);
 
-	ret = kstrtoint(page, 10, &input);
-	if (ret || (input != 0 && input != 1)) {
+	ret = kstrtobool(page, &input);
+	if (ret) {
 		pr_err("invalid param\n");
 		goto exit;
 	}
 
-	if (input == 0 && monitor_id != INT_MAX) {
+	if (!input && monitor_id != INT_MAX) {
 		bitmap_clear(monitor_free_bitmap, monitor_id, 1);
 		set_monitor_id(item, INT_MAX);
-		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_CSU_MONITOR);
-		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_MBW_MONITOR);
-	} else if (input == 1 && monitor_id == INT_MAX) {
+		cpu_mpam_disable_monitor(monitor_id, MPAM_TYPE_CSU_MONITOR);
+		cpu_mpam_disable_monitor(monitor_id, MPAM_TYPE_MBW_MONITOR);
+	} else if (input && monitor_id == INT_MAX) {
 		monitor_id = bitmap_find_next_zero_area(monitor_free_bitmap,
 				MONITOR_MAX, 0, 1, 0);
 		if (monitor_id > MONITOR_MAX) {
@@ -440,18 +357,18 @@ static ssize_t qcom_mpam_enable_monitor_store(struct config_item *item,
 
 		bitmap_set(monitor_free_bitmap, monitor_id, 1);
 		set_monitor_id(item, monitor_id);
-		qcom_mpam_enable_monitor(monitor_id, part_id,
+		cpu_mpam_enable_monitor(monitor_id, part_id,
 				MPAM_TYPE_CSU_MONITOR);
-		qcom_mpam_enable_monitor(monitor_id, part_id,
+		cpu_mpam_enable_monitor(monitor_id, part_id,
 				MPAM_TYPE_MBW_MONITOR);
 	}
 
 exit:
 	return count;
 }
-CONFIGFS_ATTR(qcom_mpam_, enable_monitor);
+CONFIGFS_ATTR(cpu_mpam_, enable_monitor);
 
-static ssize_t qcom_mpam_monitor_data_show(struct config_item *item,
+static ssize_t cpu_mpam_monitor_data_show(struct config_item *item,
 		char *page)
 {
 	int i, monitor_id, retry_cnt = 0;
@@ -482,18 +399,18 @@ static ssize_t qcom_mpam_monitor_data_show(struct config_item *item,
 	} else
 		return scnprintf(page, PAGE_SIZE, "monitor not enabled\n");
 }
-CONFIGFS_ATTR_RO(qcom_mpam_, monitor_data);
+CONFIGFS_ATTR_RO(cpu_mpam_, monitor_data);
 
-static struct configfs_attribute *qcom_mpam_attrs[] = {
-	&qcom_mpam_attr_part_id,
-	&qcom_mpam_attr_schemata,
-	&qcom_mpam_attr_tasks,
-	&qcom_mpam_attr_enable_monitor,
-	&qcom_mpam_attr_monitor_data,
+static struct configfs_attribute *cpu_mpam_attrs[] = {
+	&cpu_mpam_attr_part_id,
+	&cpu_mpam_attr_schemata,
+	&cpu_mpam_attr_tasks,
+	&cpu_mpam_attr_enable_monitor,
+	&cpu_mpam_attr_monitor_data,
 	NULL,
 };
 
-static void qcom_mpam_reset_param(int part_id)
+static void cpu_mpam_reset_param(int part_id)
 {
 	int i;
 	struct mpam_set_cache_partition mpam_param;
@@ -502,7 +419,8 @@ static void qcom_mpam_reset_param(int part_id)
 	mpam_param.dspri = mpam_default_val.dspri;
 	mpam_param.cpbm_mask = mpam_default_val.cpbm;
 	mpam_param.cache_capacity = mpam_default_val.capacity;
-	mpam_param.mpam_config_ctrl = SET_CACHE_CAPACITY_AND_CPBM_AND_DSPRI;
+	mpam_param.slc_partition_id = mpam_default_val.slc_partition_id;
+	mpam_param.mpam_config_ctrl = SET_ALL_CPU_TUNABLE;
 
 	for (i = 0; i < mpam_msc_cnt; i++) {
 		mpam_param.msc_id = mpam_mscs[i].msc_id;
@@ -510,7 +428,7 @@ static void qcom_mpam_reset_param(int part_id)
 	}
 }
 
-static void qcom_mpam_drop_item(struct config_group *group,
+static void cpu_mpam_drop_item(struct config_group *group,
 		struct config_item *item)
 {
 	int part_id, monitor_id;
@@ -518,28 +436,28 @@ static void qcom_mpam_drop_item(struct config_group *group,
 	part_id = get_part_id(item);
 	monitor_id = get_monitor_id(item);
 
-	qcom_mpam_partition_transfer(part_id, PARTID_DEFAULT);
+	cpu_mpam_partition_transfer(part_id, PARTID_DEFAULT);
 	bitmap_clear(part_id_free_bitmap, part_id, 1);
 	if (monitor_id != INT_MAX) {
 		bitmap_clear(monitor_free_bitmap, monitor_id, 1);
-		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_CSU_MONITOR);
-		qcom_mpam_disable_monitor(monitor_id, MPAM_TYPE_MBW_MONITOR);
+		cpu_mpam_disable_monitor(monitor_id, MPAM_TYPE_CSU_MONITOR);
+		cpu_mpam_disable_monitor(monitor_id, MPAM_TYPE_MBW_MONITOR);
 	}
-	qcom_mpam_reset_param(part_id);
+	cpu_mpam_reset_param(part_id);
 
 	kfree(to_partition(item)->val);
 	kfree(to_partition(item));
 }
 
-static const struct config_item_type qcom_mpam_item_type = {
-	.ct_attrs	= qcom_mpam_attrs,
+static const struct config_item_type cpu_mpam_item_type = {
+	.ct_attrs	= cpu_mpam_attrs,
 };
 
-static struct config_group *qcom_mpam_make_group(
+static struct config_group *cpu_mpam_make_group(
 		struct config_group *group, const char *name)
 {
 	int i, part_id;
-	struct qcom_mpam_partition *partition;
+	struct cpu_mpam_partition *partition;
 
 	part_id = bitmap_find_next_zero_area(part_id_free_bitmap,
 				   PARTID_AVAILABLE, 0, 1, 0);
@@ -547,7 +465,7 @@ static struct config_group *qcom_mpam_make_group(
 	if (part_id > PARTID_AVAILABLE)
 		return ERR_PTR(-ENOMEM);
 
-	partition = kzalloc(sizeof(struct qcom_mpam_partition), GFP_KERNEL);
+	partition = kzalloc(sizeof(struct cpu_mpam_partition), GFP_KERNEL);
 	if (!partition)
 		return ERR_PTR(-ENOMEM);
 
@@ -555,41 +473,41 @@ static struct config_group *qcom_mpam_make_group(
 	partition->part_id = part_id;
 	partition->monitor_id = INT_MAX;
 
-	partition->val = kcalloc(mpam_msc_cnt, sizeof(struct mpam_slice_val), GFP_KERNEL);
+	partition->val = kcalloc(mpam_msc_cnt, sizeof(struct mpam_config_val), GFP_KERNEL);
 	if (!partition->val)
 		return ERR_PTR(-ENOMEM);
 
 	for (i = 0; i < mpam_msc_cnt; i++)
-		memcpy(&(partition->val[i]), &mpam_default_val, sizeof(struct mpam_slice_val));
+		memcpy(&(partition->val[i]), &mpam_default_val, sizeof(struct mpam_config_val));
 
-	qcom_mpam_reset_param(part_id);
+	cpu_mpam_reset_param(part_id);
 
 	config_group_init_type_name(&partition->group, name,
-				   &qcom_mpam_item_type);
+				   &cpu_mpam_item_type);
 
 	return &partition->group;
 }
 
-static struct configfs_group_operations qcom_mpam_group_ops = {
-	.make_group	= qcom_mpam_make_group,
-	.drop_item	= qcom_mpam_drop_item,
+static struct configfs_group_operations cpu_mpam_group_ops = {
+	.make_group	= cpu_mpam_make_group,
+	.drop_item	= cpu_mpam_drop_item,
 };
 
-static const struct config_item_type qcom_mpam_subsys_type = {
-	.ct_group_ops	= &qcom_mpam_group_ops,
+static const struct config_item_type cpu_mpam_subsys_type = {
+	.ct_group_ops	= &cpu_mpam_group_ops,
 	.ct_owner	= THIS_MODULE,
 };
 
-static struct configfs_subsystem qcom_mpam_subsys = {
+static struct configfs_subsystem cpu_mpam_subsys = {
 	.su_group = {
 		.cg_item = {
-			.ci_namebuf = "qcom_mpam",
-			.ci_type = &qcom_mpam_subsys_type,
+			.ci_namebuf = "cpu_mpam",
+			.ci_type = &cpu_mpam_subsys_type,
 		},
 	},
 };
 
-static void qcom_mpam_write_partid(u8 part_id, pid_t next_pid)
+static void cpu_mpam_write_partid(u8 part_id)
 {
 	u64 reg;
 
@@ -600,16 +518,16 @@ static void qcom_mpam_write_partid(u8 part_id, pid_t next_pid)
 	write_sysreg_s(reg, SYS_MPAM1_EL1);
 }
 
-static void qcom_mpam_switch_task(void *unused, struct task_struct *prev,
+static void cpu_mpam_switch_task(void *unused, struct task_struct *prev,
 							struct task_struct *next)
 {
 	struct walt_task_struct *wts;
 
 	wts = (struct walt_task_struct *) next->android_vendor_data1;
-	qcom_mpam_write_partid(wts->mpam_part_id, next->pid);
+	cpu_mpam_write_partid(wts->mpam_part_id);
 }
 
-static int qcom_mpam_configfs_init(void)
+static int cpu_mpam_configfs_init(void)
 {
 	int ret;
 	struct config_group *default_group;
@@ -621,31 +539,35 @@ static int qcom_mpam_configfs_init(void)
 		return -ENOMEM;
 	}
 
-	config_group_init(&qcom_mpam_subsys.su_group);
-	mutex_init(&qcom_mpam_subsys.su_mutex);
+	config_group_init(&cpu_mpam_subsys.su_group);
+	mutex_init(&cpu_mpam_subsys.su_mutex);
 
-	default_group = qcom_mpam_make_group(NULL, "default");
-	configfs_add_default_group(default_group, &qcom_mpam_subsys.su_group);
+	default_group = cpu_mpam_make_group(NULL, "default");
+	if (IS_ERR(default_group)) {
+		pr_err("Error create group\n");
+		return PTR_ERR(default_group);
+	}
+	configfs_add_default_group(default_group, &cpu_mpam_subsys.su_group);
 
-	ret = configfs_register_subsystem(&qcom_mpam_subsys);
+	ret = configfs_register_subsystem(&cpu_mpam_subsys);
 	if (ret) {
-		mutex_destroy(&qcom_mpam_subsys.su_mutex);
+		mutex_destroy(&cpu_mpam_subsys.su_mutex);
 		pr_err("Error while registering subsystem %d\n", ret);
 		return ret;
 	}
 
-	register_trace_android_vh_mpam_set(qcom_mpam_switch_task, NULL);
+	register_trace_android_vh_mpam_set(cpu_mpam_switch_task, NULL);
 
 	return 0;
 }
 
-static void qcom_mpam_configfs_remove(void)
+static void cpu_mpam_configfs_remove(void)
 {
-	configfs_unregister_subsystem(&qcom_mpam_subsys);
-	unregister_trace_android_vh_mpam_set(qcom_mpam_switch_task, NULL);
+	configfs_unregister_subsystem(&cpu_mpam_subsys);
+	unregister_trace_android_vh_mpam_set(cpu_mpam_switch_task, NULL);
 }
 
-static int qcom_mpam_probe(struct platform_device *pdev)
+static int cpu_mpam_probe(struct platform_device *pdev)
 {
 	int i = 0, ret = 0;
 	uint32_t mscid;
@@ -661,7 +583,7 @@ static int qcom_mpam_probe(struct platform_device *pdev)
 	}
 
 	mpam_mscs = devm_kcalloc(&pdev->dev, mpam_msc_cnt,
-		sizeof(struct qcom_mpam_msc), GFP_KERNEL);
+		sizeof(struct cpu_mpam_msc), GFP_KERNEL);
 	if (!mpam_mscs)
 		return -ENOMEM;
 
@@ -675,21 +597,6 @@ static int qcom_mpam_probe(struct platform_device *pdev)
 		i++;
 	}
 	mpam_msc_cnt = i;
-
-	sdev = get_qcom_scmi_device();
-	if (IS_ERR(sdev)) {
-		ret = PTR_ERR(sdev);
-		if (ret != -EPROBE_DEFER)
-			dev_err(&pdev->dev, "Error getting scmi_dev ret=%d\n", ret);
-		return ret;
-	}
-	ops = sdev->handle->devm_protocol_get(sdev, QCOM_SCMI_VENDOR_PROTOCOL, &ph);
-	if (IS_ERR(ops)) {
-		ret = PTR_ERR(ops);
-		ops = NULL;
-		dev_err(&pdev->dev, "Error getting vendor protocol ops: %d\n", ret);
-		return ret;
-	}
 
 	mpam_param.msc_id = 0;
 	mpam_param.part_id = PARTID_MAX - 1;
@@ -708,39 +615,36 @@ static int qcom_mpam_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	if (IS_ENABLED(CONFIG_QTI_MPAM_CONFIGFS)) {
-		ret = qcom_mpam_configfs_init();
-		if (ret)
-			dev_err(&pdev->dev, "Error creating configfs %d\n", ret);
-	}
+	ret = cpu_mpam_configfs_init();
+	if (ret)
+		dev_err(&pdev->dev, "Error creating configfs %d\n", ret);
 
 	return ret;
 }
 
-static int qcom_mpam_remove(struct platform_device *pdev)
+static int cpu_mpam_remove(struct platform_device *pdev)
 {
-	if (IS_ENABLED(CONFIG_QTI_MPAM_CONFIGFS))
-		qcom_mpam_configfs_remove();
+	cpu_mpam_configfs_remove();
 	return 0;
 }
 
-static const struct of_device_id qcom_mpam_table[] = {
-	{ .compatible = "qcom,mpam" },
+static const struct of_device_id cpu_mpam_table[] = {
+	{ .compatible = "qcom,cpu-mpam" },
 	{}
 };
+MODULE_DEVICE_TABLE(of, cpu_mpam_table);
 
-static struct platform_driver qcom_mpam_driver = {
+static struct platform_driver cpu_mpam_driver = {
 	.driver = {
-		.name = "qcom-mpam",
-		.of_match_table = qcom_mpam_table,
-		.suppress_bind_attrs = true,
+		.name = "cpu-mpam",
+		.of_match_table = cpu_mpam_table,
 	},
-	.probe = qcom_mpam_probe,
-	.remove = qcom_mpam_remove,
+	.probe = cpu_mpam_probe,
+	.remove = cpu_mpam_remove,
 };
 
-module_platform_driver(qcom_mpam_driver);
+module_platform_driver(cpu_mpam_driver);
 
-MODULE_SOFTDEP("pre: qcom_scmi_client");
-MODULE_DESCRIPTION("QCOM MPAM driver");
+MODULE_SOFTDEP("pre: mpam");
+MODULE_DESCRIPTION("QCOM CPU MPAM driver");
 MODULE_LICENSE("GPL");
