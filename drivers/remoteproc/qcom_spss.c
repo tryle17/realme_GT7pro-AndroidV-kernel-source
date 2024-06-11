@@ -556,6 +556,13 @@ static int spss_attach(struct rproc *rproc)
 	/* If rproc already crashed stop it and propagate error */
 	if (check_status(spss, &ret)) {
 		dev_err(spss->dev, "Failed to attach SPSS remote proc and shutdown\n");
+
+		/* Panic if SPSS failed to attach in SP-PBL patched device*/
+#ifdef CONFIG_ARCH_SUN
+		dev_info(spss->dev, "SP-PBL patch version is %d\n", sp_pbl_patch_version);
+		if (rproc->recovery_disabled && sp_pbl_patch_version)
+			panic("Panicking, failed to attach %s and shutdown\n", rproc->name);
+#endif
 		spss_stop(rproc);
 		return ret;
 	}
