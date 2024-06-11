@@ -557,21 +557,21 @@ static void send_back_notification(uint32_t slav_status_reg,
 		}
 
 		if (slav_status_reg & BIT(26)) {
-			pr_err("Slate DSP DOWN\n", __func__);
+			pr_err("Slate DSP DOWN\n");
 			state_ops.set_dsp_state(false);
 		} else if (slav_status_reg & BIT(30)) {
 			if (!(slav_status_reg & BIT(26))) {
-				pr_err("Slate DSP UP\n", __func__);
+				pr_err("Slate DSP UP\n");
 				state_ops.set_dsp_state(true);
 			}
 		}
 
 		if (slav_status_reg & BIT(25)) {
-			pr_err("Slate BT DOWN\n", __func__);
+			pr_err("Slate BT DOWN\n");
 			state_ops.set_bt_state(false);
 		} else if (slav_status_reg & BIT(30)) {
 			if (!(slav_status_reg & BIT(25))) {
-				pr_err("Slate BT UP\n", __func__);
+				pr_err("Slate BT UP\n");
 				state_ops.set_bt_state(true);
 			}
 		}
@@ -648,7 +648,7 @@ static void slate_irq_tasklet_hndlr_l(void)
 
 	/* Check if there are any status updates */
 	if (slav_status_auto_clear_reg & OK_TO_SLEEP_CLEARED) {
-		SLATECOM_INFO("SLAVE_STATUS_READY = 0x%08X, OK_TO_SLEEP_CLEARED = 0x%08X\n",
+		SLATECOM_INFO("SLAVE_STATUS_READY = 0x%08lX, OK_TO_SLEEP_CLEARED = 0x%08lX\n",
 				(slave_status_reg & SLAVE_STATUS_READY),
 				(OK_TO_SLEEP_CLEARED & slav_status_auto_clear_reg));
 		g_slave_status_auto_clear_reg = slav_status_auto_clear_reg;
@@ -715,7 +715,7 @@ static int is_slate_resume(void *handle, uint32_t *slav_status_reg,
 	delta = ktime_sub(ktime_get(), sleep_time_start);
 	time_elapsed = ktime_to_ms(delta);
 	if (time_elapsed < MIN_SLEEP_TIME) {
-		pr_err("avoid aggresive wakeup, sleep for %lu ms\n",
+		pr_err("avoid aggresive wakeup, sleep for %lld ms\n",
 				MIN_SLEEP_TIME - time_elapsed);
 		msleep(MIN_SLEEP_TIME - time_elapsed);
 	}
@@ -744,7 +744,7 @@ static int is_slate_resume(void *handle, uint32_t *slav_status_reg,
 		memcpy(read_buf, rx_buf+SLATE_SPI_READ_LEN, size);
 		*slav_status_reg = read_buf[0];
 		*slav_status_auto_clear_reg = read_buf[2];
-		SLATECOM_INFO("slav_status_auto_clear_reg = 0x%X - OK_TO_SLEEP_CLEARED = 0x%08X\n",
+		SLATECOM_INFO("slav_status_auto_clear_reg = 0x%X - OK_TO_SLEEP_CLEARED = 0x%08lX\n",
 				*slav_status_auto_clear_reg,
 				(*slav_status_auto_clear_reg & OK_TO_SLEEP_CLEARED));
 	}
@@ -808,7 +808,7 @@ static int slatecom_resume_l(void *handle)
 		reinit_completion(&slate_resume_wait);
 
 		is_slate_resume(handle, &slav_status_reg, &slav_status_auto_clear_reg);
-		SLATECOM_INFO("SLAVE_STATUS_READY = 0x%08X, OK_TO_SLEEP_CLEARED = 0x%08X\n",
+		SLATECOM_INFO("SLAVE_STATUS_READY = 0x%08lX, OK_TO_SLEEP_CLEARED = 0x%08lX\n",
 			(slav_status_reg & SLAVE_STATUS_READY),
 			(slav_status_auto_clear_reg & OK_TO_SLEEP_CLEARED));
 
@@ -1628,7 +1628,7 @@ err_ret:
 	return -ENODEV;
 }
 
-static int slate_spi_remove(struct spi_device *spi)
+static void slate_spi_remove(struct spi_device *spi)
 {
 	struct slate_spi_priv *slate_spi = spi_get_drvdata(spi);
 
@@ -1640,7 +1640,6 @@ static int slate_spi_remove(struct spi_device *spi)
 	mutex_destroy(&cma_buffer_lock);
 	mutex_destroy(&slate_task_mutex);
 	unregister_pm_notifier(&slatecom_pm_nb);
-	return 0;
 }
 
 static void slate_spi_shutdown(struct spi_device *spi)
@@ -1667,9 +1666,6 @@ static int slatecom_pm_prepare(struct device *dev)
 
 	if (is_hibernate)
 		cmnd_reg |= SLATE_OK_SLP_S2D;
-
-	else if (pm_suspend_via_firmware())
-		cmnd_reg |= SLATE_OK_SLP_S2R;
 	else
 		cmnd_reg |= SLATE_OK_SLP_RBSC;
 
