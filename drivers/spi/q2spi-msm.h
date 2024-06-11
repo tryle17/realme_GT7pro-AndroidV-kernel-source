@@ -513,6 +513,7 @@ struct q2spi_dma_transfer {
  * @sys_mem_read_in_progress: reflects system memory read request is in progress
  * @q2spi_cr_txn_err: reflects Q2SPI_CR_TRANSACTION_ERROR in CR body
  * @q2spi_sleep_cmd_enable: reflects start sending the sleep command to slave
+ * @q2spi_cr_hdr_err: reflects CR Header incorrect in CR Header
  */
 struct q2spi_geni {
 	struct device *wrapper_dev;
@@ -617,6 +618,7 @@ struct q2spi_geni {
 	bool sys_mem_read_in_progress;
 	bool q2spi_cr_txn_err;
 	bool q2spi_sleep_cmd_enable;
+	bool q2spi_cr_hdr_err;
 };
 
 /**

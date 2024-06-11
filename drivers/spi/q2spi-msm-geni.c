@@ -1140,6 +1140,7 @@ static int q2spi_open(struct inode *inode, struct file *filp)
 	filp->private_data = q2spi;
 	q2spi->q2spi_cr_txn_err = false;
 	q2spi->q2spi_sleep_cmd_enable = false;
+	q2spi->q2spi_cr_hdr_err = false;
 	Q2SPI_DEBUG(q2spi, "%s End PID:%d, allocs:%d\n",
 		    __func__, current->pid, atomic_read(&q2spi->alloc_count));
 err:
@@ -1797,9 +1798,10 @@ static int q2spi_wakeup_hw_from_sleep(struct q2spi_geni *q2spi)
 	long timeout = 0;
 	int ret = 0;
 
-	if (q2spi->q2spi_cr_txn_err) {
+	if (q2spi->q2spi_cr_txn_err || q2spi->q2spi_cr_hdr_err) {
 		q2spi_transfer_abort(q2spi);
 		q2spi->q2spi_cr_txn_err = false;
+		q2spi->q2spi_cr_hdr_err = false;
 		return 0;
 	}
 
@@ -1992,6 +1994,7 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 				}
 			}
 			q2spi->q2spi_cr_txn_err = false;
+			q2spi->q2spi_cr_hdr_err = false;
 
 			/* Reset 100msec client sleep timer */
 			mod_timer(&q2spi->slave_sleep_timer,
@@ -3986,6 +3989,10 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 	if (ret) {
 		Q2SPI_DEBUG(q2spi, "%s db rx completion timeout: %d\n", __func__, ret);
 		q2spi_unmap_doorbell_rx_buf(q2spi);
+		atomic_set(&q2spi->sma_wr_pending, 0);
+		atomic_set(&q2spi->doorbell_pending, 0);
+		q2spi_geni_se_dump_regs(q2spi);
+		gpi_dump_for_geni(q2spi->gsi->tx_c);
 		goto exit_doorbell_work;
 	}
 
