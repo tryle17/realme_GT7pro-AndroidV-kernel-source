@@ -236,6 +236,7 @@ def define_parrot():
         "net/qrtr/qrtr-gunyah.ko",
         "net/qrtr/qrtr-mhi.ko",
         "net/qrtr/qrtr-smd.ko",
+        "net/wireless/cfg80211.ko",
     ]
 
     _parrot_consolidate_in_tree_modules = _parrot_in_tree_modules + [
