@@ -17,6 +17,7 @@ def define_monaco():
         "drivers/clk/qcom/gdsc-regulator.ko",
         "drivers/clk/qcom/gpucc-monaco.ko",
         "drivers/cpufreq/qcom-cpufreq-hw.ko",
+        "drivers/cpufreq/qcom-cpufreq-hw-debug.ko",
         "drivers/cpuidle/governors/qcom_lpm.ko",
         "drivers/crypto/qcom-rng.ko",
         "drivers/dma-buf/heaps/qcom_dma_heaps.ko",
