@@ -566,9 +566,6 @@ static void free_pmu_counters(unsigned int cpu)
 {
 	int i = 0;
 
-	if (!cpu_possible(cpu))
-		return;
-
 	for (i = 0; i < NO_OF_EVENT; i++) {
 		pmu_events[i][cpu].prev_count = 0;
 		pmu_events[i][cpu].cur_delta = 0;
