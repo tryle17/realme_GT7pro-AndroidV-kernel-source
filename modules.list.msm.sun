@@ -49,6 +49,7 @@ rtc-pm8xxx.ko
 pmic-pon-log.ko
 gcc-sun.ko
 gcc-tuna.ko
+gcc-kera.ko
 gpucc-sun.ko
 secure_buffer.ko
 dispcc-sun.ko
