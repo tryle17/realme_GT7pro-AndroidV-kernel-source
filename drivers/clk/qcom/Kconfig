@@ -1434,4 +1434,13 @@ config SM_GPUCC_TUNA
 	  Say Y if you want to support graphics controller devices and
 	  functionality such as 3D graphics.
 
+config SM_GCC_KERA
+	tristate "Kera Global Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  Kera devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, SD/UFS, PCIe etc.
+
 endif
