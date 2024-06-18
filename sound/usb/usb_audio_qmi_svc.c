@@ -1362,6 +1362,12 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 	}
 
 	subs = find_substream(pcm_card_num, pcm_dev_num, direction);
+
+	if (!subs) {
+		uaudio_err("invalid substream\n");
+		goto response;
+	}
+
 	chip = uadev[pcm_card_num].chip;
 	if (!subs || !chip || atomic_read(&chip->shutdown)) {
 		uaudio_err("can't find substream for card# %u, dev# %u dir%u\n",
