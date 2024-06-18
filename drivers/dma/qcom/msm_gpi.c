@@ -3004,12 +3004,7 @@ static void gpi_queue_xfer(struct gpii *gpii,
 	*wp = ch_tre;
 }
 
-/**
- * gpi_terminate_all() - function to stop and restart the channels
- * @chan: gsi dma channel handle
- *
- * Return: Returns success or failure
- */
+/* reset and restart transfer channel */
 int gpi_terminate_all(struct dma_chan *chan)
 {
 	struct gpii_chan *gpii_chan = to_gpii_chan(chan);
@@ -3022,7 +3017,7 @@ int gpi_terminate_all(struct dma_chan *chan)
 
 	/*
 	 * treat both channels as a group if its protocol is not UART
-	 * STOP, RESET if STOP fails, and RE-START needs to be in lockstep
+	 * STOP, RESET, or START needs to be in lockstep
 	 */
 	schid = (gpii->protocol == SE_PROTOCOL_UART) ? gpii_chan->chid : 0;
 	echid = (gpii->protocol == SE_PROTOCOL_UART) ? schid + 1 :
@@ -3039,24 +3034,37 @@ int gpi_terminate_all(struct dma_chan *chan)
 
 		/* send command to Stop the channel */
 		ret = gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_STOP);
-		if (ret) {
+		if (ret)
 			GPII_ERR(gpii, gpii_chan->chid,
 				 "Error Stopping Chan:%d resetting\n", ret);
-			ret = gpi_reset_chan(gpii_chan, GPI_CH_CMD_RESET);
-			if (ret) {
-				GPII_ERR(gpii, gpii_chan->chid,
-					 "Error resetting channel ret:%d\n", ret);
-				if (!gpii->reg_table_dump) {
-					gpi_dump_debug_reg(gpii);
-					gpii->reg_table_dump = true;
-				}
-				goto terminate_exit;
+	}
+
+	/* reset the channels (clears any pending tre) */
+	for (i = schid; i < echid; i++) {
+		gpii_chan = &gpii->gpii_chan[i];
+
+		ret = gpi_reset_chan(gpii_chan, GPI_CH_CMD_RESET);
+		if (ret) {
+			GPII_ERR(gpii, gpii_chan->chid,
+				 "Error resetting channel ret:%d\n", ret);
+			if (!gpii->reg_table_dump) {
+				gpi_dump_debug_reg(gpii);
+				gpii->reg_table_dump = true;
 			}
+			goto terminate_exit;
+		}
+
+		/* reprogram channel CNTXT */
+		ret = gpi_alloc_chan(gpii_chan, false);
+		if (ret) {
+			GPII_ERR(gpii, gpii_chan->chid,
+				 "Error alloc_channel ret:%d\n", ret);
+			goto terminate_exit;
 		}
 	}
 
 	/* restart the channels */
-	for (i = echid - 1; i >= schid; i--) {
+	for (i = schid; i < echid; i++) {
 		gpii_chan = &gpii->gpii_chan[i];
 
 		ret = gpi_start_chan(gpii_chan);
