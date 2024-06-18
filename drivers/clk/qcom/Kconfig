@@ -1358,4 +1358,22 @@ config SDW_DEBUGCC_MONACO
 	  Say Y if you want to support the debug clocks such as
 	  clock measurement functionality.
 
+config SM_VIDEOCC_TUNA
+	tristate "TUNA Video Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the video clock controller on Qualcomm Technologies, Inc.
+	  TUNA devices.
+	  Say Y if you want to support video devices and functionality such as
+	  video encode/decode.
+
+config SM_EVACC_TUNA
+	tristate "TUNA EVA Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the EVA clock controller on Qualcomm Technologies, Inc
+	  TUNA devices.
+	  Say Y if you want to support EVA devices to get better
+	  visual analysis.
+
 endif
