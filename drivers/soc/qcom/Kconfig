@@ -301,15 +301,6 @@ config QCOM_RPMH
 	  of hardware components aggregate requests for these resources and
 	  help apply the aggregated state on the resource.
 
-config RPMH_INCREASED_TIMEOUT
-	bool "rpmh increased timeout"
-	depends on QCOM_RPMH
-	help
-	  Say y here to increase the rpmh and crm drivers's completion
-	  timeout from one second to two seoonds whcih need to wait for
-	  rpmh and crm interrupts need to be service beyond one second after
-	  they triggered.
-
 config QCOM_RPMHPD
 	tristate "Qualcomm RPMh Power domain driver"
 	depends on QCOM_RPMH && QCOM_COMMAND_DB

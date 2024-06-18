@@ -23,11 +23,7 @@
 
 #include "rpmh-internal.h"
 
-#ifdef CONFIG_RPMH_INCREASED_TIMEOUT
-#define RPMH_TIMEOUT_MS			msecs_to_jiffies(2000)
-#else
 #define RPMH_TIMEOUT_MS			msecs_to_jiffies(1000)
-#endif
 
 #define DEFINE_RPMH_MSG_ONSTACK(device, s, q, name)	\
 	struct rpmh_request name = {			\
