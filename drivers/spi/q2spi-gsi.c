@@ -59,9 +59,23 @@ static void q2spi_rx_xfer_completion_event(struct msm_gpi_dma_async_tx_cb_param 
 
 static void q2spi_tx_xfer_completion_event(struct msm_gpi_dma_async_tx_cb_param *cb_param)
 {
-	struct q2spi_packet *q2spi_pkt = cb_param->userdata;
-	struct q2spi_geni *q2spi = q2spi_pkt->q2spi;
-	struct q2spi_dma_transfer *xfer = q2spi_pkt->xfer;
+	struct q2spi_packet *q2spi_pkt;
+	struct q2spi_geni *q2spi;
+	struct q2spi_dma_transfer *xfer;
+
+	q2spi_pkt = cb_param->userdata;
+	if (!q2spi_pkt) {
+		pr_err("%s Err Invalid q2spi_packet\n", __func__);
+		return;
+	}
+
+	q2spi = q2spi_pkt->q2spi;
+	if (!q2spi || !q2spi_pkt->xfer) {
+		pr_err("%s Err Invalid q2spi or xfer\n", __func__);
+		return;
+	}
+
+	xfer = q2spi_pkt->xfer;
 
 	Q2SPI_DEBUG(q2spi, "%s xfer->tx_len:%d cb_param_length:%d\n", __func__,
 		    xfer->tx_len, cb_param->length);
@@ -508,6 +522,7 @@ int q2spi_setup_gsi_xfer(struct q2spi_packet *q2spi_pkt)
 	q2spi->gsi->num_tx_eot = 0;
 	q2spi->gsi->num_rx_eot = 0;
 	q2spi->gsi->qup_gsi_err = false;
+	q2spi->gsi->qup_gsi_global_err = false;
 	xfer_tx_sg = q2spi->gsi->tx_sg;
 	xfer_rx_sg = q2spi->gsi->rx_sg;
 	c0_tre = &q2spi->gsi->config0_tre;
@@ -707,6 +722,9 @@ void q2spi_gsi_ch_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb, void *
 	default:
 		break;
 	}
+
+	if (cb->cb_event == MSM_GPI_QUP_ERROR)
+		q2spi->gsi->qup_gsi_global_err = true;
 
 	if (q2spi->gsi->qup_gsi_err)
 		Q2SPI_DEBUG(q2spi, "%s set qup_gsi_err\n", __func__);
