@@ -1927,9 +1927,12 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 				       int flow_id, void *user_buf)
 {
 	void *data_buf;
-	int i, ret = 0;
+	int i, ret = 0, retry_count = Q2SPI_MAX_TX_RETRIES;
 
-	for (i = 0; i <= Q2SPI_MAX_TX_RETRIES; i++) {
+	if (q2spi_req.cmd == LOCAL_REG_READ)
+		retry_count = 0;
+
+	for (i = 0; i <= retry_count; i++) {
 		/* Reset 100msec client sleep timer */
 		mod_timer(&q2spi->slave_sleep_timer,
 			  jiffies + msecs_to_jiffies(Q2SPI_SLAVE_SLEEP_TIME_MSECS));
