@@ -54,3 +54,7 @@ clk-smd-rpm.ko
 gcc-monaco.ko
 qcom-cpufreq-hw.ko
 dispcc-monaco.ko
+icc-debug.ko
+icc-rpm.ko
+qnoc-monaco.ko
+qnoc-qos-rpm.ko
