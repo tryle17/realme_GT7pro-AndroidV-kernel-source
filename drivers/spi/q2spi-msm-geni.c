@@ -4537,6 +4537,8 @@ int q2spi_put_slave_to_sleep(struct q2spi_geni *q2spi)
 	q2spi_del_pkt_from_tx_queue(q2spi, q2spi_pkt);
 	q2spi_free_q2spi_pkt(q2spi_pkt, __LINE__);
 	atomic_set(&q2spi->slave_in_sleep, 1);
+	/* add 2msec delay for slave to process the sleep packet */
+	usleep_range(2000, 3000);
 	Q2SPI_DEBUG(q2spi, "%s: PID=%d End slave_in_sleep:%d\n", __func__, current->pid,
 		    atomic_read(&q2spi->slave_in_sleep));
 err:
