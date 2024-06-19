@@ -2464,12 +2464,7 @@ static int q2spi_release(struct inode *inode, struct file *filp)
 	atomic_set(&q2spi->sma_wr_pending, 0);
 	atomic_set(&q2spi->sma_rd_pending, 0);
 
-	if (q2spi->hw_state_is_bad) {
-		Q2SPI_DEBUG(q2spi, "%s Err check HW state\n", __func__);
-		q2spi->port_release = true;
-		mutex_unlock(&q2spi->port_lock);
-		return -EPIPE;
-	}
+	q2spi->hw_state_is_bad = false;
 
 	if (mutex_is_locked(&q2spi->send_msgs_lock)) {
 		Q2SPI_DEBUG(q2spi, "%s q2spi_transfer is in progress\n", __func__);
