@@ -48,8 +48,6 @@
 
 #define to_rproc(d) container_of(d, struct rproc, dev)
 
-#define SOCCP_SLEEP_US  100
-#define SOCCP_TIMEOUT_US  10000
 #define SOCCP_STATE_MASK 0x600
 #define SOCCP_D0  0x2
 #define SOCCP_D1  0x4
@@ -726,10 +724,21 @@ static irqreturn_t soccp_running_ack(int irq, void *data)
  */
 static int rproc_config_check(struct qcom_adsp *adsp, u32 state)
 {
+	unsigned int retry_num = 50;
 	u32 val;
 
-	return readx_poll_timeout_atomic(readl, adsp->config_addr, val,
-				val == state, SOCCP_SLEEP_US, SOCCP_TIMEOUT_US);
+	do {
+		msleep(RPROC_HANDOVER_POLL_DELAY_MS);
+		/* Making sure the mem mapped io is read correctly*/
+		dsb(sy);
+		val = readl(adsp->config_addr);
+		if (state ==SOCCP_D0) {
+			if (val == SOCCP_D1)
+				return 0;
+		}
+	} while (val != state && --retry_num);
+
+	return (val==state) ? 0 : -ETIMEDOUT;
 }
 
 /*
@@ -856,6 +865,7 @@ int rproc_set_state(struct rproc *rproc, bool state)
 		}
 
 		ret = rproc_config_check(adsp, SOCCP_D0);
+		dsb(sy);
 		dev_err(adsp->dev, "%s requested D3->D0: soccp returned tcsr: tcsr val=%d\n",
 			current->comm, readl(adsp->config_addr));
 		if (ret) {
@@ -889,6 +899,7 @@ int rproc_set_state(struct rproc *rproc, bool state)
 			}
 
 			ret = rproc_config_check(adsp, SOCCP_D3);
+			dsb(sy);
 			dev_err(adsp->dev, "%s requested D0->D3: soccp returned tcsr: tcsr val=%d\n",
 				current->comm, readl(adsp->config_addr));
 			if (ret) {
@@ -946,10 +957,13 @@ static void qcom_pas_handover(struct qcom_q6v5 *q6v5)
 
 	if (adsp->check_status) {
 		ret = rproc_config_check(adsp, SOCCP_D3);
+		dsb(sy);
 		if (ret)
-			dev_err(adsp->dev, "state not changed in handover\n");
+			dev_err(adsp->dev, "state not changed in handover TCSR val = %d\n",
+				readl(adsp->config_addr));
 		else
-			dev_info(adsp->dev, "state changed in handover for soccp!\n");
+			dev_info(adsp->dev, "state changed in handover for soccp! TCSR val = %d\n",
+					readl(adsp->config_addr));
 	}
 	if (adsp->px_supply)
 		regulator_disable(adsp->px_supply);
