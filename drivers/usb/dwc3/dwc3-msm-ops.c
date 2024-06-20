@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -12,14 +12,52 @@
 #include <linux/sched.h>
 #include <linux/usb/dwc3-msm.h>
 #include <linux/usb/composite.h>
+#include <linux/usb/android_configfs_uevent.h>
 #include "core.h"
 #include "debug-ipc.h"
 #include "gadget.h"
 
-struct kprobe_data {
-	struct dwc3 *dwc;
-	int xi0;
+union kprobe_data {
+	struct {
+		struct dwc3 *dwc;
+		int xi0;
+	};
+	struct work_struct *data;
 };
+
+static int entry_usb_ep_set_maxpacket_limit(struct kretprobe_instance *ri,
+				struct pt_regs *regs)
+{
+	struct usb_ep *ep = (struct usb_ep *)regs->regs[0];
+	struct dwc3_ep *dep;
+	struct dwc3 *dwc;
+	union kprobe_data *data = (union kprobe_data *)ri->data;
+
+	dep =  to_dwc3_ep(ep);
+	dwc = dep->dwc;
+
+	data->dwc = dwc;
+	data->xi0 = dep->number;
+
+	return 0;
+}
+
+static int exit_usb_ep_set_maxpacket_limit(struct kretprobe_instance *ri,
+				struct pt_regs *regs)
+{
+	union kprobe_data *data = (union kprobe_data *)ri->data;
+	struct dwc3 *dwc = data->dwc;
+	u8 epnum = data->xi0;
+	struct dwc3_ep *dep = dwc->eps[epnum];
+	struct usb_ep *ep = &dep->endpoint;
+
+	if (epnum >= 2) {
+		ep->maxpacket_limit = 1024;
+		ep->maxpacket = 1024;
+	}
+
+	return 0;
+}
 
 static int entry_dwc3_gadget_run_stop(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
@@ -92,6 +130,7 @@ static int entry_dwc3_gadget_reset_interrupt(struct kretprobe_instance *ri,
 {
 	struct dwc3 *dwc = (struct dwc3 *)regs->regs[0];
 
+	dwc3_core_stop_hw_active_transfers(dwc);
 	dwc3_msm_notify_event(dwc, DWC3_CONTROLLER_NOTIFY_CLEAR_DB, 0);
 	return 0;
 }
@@ -99,7 +138,7 @@ static int entry_dwc3_gadget_reset_interrupt(struct kretprobe_instance *ri,
 static int entry_dwc3_gadget_pullup(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
-	struct kprobe_data *data = (struct kprobe_data *)ri->data;
+	union kprobe_data *data = (union kprobe_data *)ri->data;
 	struct usb_gadget *g = (struct usb_gadget *)regs->regs[0];
 
 	data->dwc = gadget_to_dwc(g);
@@ -117,7 +156,7 @@ static int entry_dwc3_gadget_pullup(struct kretprobe_instance *ri,
 static int exit_dwc3_gadget_pullup(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
-	struct kprobe_data *data = (struct kprobe_data *)ri->data;
+	union kprobe_data *data = (union kprobe_data *)ri->data;
 
 	dwc3_msm_notify_event(data->dwc, DWC3_CONTROLLER_PULLUP_EXIT,
 				data->xi0);
@@ -180,17 +219,44 @@ static int entry_trace_event_raw_event_dwc3_log_ep(struct kretprobe_instance *ri
 	return 0;
 }
 
+static int entry_android_work(struct kretprobe_instance *ri,
+			     struct pt_regs *regs)
+{
+	struct work_struct *data = (struct work_struct *)regs->regs[0];
+	union kprobe_data *w_data = (union kprobe_data *)ri->data;
+
+	w_data->data = data;
+	return 0;
+}
+
+static int exit_android_work(struct kretprobe_instance *ri,
+			    struct pt_regs *regs)
+{
+	union kprobe_data *w_data = (union kprobe_data *)ri->data;
+	struct android_uevent_opts *opts = container_of(w_data->data,
+			struct android_uevent_opts, work);
+
+	if (opts->configured)
+		pr_info("USB_STATE=CONFIGURED\n");
+	else if (opts->sw_connected)
+		pr_info(" USB_STATE=CONNECTED\n");
+	else
+		pr_info("USB_STATE=DISCONNECTED\n");
+
+	return 0;
+}
+
 #define ENTRY_EXIT(name) {\
 	.handler = exit_##name,\
 	.entry_handler = entry_##name,\
-	.data_size = sizeof(struct kprobe_data),\
+	.data_size = sizeof(union kprobe_data),\
 	.maxactive = 8,\
 	.kp.symbol_name = #name,\
 }
 
 #define ENTRY(name) {\
 	.entry_handler = entry_##name,\
-	.data_size = sizeof(struct kprobe_data),\
+	.data_size = sizeof(union kprobe_data),\
 	.maxactive = 8,\
 	.kp.symbol_name = #name,\
 }
@@ -201,6 +267,8 @@ static struct kretprobe dwc3_msm_probes[] = {
 	ENTRY(dwc3_gadget_reset_interrupt),
 	ENTRY(__dwc3_gadget_ep_enable),
 	ENTRY_EXIT(dwc3_gadget_pullup),
+	ENTRY_EXIT(android_work),
+	ENTRY_EXIT(usb_ep_set_maxpacket_limit),
 	ENTRY(trace_event_raw_event_dwc3_log_request),
 	ENTRY(trace_event_raw_event_dwc3_log_gadget_ep_cmd),
 	ENTRY(trace_event_raw_event_dwc3_log_trb),

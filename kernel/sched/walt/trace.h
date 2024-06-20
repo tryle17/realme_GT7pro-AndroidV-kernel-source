@@ -761,12 +761,13 @@ TRACE_EVENT(waltgov_util_update,
 );
 
 TRACE_EVENT(waltgov_next_freq,
-	    TP_PROTO(unsigned int cpu, unsigned long util, unsigned long max, unsigned int raw_freq,
-		     unsigned int freq, unsigned int policy_min_freq, unsigned int policy_max_freq,
-		     unsigned int cached_raw_freq, bool need_freq_update, bool thermal_isolated,
-		     unsigned int driving_cpu, unsigned int reason),
-	    TP_ARGS(cpu, util, max, raw_freq, freq, policy_min_freq, policy_max_freq,
-		    cached_raw_freq, need_freq_update, thermal_isolated, driving_cpu, reason),
+	    TP_PROTO(struct cpufreq_policy *policy, unsigned long util, unsigned long max,
+		     unsigned int raw_freq, unsigned int freq, unsigned int cached_raw_freq,
+		     bool need_freq_update, bool thermal_isolated, unsigned int driving_cpu,
+		     unsigned int reason, unsigned int final_freq),
+	    TP_ARGS(policy, util, max, raw_freq, freq,
+		    cached_raw_freq, need_freq_update, thermal_isolated, driving_cpu, reason,
+		    final_freq),
 	    TP_STRUCT__entry(
 		    __field(unsigned int, cpu)
 		    __field(unsigned long, util)
@@ -781,23 +782,27 @@ TRACE_EVENT(waltgov_next_freq,
 		    __field(unsigned int, rt_util)
 		    __field(unsigned int, driving_cpu)
 		    __field(unsigned int, reason)
+		    __field(unsigned int, smart_freq)
+		    __field(unsigned int, final_freq)
 	    ),
 	    TP_fast_assign(
-		    __entry->cpu		= cpu;
+		    __entry->cpu		= policy->cpu;
 		    __entry->util		= util;
 		    __entry->max		= max;
 		    __entry->raw_freq		= raw_freq;
 		    __entry->freq		= freq;
-		    __entry->policy_min_freq	= policy_min_freq;
-		    __entry->policy_max_freq	= policy_max_freq;
+		    __entry->policy_min_freq	= policy->min;
+		    __entry->policy_max_freq	= policy->max;
 		    __entry->cached_raw_freq	= cached_raw_freq;
 		    __entry->need_freq_update	= need_freq_update;
 		    __entry->thermal_isolated	= thermal_isolated;
-		    __entry->rt_util		= cpu_util_rt(cpu_rq(cpu));
+		    __entry->rt_util		= cpu_util_rt(cpu_rq(policy->cpu));
 		    __entry->driving_cpu	= driving_cpu;
 		    __entry->reason		= reason;
+		    __entry->smart_freq	= fmax_cap[SMART_FMAX_CAP][cpu_cluster(policy->cpu)->id];
+		    __entry->final_freq		= final_freq;
 	    ),
-	    TP_printk("cpu=%u util=%lu max=%lu raw_freq=%u freq=%u policy_min_freq=%u policy_max_freq=%u cached_raw_freq=%u need_update=%d thermal_isolated=%d rt_util=%u driv_cpu=%u reason=0x%x",
+	    TP_printk("cpu=%u util=%lu max=%lu raw_freq=%u freq=%u policy_min_freq=%u policy_max_freq=%u cached_raw_freq=%u need_update=%d thermal_isolated=%d rt_util=%u driv_cpu=%u reason=0x%x smart_freq=%u final_freq=%u",
 		      __entry->cpu,
 		      __entry->util,
 		      __entry->max,
@@ -810,20 +815,24 @@ TRACE_EVENT(waltgov_next_freq,
 		      __entry->thermal_isolated,
 		      __entry->rt_util,
 		      __entry->driving_cpu,
-		      __entry->reason)
+		      __entry->reason,
+		      __entry->smart_freq,
+		      __entry->final_freq)
 );
 
 TRACE_EVENT(walt_active_load_balance,
 
-	TP_PROTO(struct task_struct *p, int prev_cpu, int new_cpu, struct walt_task_struct *wts),
+	TP_PROTO(struct task_struct *p, int prev_cpu, int new_cpu, struct walt_task_struct *wts,
+		int oscillate_cpu),
 
-	TP_ARGS(p, prev_cpu, new_cpu, wts),
+	TP_ARGS(p, prev_cpu, new_cpu, wts, oscillate_cpu),
 
 	TP_STRUCT__entry(
 		__field(pid_t, pid)
 		__field(bool, misfit)
 		__field(int, prev_cpu)
 		__field(int, new_cpu)
+		__field(int, oscillate_cpu)
 	),
 
 	TP_fast_assign(
@@ -831,11 +840,12 @@ TRACE_EVENT(walt_active_load_balance,
 		__entry->misfit		= wts->misfit;
 		__entry->prev_cpu	= prev_cpu;
 		__entry->new_cpu	= new_cpu;
+		__entry->oscillate_cpu	= oscillate_cpu;
 	),
 
-	TP_printk("pid=%d misfit=%d prev_cpu=%d new_cpu=%d\n",
+	TP_printk("pid=%d misfit=%d prev_cpu=%d new_cpu=%d oscillate_cpu=%d\n",
 			__entry->pid, __entry->misfit, __entry->prev_cpu,
-			__entry->new_cpu)
+			__entry->new_cpu, __entry->oscillate_cpu)
 );
 
 TRACE_EVENT(walt_find_busiest_queue,
@@ -1800,6 +1810,28 @@ TRACE_EVENT(sched_pipeline_swapped,
 			__entry->prime_pid, __entry->prime_comm,
 			__entry->prime_demand_scaled, __entry->prime_coloc_demand,
 			__entry->prime_pipeline_cpu)
+);
+
+TRACE_EVENT(sched_boost_bus_dcvs,
+
+	TP_PROTO(int oscillate_cpu),
+
+	TP_ARGS(oscillate_cpu),
+
+	TP_STRUCT__entry(
+		__field(bool,           oscillation_enabled)
+		__field(bool,           storage_boosted)
+		),
+
+	TP_fast_assign(
+		__entry->oscillation_enabled    = oscillate_cpu != -1 ? true : false;
+		__entry->storage_boosted        = is_storage_boost();
+		),
+
+
+	TP_printk("rotation_enabled=%d storage_boosted=%d",
+		__entry->oscillation_enabled,
+		__entry->storage_boosted)
 );
 
 #endif /* _TRACE_WALT_H */

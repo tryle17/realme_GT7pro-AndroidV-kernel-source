@@ -25,7 +25,7 @@
 cpumask_t cpus_paused_by_us = { CPU_BITS_NONE };
 
 /* mask of all CPUS with a partial pause claim outstanding */
-static cpumask_t cpus_part_paused_by_us = { CPU_BITS_NONE };
+cpumask_t cpus_part_paused_by_us = { CPU_BITS_NONE };
 
 /* global to indicate which cpus to pause for sbt */
 cpumask_t cpus_for_sbt_pause = { CPU_BITS_NONE };
@@ -1323,6 +1323,7 @@ out:
 	return ret;
 }
 
+bool now_is_sbt;
 /**
  * sbt_ctl_check
  *
@@ -1336,7 +1337,7 @@ out:
 void sbt_ctl_check(u32 prime_wakeup_ctr_sum)
 {
 	static int prev_is_sbt_windows;
-	bool now_is_sbt = core_ctl_is_sbt(prev_is_sbt_windows, prime_wakeup_ctr_sum);
+	now_is_sbt = core_ctl_is_sbt(prev_is_sbt_windows, prime_wakeup_ctr_sum);
 	cpumask_t local_cpus;
 
 	/* if there are cpus to adjust */

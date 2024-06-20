@@ -35,6 +35,7 @@ socinfo.ko
 ufshcd-crypto-qti.ko
 smem.ko
 rtc-pm8xxx.ko
+rpm-smd-regulator.ko
 proxy-consumer.ko
 stub-regulator.ko
 debug-regulator.ko
@@ -46,3 +47,4 @@ sched-walt-debug.ko
 qcom-dcvs.ko
 qcom_llcc_pmu.ko
 qcom-pmu-lib.ko
+mdt_loader.ko

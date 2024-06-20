@@ -3009,52 +3009,6 @@ EXPORT_SYMBOL(msm_ep_set_mode);
 
 static void dwc3_resume_work(struct work_struct *w);
 
-static void dwc3_restart_usb_work(struct work_struct *w)
-{
-	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
-						restart_usb_work);
-	unsigned int timeout = 50;
-
-	if (atomic_read(&mdwc->in_lpm) || mdwc->dr_mode != USB_DR_MODE_OTG) {
-		dev_dbg(mdwc->dev, "%s failed!!!\n", __func__);
-		return;
-	}
-
-	/* guard against concurrent VBUS handling */
-	mdwc->in_restart = true;
-
-	if (!mdwc->vbus_active) {
-		dev_dbg(mdwc->dev, "%s bailing out in disconnect\n", __func__);
-		mdwc->err_evt_seen = false;
-		mdwc->in_restart = false;
-		return;
-	}
-
-	dbg_event(0xFF, "RestartUSB", 0);
-	/* Reset active USB connection */
-	dwc3_resume_work(&mdwc->resume_work);
-
-	/* Make sure disconnect is processed before sending connect */
-	while (--timeout && !pm_runtime_suspended(mdwc->dev))
-		msleep(20);
-
-	if (!timeout) {
-		dev_dbg(mdwc->dev,
-			"Not in LPM after disconnect, forcing suspend...\n");
-		dbg_event(0xFF, "ReStart:RT SUSP",
-			atomic_read(&mdwc->dev->power.usage_count));
-		pm_runtime_suspend(mdwc->dev);
-	}
-
-	mdwc->in_restart = false;
-	/* Force reconnect only if cable is still connected */
-	if (mdwc->vbus_active)
-		dwc3_resume_work(&mdwc->resume_work);
-
-	mdwc->err_evt_seen = false;
-	flush_work(&mdwc->sm_work);
-}
-
 /*
  * Config Global Distributed Switch Controller (GDSC)
  * to support controller power collapse
@@ -3457,6 +3411,13 @@ void dwc3_msm_notify_event(struct dwc3 *dwc,
 	case DWC3_CONTROLLER_CONNDONE_EVENT:
 		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_CONNDONE_EVENT received\n");
 
+		if ((dwc->speed != DWC3_DSTS_SUPERSPEED) &&
+			(dwc->speed != DWC3_DSTS_SUPERSPEED_PLUS)) {
+			reg = dwc3_msm_read_reg(mdwc->base, DWC3_GUSB3PIPECTL(0));
+			reg |= DWC3_GUSB3PIPECTL_SUSPHY;
+			dwc3_msm_write_reg(mdwc->base, DWC3_GUSB3PIPECTL(0), reg);
+		}
+
 		/*
 		 * SW WA for CV9 RESET DEVICE TEST(TD 9.23) compliance failure.
 		 * Visit eUSB2 phy driver for more details.
@@ -3532,6 +3493,16 @@ void dwc3_msm_notify_event(struct dwc3 *dwc,
 		break;
 	case DWC3_CONTROLLER_NOTIFY_CLEAR_DB:
 		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_NOTIFY_CLEAR_DB\n");
+
+		/*
+		 * Clear the susphy bit here to ensure it is not set during
+		 * the course of controller initialisation process.
+		 */
+		reg = dwc3_msm_read_reg(mdwc->base, DWC3_GUSB3PIPECTL(0));
+		reg &= ~(DWC3_GUSB3PIPECTL_SUSPHY);
+		dwc3_msm_write_reg(mdwc->base, DWC3_GUSB3PIPECTL(0), reg);
+		udelay(1000);
+
 		handle_gsi_clear_db(dwc);
 		break;
 	case DWC3_IMEM_UPDATE_PID:
@@ -3609,24 +3580,16 @@ static void dwc3_dis_sleep_mode(struct dwc3_msm *mdwc)
 	dwc3_msm_write_reg(mdwc->base, DWC3_GUCTL1, reg);
 }
 
-/* Force Gen1 speed on Gen2 controller if required */
-static void dwc3_force_gen1(struct dwc3_msm *mdwc)
-{
-	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
-
-	if (mdwc->force_gen1 && DWC3_IP_IS(DWC31))
-		dwc3_msm_write_reg_field(mdwc->base, DWC3_LLUCTL, DWC3_LLUCTL_FORCE_GEN1, 1);
-}
-
 static int dwc3_msm_power_collapse_por(struct dwc3_msm *mdwc)
 {
 	struct dwc3 *dwc = NULL;
 	u32 val;
 
-	if (!mdwc->dwc3)
-		return 0;
+	if (mdwc->dwc3)
+		dwc = platform_get_drvdata(mdwc->dwc3);
 
-	dwc = platform_get_drvdata(mdwc->dwc3);
+	if (!mdwc->ip)
+		mdwc->ip = DWC3_GSNPS_ID(dwc3_msm_read_reg(mdwc->base, DWC3_GSNPSID));
 
 	if (mdwc->dynamic_disable)
 		return -EINVAL;
@@ -3659,14 +3622,16 @@ static int dwc3_msm_power_collapse_por(struct dwc3_msm *mdwc)
 		dwc3_msm_write_reg_field(mdwc->base, DWC3_GCTL,
 				DWC3_GCTL_PRTCAPDIR(DWC3_GCTL_PRTCAP_OTG),
 				DWC3_GCTL_PRTCAPDIR(DWC3_GCTL_PRTCAP_HOST));
-		if (!dwc->dis_enblslpm_quirk)
+		if (dwc && !dwc->dis_enblslpm_quirk)
 			dwc3_en_sleep_mode(mdwc);
 
 		if (mdwc->dis_sending_cm_l1_quirk)
 			mdwc3_dis_sending_cm_l1(mdwc);
 	}
 
-	dwc3_force_gen1(mdwc);
+	/* Force Gen1 speed on Gen2 controller if required */
+	if (mdwc->force_gen1 && mdwc->ip == DWC31_IP)
+		dwc3_msm_write_reg_field(mdwc->base, DWC3_LLUCTL, DWC3_LLUCTL_FORCE_GEN1, 1);
 	return 0;
 }
 
@@ -4157,6 +4122,8 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc, bool force_power_collapse)
 	ret = dwc3_msm_prepare_suspend(mdwc, force_power_collapse);
 	if (ret) {
 		mutex_unlock(&mdwc->suspend_resume_mutex);
+		if (mdwc->in_host_mode && dwc && dwc->xhci)
+			pm_request_resume(&dwc->xhci->dev);
 		return ret;
 	}
 
@@ -4624,9 +4591,8 @@ static void dwc3_pwr_event_handler(struct dwc3_msm *mdwc)
 	struct dwc3 *dwc = NULL;
 	u32 irq_stat, irq_clear = 0;
 
-	if (!mdwc->dwc3 || !mdwc->use_pwr_event_for_wakeup)
-		return;
-	dwc = platform_get_drvdata(mdwc->dwc3);
+	if (mdwc->dwc3)
+		dwc = platform_get_drvdata(mdwc->dwc3);
 
 	irq_stat = dwc3_msm_read_reg(mdwc->base, PWR_EVNT_IRQ_STAT_REG);
 	dev_dbg(mdwc->dev, "%s irq_stat=%X\n", __func__, irq_stat);
@@ -4654,7 +4620,7 @@ static void dwc3_pwr_event_handler(struct dwc3_msm *mdwc)
 	if (irq_stat & PWR_EVNT_LPM_OUT_L1_MASK) {
 		dev_dbg(mdwc->dev, "%s: handling PWR_EVNT_LPM_OUT_L1_MASK\n",
 				__func__);
-		if (!mdwc->in_host_mode) {
+		if (!mdwc->in_host_mode && dwc) {
 			if (usb_gadget_wakeup(dwc->gadget))
 				dev_err(mdwc->dev, "%s failed to take dwc out of L1\n",
 					__func__);
@@ -4850,7 +4816,7 @@ static int dwc3_msm_id_notifier(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
-
+static void dwc3_override_vbus_status(struct dwc3_msm *mdwc, bool vbus_present);
 static int dwc3_msm_vbus_notifier(struct notifier_block *nb,
 	unsigned long event, void *ptr)
 {
@@ -4896,6 +4862,11 @@ static int dwc3_msm_vbus_notifier(struct notifier_block *nb,
 				wcd_usbss_dpdm_switch_update(false, false);
 			if (!spoof)
 				return NOTIFY_DONE;
+		}
+
+		if (!spoof && mdwc->drd_state != DRD_STATE_UNDEFINED) {
+			dwc3_override_vbus_status(mdwc, !!event);
+			return NOTIFY_DONE;
 		}
 
 		mdwc->check_eud_state = true;
@@ -5633,6 +5604,102 @@ int dwc3_msm_release_ss_lane(struct device *dev)
 }
 EXPORT_SYMBOL(dwc3_msm_release_ss_lane);
 
+static int dwc3_msm_restart_usb_host(struct dwc3_msm *mdwc)
+{
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	struct usb_hcd *hcd = platform_get_drvdata(dwc->xhci);
+	int ret = 0;
+
+	if (!test_bit(HCD_FLAG_DEAD, &hcd->flags))
+		return 0;
+
+	mutex_lock(&mdwc->role_switch_mutex);
+
+	/* Check if USB cable disconnected */
+	if (mdwc->id_state == DWC3_ID_FLOAT)
+		goto exit;
+
+	/* stop USB host mode */
+	ret = dwc3_start_stop_host(mdwc, false);
+	if (ret)
+		goto exit;
+
+	dwc3_start_stop_host(mdwc, true);
+
+exit:
+	mutex_unlock(&mdwc->role_switch_mutex);
+
+	return ret;
+}
+
+static int dwc3_msm_restart_usb_gadget(struct dwc3_msm *mdwc)
+{
+	unsigned int timeout = 50;
+
+	/* guard against concurrent VBUS handling */
+	mdwc->in_restart = true;
+
+	if (!mdwc->vbus_active) {
+		dev_dbg(mdwc->dev, "%s bailing out in disconnect\n", __func__);
+		mdwc->err_evt_seen = false;
+		mdwc->in_restart = false;
+		return 0;
+	}
+
+	dbg_event(0xFF, "RestartUSB", 0);
+	/* Reset active USB connection */
+	dwc3_resume_work(&mdwc->resume_work);
+
+	/* Make sure disconnect is processed before sending connect */
+	while (--timeout && !pm_runtime_suspended(mdwc->dev))
+		msleep(20);
+
+	if (!timeout) {
+		dev_dbg(mdwc->dev,
+			"Not in LPM after disconnect, forcing suspend...\n");
+		dbg_event(0xFF, "ReStart:RT SUSP",
+			atomic_read(&mdwc->dev->power.usage_count));
+		pm_runtime_suspend(mdwc->dev);
+	}
+
+	mdwc->in_restart = false;
+	/* Force reconnect only if cable is still connected */
+	if (mdwc->vbus_active)
+		dwc3_resume_work(&mdwc->resume_work);
+
+	mdwc->err_evt_seen = false;
+	flush_work(&mdwc->sm_work);
+
+	return 0;
+}
+
+static void dwc3_restart_usb_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
+						restart_usb_work);
+	enum usb_role role;
+
+	if (atomic_read(&mdwc->in_lpm)) {
+		dev_dbg(mdwc->dev, "%s failed!!!\n", __func__);
+		return;
+	}
+
+	mutex_lock(&mdwc->role_switch_mutex);
+	role = dwc3_msm_get_role(mdwc);
+	mutex_unlock(&mdwc->role_switch_mutex);
+
+	switch (role) {
+	case USB_ROLE_HOST:
+		dwc3_msm_restart_usb_host(mdwc);
+		break;
+	case USB_ROLE_DEVICE:
+		dwc3_msm_restart_usb_gadget(mdwc);
+		break;
+	default:
+		dev_err(mdwc->dev, "incorrect role during restart\n");
+	}
+}
+
 static int qos_rec_irq_read(struct seq_file *s, void *p)
 {
 	struct dwc3_msm *mdwc = s->private;
@@ -5720,7 +5787,6 @@ static int dwc3_msm_core_init(struct dwc3_msm *mdwc)
 	struct device_node *node = mdwc->dev->of_node, *dwc3_node;
 	struct dwc3	*dwc;
 	int ret = 0;
-	u32 val;
 
 	if (mdwc->dwc3)
 		return 0;
@@ -5756,12 +5822,6 @@ static int dwc3_msm_core_init(struct dwc3_msm *mdwc)
 		of_node_put(dwc3_node);
 		goto err;
 	}
-
-	/*
-	 * Wait for child's probe completion before retrieving the
-	 * driver data to make sure its populated properly.
-	 */
-	wait_for_device_probe();
 
 	mdwc->dwc3 = of_find_device_by_node(dwc3_node);
 	of_node_put(dwc3_node);
@@ -5813,11 +5873,6 @@ static int dwc3_msm_core_init(struct dwc3_msm *mdwc)
 	mdwc->xhci_pm_ops = kzalloc(sizeof(struct dev_pm_ops), GFP_ATOMIC);
 	if (!mdwc->xhci_pm_ops)
 		goto free_dwc_pm_ops;
-
-	val = dwc3_msm_read_reg(mdwc->base, DWC3_GSNPSID);
-	mdwc->ip = DWC3_GSNPS_ID(val);
-
-	dwc3_force_gen1(mdwc);
 
 	dwc3_msm_notify_event(dwc, DWC3_GSI_EVT_BUF_ALLOC, 0);
 	pm_runtime_set_autosuspend_delay(dwc->dev, 0);
@@ -6413,6 +6468,7 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 {
 	struct dwc3_msm *mdwc = container_of(nb, struct dwc3_msm, host_nb);
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	struct usb_hcd *hcd = platform_get_drvdata(dwc->xhci);
 	struct usb_device *udev = ptr;
 
 	if (event != USB_DEVICE_ADD && event != USB_DEVICE_REMOVE)
@@ -6471,6 +6527,9 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 
 			if (mdwc->wcd_usbss)
 				wcd_usbss_dpdm_switch_update(true, true);
+
+			if (hcd && test_bit(HCD_FLAG_DEAD, &hcd->flags))
+				schedule_work(&mdwc->restart_usb_work);
 		}
 	} else if (!udev->parent) {
 		/* USB root hub device */
@@ -6506,11 +6565,17 @@ static void msm_dwc3_perf_vote_work(struct work_struct *w)
 	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
 						perf_vote_work.work);
 	struct irq_desc *irq_desc = irq_to_desc(mdwc->core_irq);
-	unsigned int new = irq_desc->tot_count;
-	unsigned int count = new - mdwc->irq_cnt;
 	unsigned int threshold = PM_QOS_DEFAULT_SAMPLE_THRESHOLD;
 	unsigned long delay = PM_QOS_DEFAULT_SAMPLE_MS;
+	unsigned int new;
+	unsigned int count;
 	bool in_perf_mode = false;
+
+	if (!irq_desc)
+		return;
+
+	new = irq_desc->tot_count;
+	count = new - mdwc->irq_cnt;
 
 	if (mdwc->qos_rec_start && mdwc->qos_rec_index < PM_QOS_REC_MAX_RECORD)
 		mdwc->qos_rec_irq[mdwc->qos_rec_index++] = count;
@@ -6541,6 +6606,9 @@ static void msm_dwc3_perf_vote_work(struct work_struct *w)
 static void msm_dwc3_perf_vote_enable(struct dwc3_msm *mdwc, bool enable)
 {
 	struct irq_desc *irq_desc = irq_to_desc(mdwc->core_irq);
+
+	if (!irq_desc)
+		return;
 
 	if (enable) {
 		/* make sure when enable work, save a valid start irq count */

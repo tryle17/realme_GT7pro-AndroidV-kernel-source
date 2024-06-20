@@ -54,7 +54,7 @@
 
 #define UFS_DDR "ufs-ddr"
 #define CPU_UFS "cpu-ufs"
-#define MAX_PROP_SIZE		   32
+#define MAX_PROP_SIZE		   50
 #define VDDP_REF_CLK_MIN_UV        1200000
 #define VDDP_REF_CLK_MAX_UV        1200000
 #define VCCQ_DEFAULT_1_2V	1200000
@@ -205,6 +205,7 @@ static int ufs_qcom_config_shared_ice(struct ufs_qcom_host *host);
 static int ufs_qcom_ber_threshold_set(const char *val, const struct kernel_param *kp);
 static int ufs_qcom_ber_duration_set(const char *val, const struct kernel_param *kp);
 static void ufs_qcom_ber_mon_init(struct ufs_hba *hba);
+static void ufs_qcom_enable_vccq_proxy_vote(struct ufs_hba *hba);
 
 static s64 idle_time[UFS_QCOM_BER_MODE_MAX];
 static ktime_t idle_start;
@@ -944,32 +945,56 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 		goto out;
 	}
 
-	reenable_intr = hba->is_irq_enabled;
-	disable_irq(hba->irq);
-	hba->is_irq_enabled = false;
+	if (host->hw_ver.major >= 0x6) {
+		reenable_intr = hba->is_irq_enabled;
+		disable_irq(hba->irq);
+		hba->is_irq_enabled = false;
 
-	/*
-	 * Refer to the PHY programming guide.
-	 * 1. Assert the BCR reset.
-	 * 2. Power on the PHY regulators and GDSC.
-	 * 3. Release the BCR reset.
-	 */
-	ret = reset_control_assert(host->core_reset);
-	if (ret) {
-		dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
-				 __func__, ret);
-		goto out;
-	}
+		/*
+		 * Refer to the PHY programming guide.
+		 * 1. Assert the BCR reset.
+		 * 2. Power on the PHY regulators and GDSC.
+		 * 3. Release the BCR reset.
+		 */
+		ret = reset_control_assert(host->core_reset);
+		if (ret) {
+			dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
+					 __func__, ret);
+			goto out;
+		}
 
-	/*
-	 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
-	 * would be a nop because the flag is_phy_pwr_on would be true.
-	 */
-	ret = ufs_qcom_phy_power_on(hba);
-	if (ret) {
-		dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
-			__func__, ret);
-		goto out;
+		/*
+		 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
+		 * would be a nop because the flag is_phy_pwr_on would be true.
+		 */
+		ret = ufs_qcom_phy_power_on(hba);
+		if (ret) {
+			dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
+				__func__, ret);
+			goto out;
+		}
+	} else {
+		/*
+		 * Power on the PHY before resetting the UFS host controller
+		 * and the UFS PHY. Without power, the PHY reset may not work properly.
+		 * If the PHY has already been powered, the ufs_qcom_phy_power_on()
+		 * would be a nop because the flag is_phy_pwr_on would be true.
+		 */
+		ret = ufs_qcom_phy_power_on(hba);
+		if (ret) {
+			dev_err(hba->dev, "%s: phy power on failed, ret = %d\n",
+				__func__, ret);
+			goto out;
+		}
+		reenable_intr = hba->is_irq_enabled;
+		disable_irq(hba->irq);
+		hba->is_irq_enabled = false;
+		ret = reset_control_assert(host->core_reset);
+		if (ret) {
+			dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
+					 __func__, ret);
+			goto out;
+		}
 	}
 
 	/*
@@ -1893,6 +1918,10 @@ static int ufs_qcom_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op,
 
 	if (!err && ufs_qcom_is_link_off(hba) && host->device_reset)
 		ufs_qcom_device_reset_ctrl(hba, true);
+
+	/* put a proxy vote on UFS VCCQ LDO in shutdown case */
+	if (pm_op == UFS_SHUTDOWN_PM)
+		ufs_qcom_enable_vccq_proxy_vote(hba);
 
 	ufs_qcom_log_str(host, "&,%d,%d,%d,%d,%d,%d\n",
 			pm_op, hba->rpm_lvl, hba->spm_lvl, hba->uic_link_state,
@@ -3204,6 +3233,30 @@ static int ufs_qcom_set_cur_therm_state(struct thermal_cooling_device *tcd,
 	host->uqt.curr_state = data;
 
 	return 0;
+}
+
+
+/**
+ * ufs_qcom_enable_vccq_proxy_vote - read Device tree for
+ * qcom,vccq-proxy-vote handle for additional vote on VCCQ
+ * LDO during shutdown.
+ * @hba: per adapter instance
+ */
+
+static void ufs_qcom_enable_vccq_proxy_vote(struct ufs_hba *hba)
+{
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+	int err;
+
+	ufs_qcom_parse_reg_info(host, "qcom,vccq-proxy-vote",
+			&host->vccq_proxy_client);
+
+	if (host->vccq_proxy_client) {
+		err = ufs_qcom_enable_vreg(hba->dev, host->vccq_proxy_client);
+		if (err)
+			dev_err(hba->dev, "%s: failed enable vccq_proxy err=%d\n",
+						__func__, err);
+	}
 }
 
 struct thermal_cooling_device_ops ufs_thermal_ops = {
@@ -5787,6 +5840,7 @@ static int ufs_qcom_remove(struct platform_device *pdev)
 	platform_msi_domain_free_irqs(hba->dev);
 	return 0;
 }
+
 
 static void ufs_qcom_shutdown(struct platform_device *pdev)
 {

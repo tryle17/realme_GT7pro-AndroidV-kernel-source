@@ -55,6 +55,15 @@ config QCOM_COMMAND_DB
 	  resource on a RPM-hardened platform must use this database to get
 	  SoC specific identifier and information for the shared resources.
 
+config QCOM_CPUSS_SLEEP_STATS
+	tristate "Qualcomm Technologies, Inc. (QTI) CPUSS sleep stats driver"
+	depends on DEBUG_FS
+	help
+	 Qualcomm Technologies, Inc. (QTI) CPUSS sleep stats driver to get
+	 hardware LPM counts and residency for particular core/cluster
+	 low power modes. This driver creates debugfs entry which provide
+	 provision to read those counters.
+
 config QCOM_CPUSS_SLEEP_STATS_V4
 	tristate "Qualcomm Technologies, Inc. (QTI) CPUSS sleep stats v4 driver"
 	depends on DEBUG_FS
@@ -300,6 +309,15 @@ config QCOM_RPMH
 	  internal bus to transmit state requests for shared resources. A set
 	  of hardware components aggregate requests for these resources and
 	  help apply the aggregated state on the resource.
+
+config QCOM_RPMH_TIMEOUT
+	int "Timeout for RPMH and CRM communication"
+	default 1000
+	depends on QCOM_RPMH || QCOM_CRM || QCOM_CRM_V2
+	help
+	  The amount of time, in milliseconds that should enough to get
+	  response from RPMh for the resource request from APSS.
+	  Wait this much time before a warning is emitted.
 
 config QCOM_RPMHPD
 	tristate "Qualcomm RPMh Power domain driver"
@@ -647,6 +665,75 @@ config MSM_BOOT_STATS
 	  This figures are reported in mpm sleep clock cycles and have a
 	  resolution of 31 bits as 1 bit is used as an overflow check.
 
+config MSM_SLATECOM
+        tristate "Provide APIs to communicate with Slate chipset"
+        help
+          SLATECOM is a thin layer above SPI. It is used within a SoC for
+          communication between G-Link/slate_com_dev and Slate processor over SPI.
+          This handle the interrupts raised by BG and notify the G-link with
+          interrupt event and event data.
+
+config MSM_SLATECOM_INTERFACE
+        tristate "Driver support for Slate Communication"
+        depends on MSM_SLATECOM
+        help
+          Create a slate_com_dev device node for user space communication.
+          Single user space client can open device node for communication
+          from hardware. Hardware will provide access to read
+          registers and read/write AHB memory in the device.
+
+config MSM_SLATECOM_RPMSG
+        tristate "Provide support for slate control GLINK channel"
+        depends on MSM_SLATECOM_INTERFACE
+        help
+          MSM_SLATECOM_RPMSG informs SLATECOM_INTERFACE driver if GLINK channel
+          has been opened by remote processor. It doesn't maintain state machine
+          and is probed when Slate opens channel and removed when the channel is
+          closed by remote processor.
+
+config MSM_SEB
+        tristate "Provide APIs to send and receive events from Slate chipset"
+        help
+          SEB(Slate event bridge) communicates to Slate over rpmsg driver to
+          send or receive events from Slate. The button events received from
+          Slate are send to input framework. The driver provides functionality
+          for a client to register a callback to receive events from a group.
+
+config MSM_SEB_RPMSG
+        tristate "Provide support for slate event GLINK channel"
+        depends on MSM_SEB
+        help
+          SEB_RPMSG informs SEB driver if GLINK channel has been
+          opened by remote processor. It doesn't maintain state machine
+          and is probed when Slate opens channel and removed when the
+          channel is closed by remote processor.
+
+config MSM_SLATECOM_EVENT
+        tristate "provide support for slate sensor event Communication"
+        depends on MSM_SEB
+        help
+         Create a slate_com_event device node for user space communication.
+         This event driver register for AON event bridge to receive sensor
+         up and down and notifies upper layer HAL about sensor stataus
+         through uevent via netlink socket.
+
+config MSM_SLATERSB
+        tristate "Provide support for rsb events on Slate"
+        help
+          SLATERSB communicates to SLATE over rpmsg driver for RSB configuration
+          and enable/disable on device power state change.Add slate rsb driver
+          which is use to configure rsb on slate.Slate rsb driver uses glink
+          to communicate with slate
+
+config MSM_SLATERSB_RPMSG
+        tristate "Provide support for slate events to RSB"
+        depends on MSM_SLATERSB
+        help
+          SLATERSB-RPMSG informs SLATERSB driver if GLINK channel has been
+          opened by remote processor. It doesn't maintain state machine
+          and is probed when SLATE opens channel and removed when the
+          channel is closed by remote processor.
+
 config QCOM_EUD
 	tristate "QTI Embedded USB Debugger (EUD)"
 	depends on ARCH_QCOM
@@ -658,6 +745,30 @@ config QCOM_EUD
 	  This module enables support for Qualcomm Technologies, Inc.
 	  Embedded USB Debugger (EUD).
 	  If unsure, say N.
+
+choice
+	prompt "Perform Action on spinlock bug"
+	depends on DEBUG_SPINLOCK && QCOM_CPU_VENDOR_HOOKS
+
+	default DEBUG_SPINLOCK_BITE_ON_BUG
+
+	config DEBUG_SPINLOCK_BITE_ON_BUG
+		bool "Cause a Watchdog Bite on Spinlock bug"
+		depends on QCOM_WDT_CORE
+		help
+		  On a spinlock bug, cause a watchdog bite so that we can get
+		  the precise state of the system captured at the time of spin
+		  dump. This is mutually exclusive with the below
+		  DEBUG_SPINLOCK_PANIC_ON_BUG config.
+
+	config DEBUG_SPINLOCK_PANIC_ON_BUG
+		bool "Cause a Kernel Panic on Spinlock bug"
+		help
+		  On a spinlock bug, cause a kernel panic so that we can get the
+		  complete information about the system at the time of spin dump
+		  in the dmesg. This is mutually exclusive with the above
+		  DEBUG_SPINLOCK_BITE_ON_BUG.
+endchoice
 
 config GH_TLMM_VM_MEM_ACCESS
 	tristate "Qualcomm Technologies, Inc. TLMM VM mem access driver"
@@ -817,6 +928,14 @@ config QCOM_SECURE_BUFFER
 	  memory buffers. This ensures that only the correct clients can
 	  use this memory and no unauthorized access is made to the
 	  buffer.
+
+config QCOM_MEM_HOOKS
+	tristate "Memory trace hook callbacks"
+	help
+	  A helper driver for loading various memory-related vendor
+	  hooks, which are used to control the behavior of the core.
+	  If unsure, say 'M' here to ensure that the hooks are compiled
+	  in.
 
 source "drivers/soc/qcom/mem_buf/Kconfig"
 source "drivers/soc/qcom/tmecom/Kconfig"

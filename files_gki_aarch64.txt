@@ -24,6 +24,7 @@ arch/arm64/geniezone/hvc.c
 arch/arm64/geniezone/vcpu.c
 arch/arm64/geniezone/vgic.c
 arch/arm64/geniezone/vm.c
+arch/arm64/gunyah/gunyah_hypercall.c
 arch/arm64/include/asm/acpi.h
 arch/arm64/include/asm/alternative-macros.h
 arch/arm64/include/asm/alternative.h
@@ -77,6 +78,7 @@ arch/arm64/include/asm/fpsimdmacros.h
 arch/arm64/include/asm/ftrace.h
 arch/arm64/include/asm/futex.h
 arch/arm64/include/asm/gpr-num.h
+arch/arm64/include/asm/gunyah.h
 arch/arm64/include/asm/hardirq.h
 arch/arm64/include/asm/hw_breakpoint.h
 arch/arm64/include/asm/hwcap.h
@@ -186,6 +188,7 @@ arch/arm64/include/asm/tlb.h
 arch/arm64/include/asm/tlbbatch.h
 arch/arm64/include/asm/tlbflush.h
 arch/arm64/include/asm/topology.h
+arch/arm64/include/asm/trans_pgd.h
 arch/arm64/include/asm/traps.h
 arch/arm64/include/asm/uaccess.h
 arch/arm64/include/asm/unistd.h
@@ -231,11 +234,13 @@ arch/arm64/kernel/alternative.c
 arch/arm64/kernel/armv8_deprecated.c
 arch/arm64/kernel/asm-offsets.c
 arch/arm64/kernel/cacheinfo.c
+arch/arm64/kernel/cpu-reset.S
 arch/arm64/kernel/cpu_errata.c
 arch/arm64/kernel/cpu_ops.c
 arch/arm64/kernel/cpufeature.c
 arch/arm64/kernel/cpuidle.c
 arch/arm64/kernel/cpuinfo.c
+arch/arm64/kernel/crash_core.c
 arch/arm64/kernel/debug-monitors.c
 arch/arm64/kernel/efi-header.S
 arch/arm64/kernel/efi-rt-wrapper.S
@@ -256,7 +261,10 @@ arch/arm64/kernel/io.c
 arch/arm64/kernel/irq.c
 arch/arm64/kernel/jump_label.c
 arch/arm64/kernel/kaslr.c
+arch/arm64/kernel/kexec_image.c
 arch/arm64/kernel/kuser32.S
+arch/arm64/kernel/machine_kexec.c
+arch/arm64/kernel/machine_kexec_file.c
 arch/arm64/kernel/module-plts.c
 arch/arm64/kernel/module.c
 arch/arm64/kernel/mte.c
@@ -279,6 +287,7 @@ arch/arm64/kernel/process.c
 arch/arm64/kernel/proton-pack.c
 arch/arm64/kernel/psci.c
 arch/arm64/kernel/ptrace.c
+arch/arm64/kernel/relocate_kernel.S
 arch/arm64/kernel/return_address.c
 arch/arm64/kernel/setup.c
 arch/arm64/kernel/signal.c
@@ -471,6 +480,8 @@ arch/arm64/mm/pageattr.c
 arch/arm64/mm/pgd.c
 arch/arm64/mm/proc.S
 arch/arm64/mm/ptdump.c
+arch/arm64/mm/trans_pgd-asm.S
+arch/arm64/mm/trans_pgd.c
 arch/arm64/net/bpf_jit.h
 arch/arm64/net/bpf_jit_comp.c
 arch/arm64/tools/gen-hyprel.c
@@ -719,6 +730,7 @@ drivers/base/transport_class.c
 drivers/block/brd.c
 drivers/block/loop.c
 drivers/block/ublk_drv.c
+drivers/block/virtio_blk.c
 drivers/block/zram/zcomp.c
 drivers/block/zram/zcomp.h
 drivers/block/zram/zram_drv.c
@@ -739,6 +751,8 @@ drivers/bluetooth/hci_uart.h
 drivers/bus/qcom-ebi2.c
 drivers/bus/simple-pm-bus.c
 drivers/char/hw_random/arm_smccc_trng.c
+drivers/char/hw_random/cctrng.c
+drivers/char/hw_random/cctrng.h
 drivers/char/hw_random/cn10k-rng.c
 drivers/char/hw_random/core.c
 drivers/char/hw_random/hisi-rng.c
@@ -746,6 +760,7 @@ drivers/char/hw_random/histb-rng.c
 drivers/char/mem.c
 drivers/char/misc.c
 drivers/char/random.c
+drivers/char/virtio_console.c
 drivers/clk/clk-bulk.c
 drivers/clk/clk-composite.c
 drivers/clk/clk-conf.c
@@ -1281,9 +1296,11 @@ drivers/media/v4l2-core/v4l2-trace.c
 drivers/mfd/act8945a.c
 drivers/mfd/mfd-core.c
 drivers/mfd/syscon.c
+drivers/misc/open-dice.c
 drivers/misc/sram.c
 drivers/misc/sram.h
 drivers/misc/uid_sys_stats.c
+drivers/misc/vcpu_stall_detector.c
 drivers/mmc/core/block.c
 drivers/mmc/core/block.h
 drivers/mmc/core/bus.c
@@ -1456,6 +1473,7 @@ drivers/of/device.c
 drivers/of/fdt.c
 drivers/of/fdt_address.c
 drivers/of/irq.c
+drivers/of/kexec.c
 drivers/of/kobj.c
 drivers/of/module.c
 drivers/of/of_private.h
@@ -1534,6 +1552,7 @@ drivers/pinctrl/pinctrl-utils.c
 drivers/pinctrl/pinctrl-utils.h
 drivers/pinctrl/pinmux.c
 drivers/pinctrl/pinmux.h
+drivers/pmdomain/arm/scmi_perf_domain.c
 drivers/power/reset/hisi-reboot.c
 drivers/power/reset/syscon-reboot.c
 drivers/power/supply/power_supply.h
@@ -1857,6 +1876,11 @@ drivers/usb/host/xhci-trace.c
 drivers/usb/host/xhci-trace.h
 drivers/usb/host/xhci.c
 drivers/usb/host/xhci.h
+drivers/usb/mon/mon_bin.c
+drivers/usb/mon/mon_main.c
+drivers/usb/mon/mon_stat.c
+drivers/usb/mon/mon_text.c
+drivers/usb/mon/usb_mon.h
 drivers/usb/phy/of.c
 drivers/usb/phy/phy.c
 drivers/usb/roles/class.c
@@ -1940,8 +1964,24 @@ drivers/virt/geniezone/gzvm_main.c
 drivers/virt/geniezone/gzvm_mmu.c
 drivers/virt/geniezone/gzvm_vcpu.c
 drivers/virt/geniezone/gzvm_vm.c
+drivers/virt/gunyah/gunyah.c
+drivers/virt/gunyah/gunyah_ioeventfd.c
+drivers/virt/gunyah/gunyah_irqfd.c
+drivers/virt/gunyah/gunyah_platform_hooks.c
+drivers/virt/gunyah/gunyah_vcpu.c
+drivers/virt/gunyah/rsc_mgr.c
+drivers/virt/gunyah/rsc_mgr.h
+drivers/virt/gunyah/rsc_mgr_rpc.c
+drivers/virt/gunyah/vm_mgr.c
+drivers/virt/gunyah/vm_mgr.h
+drivers/virt/gunyah/vm_mgr_mem.c
 drivers/virtio/virtio.c
 drivers/virtio/virtio_anchor.c
+drivers/virtio/virtio_balloon.c
+drivers/virtio/virtio_pci_common.c
+drivers/virtio/virtio_pci_common.h
+drivers/virtio/virtio_pci_modern.c
+drivers/virtio/virtio_pci_modern_dev.c
 drivers/virtio/virtio_ring.c
 drivers/watchdog/watchdog_core.c
 drivers/watchdog/watchdog_core.h
@@ -2974,6 +3014,7 @@ include/linux/gpio/driver.h
 include/linux/gpio/machine.h
 include/linux/gpio_keys.h
 include/linux/group_cpus.h
+include/linux/gunyah.h
 include/linux/hardirq.h
 include/linux/hash.h
 include/linux/hashtable.h
@@ -3492,6 +3533,7 @@ include/linux/ptp_kvm.h
 include/linux/ptr_ring.h
 include/linux/ptrace.h
 include/linux/ptrace_api.h
+include/linux/purgatory.h
 include/linux/pvclock_gtod.h
 include/linux/pwm.h
 include/linux/quota.h
@@ -3562,6 +3604,7 @@ include/linux/rtc.h
 include/linux/rtmutex.h
 include/linux/rtnetlink.h
 include/linux/rv.h
+include/linux/rw_hint.h
 include/linux/rwlock.h
 include/linux/rwlock_api_smp.h
 include/linux/rwlock_types.h
@@ -3856,7 +3899,10 @@ include/linux/virtio.h
 include/linux/virtio_anchor.h
 include/linux/virtio_byteorder.h
 include/linux/virtio_config.h
+include/linux/virtio_console.h
 include/linux/virtio_net.h
+include/linux/virtio_pci_legacy.h
+include/linux/virtio_pci_modern.h
 include/linux/virtio_ring.h
 include/linux/virtio_vsock.h
 include/linux/vm_event_item.h
@@ -4346,6 +4392,7 @@ include/trace/hooks/dmabuf.h
 include/trace/hooks/dtask.h
 include/trace/hooks/epoch.h
 include/trace/hooks/fault.h
+include/trace/hooks/fips140.h
 include/trace/hooks/fpsimd.h
 include/trace/hooks/ftrace_dump.h
 include/trace/hooks/futex.h
@@ -4361,9 +4408,9 @@ include/trace/hooks/mpam.h
 include/trace/hooks/net.h
 include/trace/hooks/pm_domain.h
 include/trace/hooks/power.h
-include/trace/hooks/preemptirq.h
 include/trace/hooks/printk.h
 include/trace/hooks/psci.h
+include/trace/hooks/reboot.h
 include/trace/hooks/regmap.h
 include/trace/hooks/remoteproc.h
 include/trace/hooks/rwsem.h
@@ -4380,6 +4427,7 @@ include/trace/hooks/timer.h
 include/trace/hooks/topology.h
 include/trace/hooks/traps.h
 include/trace/hooks/ufshcd.h
+include/trace/hooks/user.h
 include/trace/hooks/vendor_hooks.h
 include/trace/hooks/vmscan.h
 include/trace/hooks/wqlockup.h
@@ -4504,6 +4552,7 @@ include/uapi/linux/futex.h
 include/uapi/linux/gen_stats.h
 include/uapi/linux/genetlink.h
 include/uapi/linux/gpio.h
+include/uapi/linux/gunyah.h
 include/uapi/linux/gzvm.h
 include/uapi/linux/hash_info.h
 include/uapi/linux/hdlc/ioctl.h
@@ -4839,10 +4888,14 @@ include/uapi/linux/vfio.h
 include/uapi/linux/vhost.h
 include/uapi/linux/vhost_types.h
 include/uapi/linux/videodev2.h
+include/uapi/linux/virtio_balloon.h
+include/uapi/linux/virtio_blk.h
 include/uapi/linux/virtio_config.h
+include/uapi/linux/virtio_console.h
 include/uapi/linux/virtio_fs.h
 include/uapi/linux/virtio_ids.h
 include/uapi/linux/virtio_net.h
+include/uapi/linux/virtio_pci.h
 include/uapi/linux/virtio_ring.h
 include/uapi/linux/virtio_scmi.h
 include/uapi/linux/virtio_types.h
@@ -5055,6 +5108,7 @@ kernel/configs.c
 kernel/context_tracking.c
 kernel/cpu.c
 kernel/cpu_pm.c
+kernel/crash_core.c
 kernel/cred.c
 kernel/delayacct.c
 kernel/dma/coherent.c
@@ -5114,6 +5168,9 @@ kernel/jump_label.c
 kernel/kallsyms.c
 kernel/kallsyms_internal.h
 kernel/kcmp.c
+kernel/kexec_core.c
+kernel/kexec_file.c
+kernel/kexec_internal.h
 kernel/kheaders.c
 kernel/kprobes.c
 kernel/ksyms_common.c
@@ -6330,6 +6387,7 @@ net/unix/unix_bpf.c
 net/vmw_vsock/af_vsock.c
 net/vmw_vsock/af_vsock_tap.c
 net/vmw_vsock/diag.c
+net/vmw_vsock/virtio_transport.c
 net/vmw_vsock/virtio_transport_common.c
 net/vmw_vsock/vsock_addr.c
 net/vmw_vsock/vsock_bpf.c

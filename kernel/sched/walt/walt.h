@@ -84,6 +84,10 @@ enum freq_caps {
 #define	SOC_ENABLE_SW_CYCLE_COUNTER_BIT			BIT(6)
 #define SOC_ENABLE_COLOCATION_PLACEMENT_BOOST_BIT	BIT(7)
 #define SOC_ENABLE_FT_BOOST_TO_ALL			BIT(8)
+#define SOC_ENABLE_OSCILLATE_ON_THERMALS		BIT(9)
+#define SOC_ENABLE_PIPELINE_SWAPPING_BIT		BIT(10)
+
+extern int soc_sched_lib_name_capacity;
 
 #define WALT_FEAT_TRAILBLAZER_BIT	BIT_ULL(0)
 extern unsigned int trailblazer_floor_freq[MAX_CLUSTERS];
@@ -200,6 +204,7 @@ extern bool use_cycle_counter;
 extern struct walt_sched_cluster *sched_cluster[WALT_NR_CPUS];
 extern cpumask_t part_haltable_cpus;
 extern cpumask_t cpus_paused_by_us;
+extern cpumask_t cpus_part_paused_by_us;
 /*END SCHED.H PORT*/
 
 extern u64 (*walt_get_cycle_counts_cb)(int cpu, u64 wc);
@@ -392,6 +397,7 @@ extern struct irq_work walt_migration_irq_work;
 #define LIB_PATH_LENGTH 512
 extern unsigned int cpuinfo_max_freq_cached;
 extern char sched_lib_name[LIB_PATH_LENGTH];
+extern char sched_lib_task[LIB_PATH_LENGTH];
 extern unsigned int sched_lib_mask_force;
 
 extern cpumask_t cpus_for_sbt_pause;
@@ -1231,6 +1237,14 @@ extern void walt_cfs_deactivate_mvp_task(struct rq *rq, struct task_struct *p);
 void inc_rq_walt_stats(struct rq *rq, struct task_struct *p);
 void dec_rq_walt_stats(struct rq *rq, struct task_struct *p);
 
+extern bool is_obet;
+extern int oscillate_cpu;
+extern int oscillate_period_ns;
+extern enum hrtimer_restart walt_oscillate_timer_cb(struct hrtimer *hrt);
+extern bool should_oscillate(void);
+extern bool now_is_sbt;
+extern bool is_sbt_or_oscillate(void);
+
 enum WALT_DEBUG_FEAT {
 	WALT_BUG_UPSTREAM,
 	WALT_BUG_WALT,
@@ -1320,4 +1334,10 @@ extern bool enable_load_sync(int cpu);
 extern unsigned int enable_pipeline_boost;
 extern struct walt_related_thread_group *lookup_related_thread_group(unsigned int group_id);
 extern bool prev_is_sbt;
+extern unsigned int sysctl_sched_pipeline_special;
+extern struct task_struct *pipeline_special_task;
+extern void remove_special_task(void);
+extern void set_special_task(struct task_struct *pipeline_special_local);
+extern unsigned int sysctl_sched_pipeline_util_thres;
+#define MAX_NR_PIPELINE 3
 #endif /* _WALT_H */

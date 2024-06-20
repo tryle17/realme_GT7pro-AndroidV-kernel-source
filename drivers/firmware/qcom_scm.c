@@ -358,6 +358,9 @@ static int qcom_scm_set_boot_addr(void *entry, const u8 *cpu_bits)
 		.owner = ARM_SMCCC_OWNER_SIP,
 	};
 
+	if (!__scm)
+		return -EINVAL;
+
 	for_each_present_cpu(cpu) {
 		if (cpu >= QCOM_SCM_BOOT_MAX_CPUS)
 			return -EINVAL;
@@ -367,7 +370,7 @@ static int qcom_scm_set_boot_addr(void *entry, const u8 *cpu_bits)
 	desc.args[0] = flags;
 	desc.args[1] = virt_to_phys(entry);
 
-	return qcom_scm_call_atomic(__scm ? __scm->dev : NULL, &desc, NULL);
+	return qcom_scm_call_atomic(__scm->dev, &desc, NULL);
 }
 
 static int qcom_scm_set_boot_addr_mc(void *entry, unsigned int flags)
@@ -1396,6 +1399,10 @@ int qcom_scm_kgsl_init_regs(u32 gpu_req)
 		.args[0] = gpu_req,
 		.arginfo = QCOM_SCM_ARGS(1),
 	};
+
+	if (!__qcom_scm_is_call_available(__scm->dev, QCOM_SCM_SVC_GPU,
+					  QCOM_SCM_SVC_GPU_INIT_REGS))
+		return -EOPNOTSUPP;
 
 	return qcom_scm_call(__scm->dev, &desc, NULL);
 }
@@ -2595,6 +2602,7 @@ static int qcom_scm_probe(struct platform_device *pdev)
 
 	mutex_init(&scm->scm_bw_lock);
 
+	scm->dev = &pdev->dev;
 	scm->path = devm_of_icc_get(&pdev->dev, NULL);
 	if (IS_ERR(scm->path))
 		return dev_err_probe(&pdev->dev, PTR_ERR(scm->path),
@@ -2631,7 +2639,6 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, scm);
 
 	__scm = scm;
-	__scm->dev = &pdev->dev;
 
 	init_completion(&__scm->waitq_comp);
 

@@ -627,8 +627,8 @@ static int adsp_start(struct rproc *rproc)
 	if (adsp->dtb_pas_id) {
 		ret = qcom_scm_pas_auth_and_reset(adsp->dtb_pas_id);
 		if (ret)
-			panic("Panicking, auth and reset failed for remoteproc %s dtb\n",
-				 rproc->name);
+			panic("Panicking, auth and reset failed for remoteproc %s dtb ret=%d\n",
+				rproc->name, ret);
 	}
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_firmware_loading", "enter");
@@ -652,7 +652,9 @@ static int adsp_start(struct rproc *rproc)
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_auth_reset", "exit");
 	if (ret)
-		panic("Panicking, auth and reset failed for remoteproc %s\n", rproc->name);
+		panic("Panicking, auth and reset failed for remoteproc %s ret=%d\n",
+				rproc->name, ret);
+	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_auth_reset", "exit");
 
 	if (!qcom_pil_timeouts_disabled()) {
 		ret = qcom_q6v5_wait_for_start(&adsp->q6v5, msecs_to_jiffies(5000));
@@ -718,7 +720,7 @@ static int rproc_config_check(struct qcom_adsp *adsp, u32 state)
 {
 	u32 val;
 
-	return readx_poll_timeout(readl, adsp->config_addr, val,
+	return readx_poll_timeout_atomic(readl, adsp->config_addr, val,
 				val == state, SOCCP_SLEEP_US, SOCCP_TIMEOUT_US);
 }
 
@@ -795,12 +797,14 @@ int rproc_set_state(struct rproc *rproc, bool state)
 {
 	int ret = 0;
 	int users;
-	struct qcom_adsp *adsp = (struct qcom_adsp *)rproc->priv;
+	struct qcom_adsp *adsp;
 
-	if (!rproc || !adsp) {
+	if (!rproc || !rproc->priv) {
 		pr_err("no rproc or adsp\n");
 		return -EINVAL;
 	}
+
+	adsp = (struct qcom_adsp *)rproc->priv;
 	if (!adsp->q6v5.running) {
 		dev_err(adsp->dev, "rproc is not running\n");
 		return -EINVAL;
@@ -1369,9 +1373,6 @@ static int adsp_probe(struct platform_device *pdev)
 		mutex_init(&adsp->adsp_lock);
 
 		refcount_set(&adsp->current_users, 0);
-		adsp->panic_blk.priority = INT_MAX - 1;
-		adsp->panic_blk.notifier_call = rproc_panic_handler;
-		atomic_notifier_chain_register(&panic_notifier_list, &adsp->panic_blk);
 	}
 
 	qcom_q6v5_register_ssr_subdev(&adsp->q6v5, &adsp->ssr_subdev.subdev);
@@ -1408,6 +1409,12 @@ static int adsp_probe(struct platform_device *pdev)
 	 */
 	rproc_recovery_set_fn = rproc_recovery_set;
 
+	if (adsp->check_status) {
+		adsp->panic_blk.priority = INT_MAX - 1;
+		adsp->panic_blk.notifier_call = rproc_panic_handler;
+		atomic_notifier_chain_register(&panic_notifier_list, &adsp->panic_blk);
+	}
+
 	return 0;
 
 destroy_minidump_dev:
@@ -1440,6 +1447,8 @@ static void adsp_remove(struct platform_device *pdev)
 	qcom_remove_sysmon_subdev(adsp->sysmon);
 	qcom_remove_smd_subdev(adsp->rproc, &adsp->smd_subdev);
 	qcom_remove_ssr_subdev(adsp->rproc, &adsp->ssr_subdev);
+	if (adsp->check_status)
+		atomic_notifier_chain_unregister(&panic_notifier_list, &adsp->panic_blk);
 	adsp_pds_detach(adsp, adsp->proxy_pds, adsp->proxy_pd_count);
 	device_init_wakeup(adsp->dev, false);
 	rproc_free(adsp->rproc);
@@ -2034,6 +2043,28 @@ static const struct adsp_data ravelin_wpss_resource = {
 	.ssctl_id = 0x19,
 };
 
+static const struct adsp_data monaco_adsp_resource = {
+	.crash_reason_smem = 423,
+	.firmware_name = "adsp.mdt",
+	.pas_id = 1,
+	.minidump_id = 5,
+	.uses_elf64 = false,
+	.ssr_name = "lpass",
+	.sysmon_name = "adsp",
+	.ssctl_id = 0x14,
+};
+
+static const struct adsp_data monaco_modem_resource = {
+	.crash_reason_smem = 421,
+	.firmware_name = "modem.mdt",
+	.pas_id = 4,
+	.minidump_id = 3,
+	.uses_elf64 = true,
+	.ssr_name = "mpss",
+	.sysmon_name = "modem",
+	.ssctl_id = 0x12,
+};
+
 static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,msm8226-adsp-pil", .data = &adsp_resource_init},
 	{ .compatible = "qcom,msm8953-adsp-pil", .data = &msm8996_adsp_resource},
@@ -2096,6 +2127,8 @@ static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,ravelin-adsp-pas", .data = &ravelin_adsp_resource},
 	{ .compatible = "qcom,ravelin-modem-pas", .data = &ravelin_mpss_resource},
 	{ .compatible = "qcom,ravelin-wpss-pas", .data = &ravelin_wpss_resource},
+	{ .compatible = "qcom,monaco-adsp-pas", .data = &monaco_adsp_resource},
+	{ .compatible = "qcom,monaco-modem-pas", .data = &monaco_modem_resource},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, adsp_of_match);

@@ -14,7 +14,7 @@
  * This driver is based on idea from Hafnium Hypervisor Linux Driver,
  * but modified to work with Gunyah Hypervisor as needed.
  *
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt)	"gh_proxy_sched: " fmt
@@ -37,6 +37,7 @@
 #include <linux/workqueue.h>
 #include <linux/suspend.h>
 
+#include <linux/gunyah/gh_errno.h>
 #include <linux/gunyah/gh_rm_drv.h>
 #include <linux/gunyah/gh_vm.h>
 #include "gh_proxy_sched.h"
@@ -44,9 +45,8 @@
 #define CREATE_TRACE_POINTS
 #include "gh_proxy_sched_trace.h"
 
-#define GH_MAX_VMS 5
 #define GH_MAX_VCPUS_PER_VM 8
-#define GH_MAX_SYSTEM_VCPUS (GH_MAX_VMS * GH_MAX_VCPUS_PER_VM)
+#define GH_MAX_SYSTEM_VCPUS (GH_VM_MAX * GH_MAX_VCPUS_PER_VM)
 
 /* VCPU is ready to run */
 #define GH_VCPU_STATE_READY		0
@@ -142,14 +142,17 @@ static inline bool is_vm_supports_proxy(gh_vmid_t gh_vmid)
 
 static inline struct gh_proxy_vm *gh_get_vm(gh_vmid_t vmid)
 {
-	int i;
+	int ret;
+	enum gh_vm_names vm_name;
 	struct gh_proxy_vm *vm = NULL;
 
-	for (i = 0; i < GH_MAX_VMS; i++) {
-		vm = &gh_vms[i];
-		if (vmid == vm->id || vm->id == GH_VMID_INVAL)
-			break;
+	ret = gh_rm_get_vm_name(vmid, &vm_name);
+	if (ret) {
+		pr_err("Failed to get VM name for VMID%d ret=%d\n", vmid, ret);
+		return vm;
 	}
+
+	vm = &gh_vms[vm_name];
 
 	return vm;
 }
@@ -200,7 +203,7 @@ static void gh_init_vms(void)
 	struct gh_proxy_vm *vm;
 	int i;
 
-	for (i = 0; i < GH_MAX_VMS; i++) {
+	for (i = 0; i < GH_VM_MAX; i++) {
 		vm = &gh_vms[i];
 		gh_reset_vm(vm);
 	}
@@ -213,10 +216,10 @@ static irqreturn_t gh_vcpu_irq_handler(int irq, void *data)
 
 	spin_lock(&gh_vm_lock);
 	vcpu = data;
-	vm = vcpu->vm;
 	if (!vcpu || !vcpu->vm || !vcpu->vm->is_vcpu_info_populated)
 		goto unlock;
 
+	vm = vcpu->vm;
 	trace_gh_vcpu_irq_handler(vcpu->vm->id, vcpu->idx);
 	if (vcpu->workqueue_mode)
 		queue_work(vm->vcpu_wq, &vcpu->work);
@@ -403,7 +406,7 @@ static inline void gh_get_vpmg_cap_id(int irq, gh_capid_t *vpmg_cap_id)
 	int i;
 	struct gh_proxy_vm *vm;
 
-	for (i = 0; i < GH_MAX_VMS; i++) {
+	for (i = 0; i < GH_VM_MAX; i++) {
 		vm = &gh_vms[i];
 		if (vm->susp_res_irq == irq)
 			*vpmg_cap_id = vm->vpmg_cap_id;
@@ -523,7 +526,7 @@ static void gh_populate_all_res_info(gh_vmid_t vmid, bool res_populated)
 		return;
 	}
 
-	if (nr_vms >= GH_MAX_VMS) {
+	if (nr_vms >= GH_VM_MAX) {
 		pr_err("Exceeded max VMs in the system %d\n", nr_vms);
 		return;
 	}
@@ -854,7 +857,7 @@ int gh_vcpu_run(gh_vmid_t vmid, unsigned int vcpu_id, uint64_t resume_data_0,
 	} while ((ret == GH_ERROR_OK || ret == GH_ERROR_RETRY) && vm->is_active);
 
 	if (ret != -ERESTARTSYS)
-		ret = gh_error_remap(ret);
+		ret = gh_remap_error(ret);
 
 	return ret;
 }
@@ -906,7 +909,7 @@ int gh_proxy_sched_init(void)
 {
 	int ret;
 
-	gh_vms = kcalloc(GH_MAX_VMS, sizeof(struct gh_proxy_vm), GFP_KERNEL);
+	gh_vms = kcalloc(GH_VM_MAX, sizeof(struct gh_proxy_vm), GFP_KERNEL);
 	if (!gh_vms) {
 		ret = -ENOMEM;
 		goto err;

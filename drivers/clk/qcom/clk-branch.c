@@ -342,6 +342,21 @@ static int clk_branch2_init(struct clk_hw *hw)
 	return 0;
 }
 
+static void clk_branch_restore_context_aon(struct clk_hw *hw)
+{
+	if (clk_enable_regmap(hw))
+		pr_err("Failed to enable %s\n", clk_hw_get_name(hw));
+}
+
+static void clk_branch_restore_context(struct clk_hw *hw)
+{
+	if (!(clk_hw_get_flags(hw) & CLK_IS_CRITICAL))
+		return;
+
+	if (clk_enable_regmap(hw))
+		pr_err("Failed to enable %s\n", clk_hw_get_name(hw));
+}
+
 const struct clk_ops clk_branch2_ops = {
 	.prepare = clk_prepare_regmap,
 	.unprepare = clk_unprepare_regmap,
@@ -352,6 +367,7 @@ const struct clk_ops clk_branch2_ops = {
 	.is_enabled = clk_is_enabled_regmap,
 	.init = clk_branch2_init,
 	.debug_init = clk_branch_debug_init,
+	.restore_context = clk_branch_restore_context,
 };
 EXPORT_SYMBOL_GPL(clk_branch2_ops);
 
@@ -360,10 +376,11 @@ const struct clk_ops clk_branch2_crm_ops = {
 	.init = clk_branch2_init,
 	.debug_init = clk_branch_debug_init,
 };
-EXPORT_SYMBOL(clk_branch2_crm_ops);
+EXPORT_SYMBOL_GPL(clk_branch2_crm_ops);
 
 const struct clk_ops clk_branch2_aon_ops = {
 	.enable = clk_branch2_enable,
+	.restore_context = clk_branch_restore_context_aon,
 	.is_enabled = clk_is_enabled_regmap,
 	.init = clk_branch2_init,
 	.debug_init = clk_branch_debug_init,

@@ -21,6 +21,8 @@
 #include <linux/spinlock.h>
 #include <linux/log2.h>
 #include <linux/sizes.h>
+#include <linux/cpufreq.h>
+#include <linux/sched/walt.h>
 #include <soc/qcom/dcvs.h>
 #include <trace/hooks/sched.h>
 #include "bwmon.h"
@@ -296,6 +298,12 @@ static BWMON_ATTR_RW(decay_rate);
 show_attr(io_percent);
 store_attr(io_percent, 1U, 400U);
 static BWMON_ATTR_RW(io_percent);
+show_attr(low_power_io_percent);
+store_attr(low_power_io_percent, 1U, 400U);
+static BWMON_ATTR_RW(low_power_io_percent);
+show_attr(low_power_cpufreq_thres);
+store_attr(low_power_cpufreq_thres, 0U, 6000000U);
+static BWMON_ATTR_RW(low_power_cpufreq_thres);
 show_attr(bw_step);
 store_attr(bw_step, 50U, 1000U);
 static BWMON_ATTR_RW(bw_step);
@@ -332,6 +340,12 @@ static BWMON_ATTR_RW(ab_scale);
 show_attr(second_ab_scale);
 store_attr(second_ab_scale, 0U, 100U);
 static BWMON_ATTR_RW(second_ab_scale);
+show_attr(use_sched_boost);
+store_attr(use_sched_boost, 0U, 1U);
+static BWMON_ATTR_RW(use_sched_boost);
+show_attr(sched_boost_freq);
+store_attr(sched_boost_freq, 0U, 8192000U);
+static BWMON_ATTR_RW(sched_boost_freq);
 show_list_attr(mbps_zones, NUM_MBPS_ZONES);
 store_list_attr(mbps_zones, NUM_MBPS_ZONES, 0U, UINT_MAX);
 static BWMON_ATTR_RW(mbps_zones);
@@ -344,6 +358,8 @@ static struct attribute *bwmon_attrs[] = {
 	&guard_band_mbps.attr,
 	&decay_rate.attr,
 	&io_percent.attr,
+	&low_power_io_percent.attr,
+	&low_power_cpufreq_thres.attr,
 	&bw_step.attr,
 	&sample_ms.attr,
 	&up_scale.attr,
@@ -360,6 +376,8 @@ static struct attribute *bwmon_attrs[] = {
 	&mbps_zones.attr,
 	&throttle_adj.attr,
 	&second_vote_limit.attr,
+	&use_sched_boost.attr,
+	&sched_boost_freq.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(bwmon);
@@ -538,6 +556,9 @@ static unsigned long get_bw_and_set_irq(struct hwmon_node *node,
 	unsigned int ms = 0;
 
 	spin_lock_irqsave(&sample_irq_lock, flags);
+
+	if (node->cur_low_power_cpufreq <= node->low_power_cpufreq_thres)
+		io_percent = node->low_power_io_percent;
 
 	if (!hw->set_hw_events) {
 		ts = ktime_get();
@@ -747,6 +768,9 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 	new_freq.ib = MBPS_TO_KHZ(new_freq.ib, hw->dcvs_width);
 	new_freq.ib = max(new_freq.ib, node->min_freq);
 	new_freq.ib = min(new_freq.ib, node->max_freq);
+	/* sched_boost_freq is intentionally not limited by max_freq */
+	if (node->cur_sched_boost)
+		new_freq.ib = max(new_freq.ib, node->sched_boost_freq);
 	primary_mbps = KHZ_TO_MBPS(new_freq.ib, hw->dcvs_width);
 
 	if (new_freq.ib != node->cur_freqs[0].ib ||
@@ -762,7 +786,8 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 							hw->second_dcvs_width);
 			else
 				node->cur_freqs[1].ib = 0;
-			node->cur_freqs[1].ib = min(node->cur_freqs[1].ib,
+			if (!node->cur_sched_boost)
+				node->cur_freqs[1].ib = min(node->cur_freqs[1].ib,
 							hw->second_vote_limit);
 			node->cur_freqs[1].ab = mult_frac(new_freq.ab,
 							node->second_ab_scale, 100);
@@ -780,6 +805,30 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 	return ret;
 }
 
+static bool should_trigger_cpufreq_update(struct hwmon_node *node)
+{
+	struct bw_hwmon *hw = node->hw;
+	struct cpufreq_policy *policy;
+	u32 cur_cpufreq;
+	bool ret = false;
+
+	policy = cpufreq_cpu_get_raw(hw->low_power_cpu);
+	if (!policy)
+		return false;
+
+	cur_cpufreq = policy->cur;
+	if (node->cur_low_power_cpufreq <= node->low_power_cpufreq_thres
+			&& cur_cpufreq > node->low_power_cpufreq_thres)
+		ret = true;
+	else if (node->cur_low_power_cpufreq > node->low_power_cpufreq_thres
+			&& cur_cpufreq <= node->low_power_cpufreq_thres)
+		ret = true;
+
+	node->cur_low_power_cpufreq = cur_cpufreq;
+
+	return ret;
+}
+
 static const u64 HALF_TICK_NS = (NSEC_PER_SEC / HZ) >> 1;
 static void bwmon_jiffies_update_cb(void *unused, void *extra)
 {
@@ -788,14 +837,30 @@ static void bwmon_jiffies_update_cb(void *unused, void *extra)
 	unsigned long flags;
 	ktime_t now = ktime_get();
 	s64 delta_ns;
+	bool sched_update = false, cpufreq_update = false;
+	int new_boost_state = -1;
 
 	spin_lock_irqsave(&list_lock, flags);
 	list_for_each_entry(node, &hwmon_list, list) {
 		hw = node->hw;
 		if (!hw->is_active)
 			continue;
+		if (node->use_sched_boost) {
+			if (new_boost_state == -1)
+				new_boost_state = should_boost_bus_dcvs();
+			if (new_boost_state != node->cur_sched_boost)
+				sched_update = true;
+			node->cur_sched_boost = new_boost_state;
+		} else {
+			node->cur_sched_boost = false;
+		}
+		if (hw->low_power_supported && node->low_power_cpufreq_thres)
+			cpufreq_update = should_trigger_cpufreq_update(node);
+		else
+			node->cur_low_power_cpufreq = U32_MAX;
 		delta_ns = now - hw->last_update_ts + HALF_TICK_NS;
-		if (delta_ns > ms_to_ktime(hw->node->window_ms)) {
+		if (delta_ns > ms_to_ktime(hw->node->window_ms)
+				|| sched_update || cpufreq_update) {
 			queue_work(bwmon_wq, &hw->work);
 			hw->last_update_ts = now;
 		}
@@ -1909,6 +1974,7 @@ static int bwmon_dcvs_register(struct platform_device *pdev, struct bwmon *m)
 	struct device_node *of_node, *tmp_of_node;
 	struct device *dev = &pdev->dev;
 	struct hwmon_node *node;
+	u32 low_power_cpu;
 	int ret;
 
 	of_node = of_parse_phandle(dev->of_node, "qcom,target-dev", 0);
@@ -1934,6 +2000,12 @@ static int bwmon_dcvs_register(struct platform_device *pdev, struct bwmon *m)
 	}
 	m->hw.dcvs_path = DCVS_SLOW_PATH;
 	of_node_put(of_node);
+
+	ret = of_property_read_u32(dev->of_node, "qcom,low-power-cpu", &low_power_cpu);
+	if (ret >= 0) {
+		m->hw.low_power_supported = true;
+		m->hw.low_power_cpu = low_power_cpu;
+	}
 
 	of_node = of_parse_phandle(dev->of_node, "qcom,second-vote", 0);
 	if (of_node) {

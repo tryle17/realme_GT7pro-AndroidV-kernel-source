@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Description: CoreSight System Trace Macrocell driver
  *
@@ -211,6 +211,14 @@ static int stm_enable(struct coresight_device *csdev, struct perf_event *event,
 	/* Someone is already using the tracer */
 	if (val)
 		return -EBUSY;
+	if (drvdata->static_atid) {
+		ret = coresight_trace_id_reserve_id(drvdata->traceid);
+		if (ret) {
+			local_set(&drvdata->mode, CS_MODE_DISABLED);
+			dev_err(&csdev->dev, "reserve ATID: %d fail\n", drvdata->traceid);
+			return ret;
+		}
+	}
 	coresight_csr_set_etr_atid(csdev, drvdata->traceid, true);
 
 	ret = pm_runtime_resume_and_get(csdev->dev.parent);
@@ -288,6 +296,8 @@ static void stm_disable(struct coresight_device *csdev,
 		pm_runtime_put_sync(csdev->dev.parent);
 
 		coresight_csr_set_etr_atid(csdev, drvdata->traceid, false);
+		if (drvdata->static_atid)
+			coresight_trace_id_free_reserved_id(drvdata->traceid);
 		local_set(&drvdata->mode, CS_MODE_DISABLED);
 		dev_dbg(&csdev->dev, "STM tracing disabled\n");
 	}
