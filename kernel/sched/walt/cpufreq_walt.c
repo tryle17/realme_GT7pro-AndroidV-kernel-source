@@ -57,6 +57,7 @@ struct waltgov_policy {
 	unsigned int		next_freq;
 	unsigned int		cached_raw_freq;
 	unsigned int		driving_cpu;
+	unsigned int		ipc_smart_freq;
 
 	/* The next fields are only needed if fast switch cannot be used: */
 	struct	irq_work	irq_work;
@@ -274,13 +275,14 @@ static unsigned int get_next_freq(struct waltgov_policy *wg_policy,
 				  struct waltgov_cpu *wg_cpu, u64 time)
 {
 	struct cpufreq_policy *policy = wg_policy->policy;
-	unsigned int freq, raw_freq, final_freq;
+	unsigned int freq, raw_freq, final_freq, smart_freq;
 	struct waltgov_cpu *wg_driv_cpu = &per_cpu(waltgov_cpu, wg_policy->driving_cpu);
-	struct walt_sched_cluster *cluster;
+	struct walt_sched_cluster *cluster = NULL;
 	bool skip = false;
 	bool thermal_isolated_now = cpus_halted_by_client(
 			wg_policy->policy->related_cpus, PAUSE_THERMAL);
 	bool reset_need_freq_update = false;
+	unsigned int smart_reason;
 
 	if (thermal_isolated_now) {
 		if (!wg_policy->thermal_isolated) {
@@ -330,16 +332,29 @@ static unsigned int get_next_freq(struct waltgov_policy *wg_policy,
 		}
 	}
 
-	if (freq > fmax_cap[SMART_FMAX_CAP][cluster->id]) {
-		freq = fmax_cap[SMART_FMAX_CAP][cluster->id];
-		wg_driv_cpu->reasons |= CPUFREQ_REASON_SMART_FMAX_CAP_BIT;
+	if (freq_cap[SMART_FREQ][cluster->id] > wg_policy->ipc_smart_freq) {
+		smart_freq = freq_cap[SMART_FREQ][cluster->id];
+		smart_reason = CPUFREQ_REASON_SMART_FREQ_BIT;
+	} else if (freq_cap[SMART_FREQ][cluster->id] < wg_policy->ipc_smart_freq) {
+		smart_freq = wg_policy->ipc_smart_freq;
+		smart_reason = CPUFREQ_REASON_IPC_SMART_FREQ_BIT;
+	} else {
+		smart_freq = wg_policy->ipc_smart_freq;
+		smart_reason = CPUFREQ_REASON_SMART_FREQ_BIT | CPUFREQ_REASON_IPC_SMART_FREQ_BIT;
 	}
-	if (freq > fmax_cap[HIGH_PERF_CAP][cluster->id]) {
-		freq = fmax_cap[HIGH_PERF_CAP][cluster->id];
+
+	if (freq > smart_freq) {
+		freq = smart_freq;
+		wg_driv_cpu->reasons |= smart_reason;
+	}
+
+	if (freq > freq_cap[HIGH_PERF_CAP][cluster->id]) {
+		freq = freq_cap[HIGH_PERF_CAP][cluster->id];
 		wg_driv_cpu->reasons |= CPUFREQ_REASON_HIGH_PERF_CAP_BIT;
 	}
-	if (freq > fmax_cap[PARTIAL_HALT_CAP][cluster->id]) {
-		freq = fmax_cap[PARTIAL_HALT_CAP][cluster->id];
+
+	if (freq > freq_cap[PARTIAL_HALT_CAP][cluster->id]) {
+		freq = freq_cap[PARTIAL_HALT_CAP][cluster->id];
 		wg_driv_cpu->reasons |= CPUFREQ_REASON_PARTIAL_HALT_CAP_BIT;
 	}
 
@@ -360,6 +375,7 @@ out:
 				wg_policy->cached_raw_freq, wg_policy->need_freq_update,
 				wg_policy->thermal_isolated,
 				wg_driv_cpu->cpu, wg_driv_cpu->reasons,
+				wg_policy->ipc_smart_freq,
 				final_freq);
 
 	if (reset_need_freq_update)
@@ -495,6 +511,32 @@ static unsigned int waltgov_next_freq_shared(struct waltgov_cpu *wg_cpu, u64 tim
 	return get_next_freq(wg_policy, util, max, wg_cpu, time);
 }
 
+static void waltgov_update_smart_freq(struct waltgov_callback *cb, u64 time,
+				unsigned int flags)
+{
+	struct waltgov_cpu *wg_cpu = container_of(cb, struct waltgov_cpu, cb);
+	struct waltgov_policy *wg_policy = wg_cpu->wg_policy;
+	unsigned int next_f;
+
+	raw_spin_lock(&wg_policy->update_lock);
+
+	wg_policy->ipc_smart_freq = get_cluster_ipc_level_freq(wg_cpu->cpu, time);
+	update_smart_freq_capacities_one_cluster(cpu_cluster(wg_cpu->cpu));
+
+	next_f = waltgov_next_freq_shared(wg_cpu, time);
+
+	if (!next_f)
+		goto out;
+
+	if (wg_policy->policy->fast_switch_enabled)
+		waltgov_fast_switch(wg_policy, time, next_f);
+	else
+		waltgov_deferred_update(wg_policy, time, next_f);
+
+out:
+	raw_spin_unlock(&wg_policy->update_lock);
+}
+
 static void waltgov_update_freq(struct waltgov_callback *cb, u64 time,
 				unsigned int flags)
 {
@@ -502,6 +544,11 @@ static void waltgov_update_freq(struct waltgov_callback *cb, u64 time,
 	struct waltgov_policy *wg_policy = wg_cpu->wg_policy;
 	unsigned long hs_util, rtg_boost_util;
 	unsigned int next_f;
+
+	if (flags & WALT_CPUFREQ_SMART_FREQ_BIT) {
+		waltgov_update_smart_freq(cb, time, flags);
+		return;
+	}
 
 	if (!wg_policy->tunables->pl && flags & WALT_CPUFREQ_PL_BIT)
 		return;
