@@ -4450,12 +4450,14 @@ include/trace/events/writeback.h
 include/trace/events/xdp.h
 include/trace/hooks/avc.h
 include/trace/hooks/binder.h
+include/trace/hooks/blk.h
 include/trace/hooks/bug.h
 include/trace/hooks/cgroup.h
 include/trace/hooks/compaction.h
 include/trace/hooks/cpufreq.h
 include/trace/hooks/cpuidle.h
 include/trace/hooks/cpuidle_psci.h
+include/trace/hooks/cpuinfo.h
 include/trace/hooks/creds.h
 include/trace/hooks/debug.h
 include/trace/hooks/dmabuf.h
@@ -4494,6 +4496,7 @@ include/trace/hooks/sd.h
 include/trace/hooks/selinux.h
 include/trace/hooks/signal.h
 include/trace/hooks/softlockup.h
+include/trace/hooks/suspend.h
 include/trace/hooks/sys.h
 include/trace/hooks/syscall_check.h
 include/trace/hooks/sysrqcrash.h
