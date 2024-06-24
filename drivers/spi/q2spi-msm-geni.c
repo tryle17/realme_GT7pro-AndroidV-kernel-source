@@ -4544,9 +4544,14 @@ int q2spi_put_slave_to_sleep(struct q2spi_geni *q2spi)
 	Q2SPI_DEBUG(q2spi, "%s q2spi_pkt:%p tid:%d\n", __func__, q2spi_pkt, q2spi_pkt->xfer->tid);
 	q2spi_pkt->is_client_sleep_pkt = true;
 	ret = __q2spi_transfer(q2spi, q2spi_req, q2spi_pkt, 0);
-	if (ret)
+	if (ret) {
 		Q2SPI_DEBUG(q2spi, "%s __q2spi_transfer q2spi_pkt:%p ret%d\n",
 			    __func__, q2spi_pkt, ret);
+		if (q2spi->port_release) {
+			Q2SPI_DEBUG(q2spi, "%s Err Port in closed state, return\n", __func__);
+			return -ENOENT;
+		}
+	}
 	q2spi_pkt->state = IN_DELETION;
 	q2spi_free_xfer_tid(q2spi, q2spi_pkt->xfer->tid);
 	q2spi_del_pkt_from_tx_queue(q2spi, q2spi_pkt);
