@@ -2213,7 +2213,8 @@ static ssize_t q2spi_transfer(struct file *filp, const char __user *buf, size_t 
 	flow_id = q2spi_add_req_to_tx_queue(q2spi, q2spi_req, &cur_q2spi_pkt);
 	mutex_unlock(&q2spi->queue_lock);
 	if (flow_id < 0) {
-		q2spi_kfree(q2spi, data_buf, __LINE__);
+		if (q2spi_req.data_buff)
+			q2spi_kfree(q2spi, data_buf, __LINE__);
 		Q2SPI_DEBUG(q2spi, "%s Err Failed to add tx request ret:%d\n", __func__, flow_id);
 		pm_runtime_mark_last_busy(q2spi->dev);
 		pm_runtime_put_autosuspend(q2spi->dev);
