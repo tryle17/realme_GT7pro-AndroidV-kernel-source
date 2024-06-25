@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CORESIGHT_CORESIGHT_TPDA_H
@@ -35,6 +35,7 @@ struct tpda_drvdata {
 	uint32_t		freq_req_val;
 	bool			freq_req;
 	bool			cmbchan_mode;
+	struct clk		*dclk;
 };
 
 
