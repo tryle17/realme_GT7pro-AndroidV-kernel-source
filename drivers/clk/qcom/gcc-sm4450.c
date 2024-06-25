@@ -20,15 +20,14 @@
 #include "clk-regmap-phy-mux.h"
 #include "gdsc.h"
 #include "reset.h"
+#include "vdd-level.h"
 
-enum {
-	DT_BI_TCXO,
-	DT_SLEEP_CLK,
-	DT_PCIE_0_PIPE_CLK,
-	DT_UFS_PHY_RX_SYMBOL_0_CLK,
-	DT_UFS_PHY_RX_SYMBOL_1_CLK,
-	DT_UFS_PHY_TX_SYMBOL_0_CLK,
-	DT_USB3_PHY_WRAPPER_GCC_USB30_PIPE_CLK,
+static DEFINE_VDD_REGULATORS(vdd_cx, VDD_HIGH + 1, 1, vdd_corner);
+static DEFINE_VDD_REGULATORS(vdd_mx, VDD_HIGH + 1, 1, vdd_corner);
+
+static struct clk_vdd_class *gcc_sm4450_regulators[] = {
+	&vdd_cx,
+	&vdd_mx,
 };
 
 enum {
@@ -41,6 +40,7 @@ enum {
 	P_GCC_GPLL4_OUT_MAIN,
 	P_GCC_GPLL9_OUT_MAIN,
 	P_GCC_GPLL10_OUT_MAIN,
+	P_PCIE_0_PIPE_CLK,
 	P_SLEEP_CLK,
 	P_UFS_PHY_RX_SYMBOL_0_CLK,
 	P_UFS_PHY_RX_SYMBOL_1_CLK,
@@ -61,10 +61,21 @@ static struct clk_alpha_pll gcc_gpll0 = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpll0",
 			.parent_data = &(const struct clk_parent_data) {
-				.index = DT_BI_TCXO,
+				.fw_name = "bi_tcxo",
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_fixed_lucid_evo_ops,
+		},
+		.vdd_data = {
+			.vdd_class = &vdd_cx,
+			.num_rate_max = VDD_NUM,
+			.rate_max = (unsigned long[VDD_NUM]) {
+				[VDD_LOWER_D1] = 500000000,
+				[VDD_LOWER] = 615000000,
+				[VDD_LOW] = 1066000000,
+				[VDD_LOW_L1] = 1500000000,
+				[VDD_NOMINAL] = 1800000000,
+				[VDD_HIGH] = 2020000000},
 		},
 	},
 };
@@ -122,14 +133,26 @@ static struct clk_alpha_pll gcc_gpll1 = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpll1",
 			.parent_data = &(const struct clk_parent_data) {
-				.index = DT_BI_TCXO,
+				.fw_name = "bi_tcxo",
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_fixed_lucid_evo_ops,
 		},
+		.vdd_data = {
+			.vdd_class = &vdd_cx,
+			.num_rate_max = VDD_NUM,
+			.rate_max = (unsigned long[VDD_NUM]) {
+				[VDD_LOWER_D1] = 500000000,
+				[VDD_LOWER] = 615000000,
+				[VDD_LOW] = 1066000000,
+				[VDD_LOW_L1] = 1500000000,
+				[VDD_NOMINAL] = 1800000000,
+				[VDD_HIGH] = 2020000000},
+		},
 	},
 };
 
+/* 400MHz Configuration */
 static const struct alpha_pll_config gcc_gpll3_config = {
 	.l = 0x14,
 	.alpha = 0xd555,
@@ -151,10 +174,21 @@ static struct clk_alpha_pll gcc_gpll3 = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpll3",
 			.parent_data = &(const struct clk_parent_data) {
-				.index = DT_BI_TCXO,
+				.fw_name = "bi_tcxo",
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_lucid_evo_ops,
+		},
+		.vdd_data = {
+			.vdd_class = &vdd_cx,
+			.num_rate_max = VDD_NUM,
+			.rate_max = (unsigned long[VDD_NUM]) {
+				[VDD_LOWER_D1] = 500000000,
+				[VDD_LOWER] = 615000000,
+				[VDD_LOW] = 1066000000,
+				[VDD_LOW_L1] = 1500000000,
+				[VDD_NOMINAL] = 1800000000,
+				[VDD_HIGH] = 2020000000},
 		},
 	},
 };
@@ -168,10 +202,21 @@ static struct clk_alpha_pll gcc_gpll4 = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpll4",
 			.parent_data = &(const struct clk_parent_data) {
-				.index = DT_BI_TCXO,
+				.fw_name = "bi_tcxo",
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_fixed_lucid_evo_ops,
+		},
+		.vdd_data = {
+			.vdd_class = &vdd_cx,
+			.num_rate_max = VDD_NUM,
+			.rate_max = (unsigned long[VDD_NUM]) {
+				[VDD_LOWER_D1] = 500000000,
+				[VDD_LOWER] = 615000000,
+				[VDD_LOW] = 1066000000,
+				[VDD_LOW_L1] = 1500000000,
+				[VDD_NOMINAL] = 1800000000,
+				[VDD_HIGH] = 2020000000},
 		},
 	},
 };
@@ -185,10 +230,21 @@ static struct clk_alpha_pll gcc_gpll9 = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpll9",
 			.parent_data = &(const struct clk_parent_data) {
-				.index = DT_BI_TCXO,
+				.fw_name = "bi_tcxo",
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_fixed_lucid_evo_ops,
+		},
+		.vdd_data = {
+			.vdd_class = &vdd_cx,
+			.num_rate_max = VDD_NUM,
+			.rate_max = (unsigned long[VDD_NUM]) {
+				[VDD_LOWER_D1] = 500000000,
+				[VDD_LOWER] = 615000000,
+				[VDD_LOW] = 1066000000,
+				[VDD_LOW_L1] = 1500000000,
+				[VDD_NOMINAL] = 1800000000,
+				[VDD_HIGH] = 2020000000},
 		},
 	},
 };
@@ -202,10 +258,21 @@ static struct clk_alpha_pll gcc_gpll10 = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpll10",
 			.parent_data = &(const struct clk_parent_data) {
-				.index = DT_BI_TCXO,
+				.fw_name = "bi_tcxo",
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_fixed_lucid_evo_ops,
+		},
+		.vdd_data = {
+			.vdd_class = &vdd_cx,
+			.num_rate_max = VDD_NUM,
+			.rate_max = (unsigned long[VDD_NUM]) {
+				[VDD_LOWER_D1] = 500000000,
+				[VDD_LOWER] = 615000000,
+				[VDD_LOW] = 1066000000,
+				[VDD_LOW_L1] = 1500000000,
+				[VDD_NOMINAL] = 1800000000,
+				[VDD_HIGH] = 2020000000},
 		},
 	},
 };
@@ -217,7 +284,7 @@ static const struct parent_map gcc_parent_map_0[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_0[] = {
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "bi_tcxo" },
 	{ .hw = &gcc_gpll0.clkr.hw },
 	{ .hw = &gcc_gpll0_out_even.clkr.hw },
 };
@@ -230,9 +297,9 @@ static const struct parent_map gcc_parent_map_1[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_1[] = {
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "bi_tcxo" },
 	{ .hw = &gcc_gpll0.clkr.hw },
-	{ .index = DT_SLEEP_CLK },
+	{ .fw_name = "sleep_clk" },
 	{ .hw = &gcc_gpll0_out_even.clkr.hw },
 };
 
@@ -245,7 +312,7 @@ static const struct parent_map gcc_parent_map_2[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_2[] = {
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "bi_tcxo" },
 	{ .hw = &gcc_gpll0.clkr.hw },
 	{ .hw = &gcc_gpll1.clkr.hw },
 	{ .hw = &gcc_gpll4.clkr.hw },
@@ -258,8 +325,8 @@ static const struct parent_map gcc_parent_map_3[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_3[] = {
-	{ .index = DT_BI_TCXO },
-	{ .index = DT_SLEEP_CLK },
+	{ .fw_name = "bi_tcxo" },
+	{ .fw_name = "sleep_clk" },
 };
 
 static const struct parent_map gcc_parent_map_4[] = {
@@ -271,7 +338,7 @@ static const struct parent_map gcc_parent_map_4[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_4[] = {
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "bi_tcxo" },
 	{ .hw = &gcc_gpll0.clkr.hw },
 	{ .hw = &gcc_gpll0_out_odd.clkr.hw },
 	{ .hw = &gcc_gpll10.clkr.hw },
@@ -283,7 +350,7 @@ static const struct parent_map gcc_parent_map_5[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_5[] = {
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_6[] = {
@@ -295,7 +362,7 @@ static const struct parent_map gcc_parent_map_6[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_6[] = {
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "bi_tcxo" },
 	{ .hw = &gcc_gpll0.clkr.hw },
 	{ .hw = &gcc_gpll9.clkr.hw },
 	{ .hw = &gcc_gpll4.clkr.hw },
@@ -308,8 +375,8 @@ static const struct parent_map gcc_parent_map_7[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_7[] = {
-	{ .index = DT_UFS_PHY_RX_SYMBOL_0_CLK },
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "ufs_phy_rx_symbol_0_clk" },
+	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_8[] = {
@@ -318,8 +385,8 @@ static const struct parent_map gcc_parent_map_8[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_8[] = {
-	{ .index = DT_UFS_PHY_RX_SYMBOL_1_CLK },
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "ufs_phy_rx_symbol_1_clk" },
+	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_9[] = {
@@ -328,8 +395,8 @@ static const struct parent_map gcc_parent_map_9[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_9[] = {
-	{ .index = DT_UFS_PHY_TX_SYMBOL_0_CLK },
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "ufs_phy_tx_symbol_0_clk" },
+	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_10[] = {
@@ -338,8 +405,8 @@ static const struct parent_map gcc_parent_map_10[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_10[] = {
-	{ .index = DT_USB3_PHY_WRAPPER_GCC_USB30_PIPE_CLK },
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "usb3_phy_wrapper_gcc_usb30_pipe_clk" },
+	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_11[] = {
@@ -349,21 +416,32 @@ static const struct parent_map gcc_parent_map_11[] = {
 };
 
 static const struct clk_parent_data gcc_parent_data_11[] = {
-	{ .index = DT_BI_TCXO },
+	{ .fw_name = "bi_tcxo" },
 	{ .hw = &gcc_gpll0.clkr.hw },
 	{ .hw = &gcc_gpll3.clkr.hw },
 };
 
-static struct clk_regmap_phy_mux gcc_pcie_0_pipe_clk_src = {
+static const struct parent_map gcc_parent_map_12[] = {
+	{ P_PCIE_0_PIPE_CLK, 0 },
+	{ P_BI_TCXO, 2 },
+};
+
+static const struct clk_parent_data gcc_parent_data_12[] = {
+	{ .fw_name = "pcie_0_pipe_clk" },
+	{ .fw_name = "bi_tcxo" },
+};
+
+static struct clk_regmap_mux gcc_pcie_0_pipe_clk_src = {
 	.reg = 0x7b060,
+	.shift = 0,
+	.width = 2,
+	.parent_map = gcc_parent_map_6,
 	.clkr = {
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_pcie_0_pipe_clk_src",
-			.parent_data = &(const struct clk_parent_data) {
-				.index = DT_PCIE_0_PIPE_CLK,
-			},
-			.num_parents = 1,
-			.ops = &clk_regmap_phy_mux_ops,
+			.parent_data = gcc_parent_data_12,
+			.num_parents = ARRAY_SIZE(gcc_parent_data_12),
+			.ops = &clk_regmap_mux_closest_ops,
 		},
 	},
 };
@@ -448,6 +526,14 @@ static struct clk_rcg2 gcc_gp1_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 50000000,
+			[VDD_LOW] = 100000000,
+			[VDD_NOMINAL] = 200000000},
+	},
 };
 
 static struct clk_rcg2 gcc_gp2_clk_src = {
@@ -463,6 +549,14 @@ static struct clk_rcg2 gcc_gp2_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 50000000,
+			[VDD_LOW] = 100000000,
+			[VDD_NOMINAL] = 200000000},
+	},
 };
 
 static struct clk_rcg2 gcc_gp3_clk_src = {
@@ -477,6 +571,14 @@ static struct clk_rcg2 gcc_gp3_clk_src = {
 		.num_parents = ARRAY_SIZE(gcc_parent_data_1),
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 50000000,
+			[VDD_LOW] = 100000000,
+			[VDD_NOMINAL] = 200000000},
 	},
 };
 
@@ -499,6 +601,13 @@ static struct clk_rcg2 gcc_pcie_0_aux_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 19200000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_pcie_0_phy_rchng_clk_src[] = {
@@ -520,6 +629,13 @@ static struct clk_rcg2 gcc_pcie_0_phy_rchng_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 19200000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_pdm2_clk_src[] = {
@@ -539,6 +655,12 @@ static struct clk_rcg2 gcc_pdm2_clk_src = {
 		.num_parents = ARRAY_SIZE(gcc_parent_data_0),
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 60000000},
 	},
 };
 
@@ -576,6 +698,14 @@ static struct clk_rcg2 gcc_qupv3_wrap0_s0_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s0_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap0_s0_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 120000000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_qupv3_wrap0_s1_clk_src[] = {
@@ -608,6 +738,14 @@ static struct clk_rcg2 gcc_qupv3_wrap0_s1_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap0_s1_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap0_s2_clk_src_init = {
@@ -625,6 +763,14 @@ static struct clk_rcg2 gcc_qupv3_wrap0_s2_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap0_s2_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap0_s3_clk_src_init = {
@@ -642,6 +788,14 @@ static struct clk_rcg2 gcc_qupv3_wrap0_s3_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap0_s3_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap0_s4_clk_src_init = {
@@ -659,6 +813,14 @@ static struct clk_rcg2 gcc_qupv3_wrap0_s4_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap0_s4_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap1_s0_clk_src_init = {
@@ -676,6 +838,14 @@ static struct clk_rcg2 gcc_qupv3_wrap1_s0_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s0_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap1_s0_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 120000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap1_s1_clk_src_init = {
@@ -693,6 +863,14 @@ static struct clk_rcg2 gcc_qupv3_wrap1_s1_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap1_s1_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 120000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap1_s2_clk_src_init = {
@@ -710,6 +888,14 @@ static struct clk_rcg2 gcc_qupv3_wrap1_s2_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap1_s2_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap1_s3_clk_src_init = {
@@ -727,6 +913,14 @@ static struct clk_rcg2 gcc_qupv3_wrap1_s3_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap1_s3_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static struct clk_init_data gcc_qupv3_wrap1_s4_clk_src_init = {
@@ -744,6 +938,14 @@ static struct clk_rcg2 gcc_qupv3_wrap1_s4_clk_src = {
 	.parent_map = gcc_parent_map_0,
 	.freq_tbl = ftbl_gcc_qupv3_wrap0_s1_clk_src,
 	.clkr.hw.init = &gcc_qupv3_wrap1_s4_clk_src_init,
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 100000000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_sdcc1_apps_clk_src[] = {
@@ -771,6 +973,14 @@ static struct clk_rcg2 gcc_sdcc1_apps_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_floor_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 100000000,
+			[VDD_LOW_L1] = 384000000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_sdcc1_ice_core_clk_src[] = {
@@ -792,6 +1002,15 @@ static struct clk_rcg2 gcc_sdcc1_ice_core_clk_src = {
 		.num_parents = ARRAY_SIZE(gcc_parent_data_4),
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_floor_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 100000000,
+			[VDD_LOW] = 150000000,
+			[VDD_LOW_L1] = 300000000},
 	},
 };
 
@@ -817,6 +1036,14 @@ static struct clk_rcg2 gcc_sdcc2_apps_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_floor_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 100000000,
+			[VDD_LOW_L1] = 202000000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_ufs_phy_axi_clk_src[] = {
@@ -840,6 +1067,15 @@ static struct clk_rcg2 gcc_ufs_phy_axi_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 150000000,
+			[VDD_NOMINAL] = 300000000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_ufs_phy_ice_core_clk_src[] = {
@@ -862,6 +1098,15 @@ static struct clk_rcg2 gcc_ufs_phy_ice_core_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 100000000,
+			[VDD_LOW] = 200000000,
+			[VDD_NOMINAL] = 403000000},
+	},
 };
 
 static struct clk_rcg2 gcc_ufs_phy_phy_aux_clk_src = {
@@ -876,6 +1121,12 @@ static struct clk_rcg2 gcc_ufs_phy_phy_aux_clk_src = {
 		.num_parents = ARRAY_SIZE(gcc_parent_data_5),
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 19200000},
 	},
 };
 
@@ -898,6 +1149,15 @@ static struct clk_rcg2 gcc_ufs_phy_unipro_core_clk_src = {
 		.num_parents = ARRAY_SIZE(gcc_parent_data_0),
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 75000000,
+			[VDD_LOW] = 150000000,
+			[VDD_NOMINAL] = 300000000},
 	},
 };
 
@@ -922,6 +1182,16 @@ static struct clk_rcg2 gcc_usb30_prim_master_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 66666667,
+			[VDD_LOW] = 133333333,
+			[VDD_NOMINAL] = 200000000,
+			[VDD_HIGH] = 240000000},
+	},
 };
 
 static const struct freq_tbl ftbl_gcc_usb30_prim_mock_utmi_clk_src[] = {
@@ -942,6 +1212,12 @@ static struct clk_rcg2 gcc_usb30_prim_mock_utmi_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 19200000},
+	},
 };
 
 static struct clk_rcg2 gcc_usb3_prim_phy_aux_clk_src = {
@@ -956,6 +1232,12 @@ static struct clk_rcg2 gcc_usb3_prim_phy_aux_clk_src = {
 		.num_parents = ARRAY_SIZE(gcc_parent_data_3),
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 19200000},
 	},
 };
 
@@ -979,6 +1261,16 @@ static struct clk_rcg2 gcc_video_venus_clk_src = {
 		.num_parents = ARRAY_SIZE(gcc_parent_data_11),
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_classes = gcc_sm4450_regulators,
+		.num_vdd_classes = ARRAY_SIZE(gcc_sm4450_regulators),
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_LOWER] = 133333333,
+			[VDD_LOW] = 240000000,
+			[VDD_LOW_L1] = 365000000,
+			[VDD_NOMINAL] = 384000000},
 	},
 };
 
@@ -1062,7 +1354,7 @@ static struct clk_branch gcc_aggre_ufs_phy_axi_hw_ctl_clk = {
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
+			.ops = &clk_branch2_hw_ctl_ops,
 		},
 	},
 };
@@ -1323,6 +1615,7 @@ static struct clk_branch gcc_gpu_memnoc_gfx_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpu_memnoc_gfx_clk",
+			.flags = CLK_DONT_HOLD_STATE,
 			.ops = &clk_branch2_ops,
 		},
 	},
@@ -1336,6 +1629,7 @@ static struct clk_branch gcc_gpu_snoc_dvm_gfx_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(const struct clk_init_data) {
 			.name = "gcc_gpu_snoc_dvm_gfx_clk",
+			.flags = CLK_DONT_HOLD_STATE,
 			.ops = &clk_branch2_ops,
 		},
 	},
@@ -2172,7 +2466,7 @@ static struct clk_branch gcc_ufs_phy_axi_hw_ctl_clk = {
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
+			.ops = &clk_branch2_hw_ctl_ops,
 		},
 	},
 };
@@ -2212,7 +2506,7 @@ static struct clk_branch gcc_ufs_phy_ice_core_hw_ctl_clk = {
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
+			.ops = &clk_branch2_hw_ctl_ops,
 		},
 	},
 };
@@ -2252,7 +2546,7 @@ static struct clk_branch gcc_ufs_phy_phy_aux_hw_ctl_clk = {
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
+			.ops = &clk_branch2_hw_ctl_ops,
 		},
 	},
 };
@@ -2346,7 +2640,7 @@ static struct clk_branch gcc_ufs_phy_unipro_core_hw_ctl_clk = {
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
+			.ops = &clk_branch2_hw_ctl_ops,
 		},
 	},
 };
@@ -2791,8 +3085,8 @@ static const struct qcom_reset_map gcc_sm4450_resets[] = {
 	[GCC_VENUS_BCR] = { 0xb601c },
 	[GCC_VIDEO_BCR] = { 0x42000 },
 	[GCC_VIDEO_VENUS_BCR] = { 0xb6000 },
-	[GCC_VENUS_CTL_AXI_CLK_ARES] = { .reg = 0x4201c, .bit = 2, .udelay = 400 },
-	[GCC_VIDEO_VENUS_CTL_CLK_ARES] = { .reg = 0xb6038, .bit = 2, .udelay = 400 },
+	[GCC_VENUS_CTL_AXI_CLK_ARES] = { 0x4201c, 2 },
+	[GCC_VIDEO_VENUS_CTL_CLK_ARES] = { 0xb6038, 2 },
 };
 
 static const struct clk_rcg_dfs_data gcc_dfs_clocks[] = {
@@ -2816,7 +3110,7 @@ static const struct regmap_config gcc_sm4450_regmap_config = {
 	.fast_io = true,
 };
 
-static const struct qcom_cc_desc gcc_sm4450_desc = {
+static struct qcom_cc_desc gcc_sm4450_desc = {
 	.config = &gcc_sm4450_regmap_config,
 	.clks = gcc_sm4450_clocks,
 	.num_clks = ARRAY_SIZE(gcc_sm4450_clocks),
@@ -2824,6 +3118,8 @@ static const struct qcom_cc_desc gcc_sm4450_desc = {
 	.num_resets = ARRAY_SIZE(gcc_sm4450_resets),
 	.gdscs = gcc_sm4450_gdscs,
 	.num_gdscs = ARRAY_SIZE(gcc_sm4450_gdscs),
+	.clk_regulators = gcc_sm4450_regulators,
+	.num_clk_regulators = ARRAY_SIZE(gcc_sm4450_regulators),
 };
 
 static const struct of_device_id gcc_sm4450_match_table[] = {
@@ -2841,27 +3137,45 @@ static int gcc_sm4450_probe(struct platform_device *pdev)
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
 
+	/* Keep some clocks always-on */
+	regmap_update_bits(regmap, 0x36004, BIT(0), BIT(0)); /* GCC_CAMERA_AHB_CLK */
+	regmap_update_bits(regmap, 0x36018, BIT(0), BIT(0)); /* GCC_CAMERA_SLEEP_CLK */
+	regmap_update_bits(regmap, 0x3601c, BIT(0), BIT(0)); /* GCC_CAMERA_XO_CLK */
+	regmap_update_bits(regmap, 0x37004, BIT(0), BIT(0)); /* GCC_DISP_AHB_CLK */
+	regmap_update_bits(regmap, 0x37014, BIT(0), BIT(0)); /* GCC_DISP_XO_CLK */
+	regmap_update_bits(regmap, 0x81004, BIT(0), BIT(0)); /* GCC_GPU_CFG_AHB_CLK */
+	regmap_update_bits(regmap, 0x42004, BIT(0), BIT(0)); /* GCC_VIDEO_AHB_CLK */
+	regmap_update_bits(regmap, 0x42018, BIT(0), BIT(0)); /* GCC_VIDEO_XO_CLK */
+
+	/* Ignore the PMU clock disable signal for gcc_venus_ctl_axi_clk */
+	regmap_update_bits(regmap, gcc_venus_ctl_axi_clk.clkr.enable_reg, BIT(21), BIT(21));
+
+	regmap_update_bits(regmap, 0x36010, BIT(20), BIT(20));
+	regmap_update_bits(regmap, 0x36014, BIT(20), BIT(20));
+
+	gcc_sm4450_desc.gdscs = NULL;
+	gcc_sm4450_desc.num_gdscs = 0;
+
 	clk_lucid_evo_pll_configure(&gcc_gpll3, regmap, &gcc_gpll3_config);
 	ret = qcom_cc_register_rcg_dfs(regmap, gcc_dfs_clocks,
 				       ARRAY_SIZE(gcc_dfs_clocks));
 	if (ret)
 		return ret;
 
-	qcom_branch_set_force_mem_core(regmap, gcc_ufs_phy_ice_core_clk, true);
+	ret = qcom_cc_really_probe(pdev, &gcc_sm4450_desc, regmap);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to register GCC clocks\n");
+		return ret;
+	}
 
-	/* Keep some clocks always-on */
-	qcom_branch_set_clk_en(regmap, 0x36004); /* GCC_CAMERA_AHB_CLK */
-	qcom_branch_set_clk_en(regmap, 0x36018); /* GCC_CAMERA_SLEEP_CLK */
-	qcom_branch_set_clk_en(regmap, 0x3601c); /* GCC_CAMERA_XO_CLK */
-	qcom_branch_set_clk_en(regmap, 0x37004); /* GCC_DISP_AHB_CLK */
-	qcom_branch_set_clk_en(regmap, 0x37014); /* GCC_DISP_XO_CLK */
-	qcom_branch_set_clk_en(regmap, 0x81004); /* GCC_GPU_CFG_AHB_CLK */
-	qcom_branch_set_clk_en(regmap, 0x42004); /* GCC_VIDEO_AHB_CLK */
-	qcom_branch_set_clk_en(regmap, 0x42018); /* GCC_VIDEO_XO_CLK */
+	dev_info(&pdev->dev, "Registered GCC clocks\n");
 
-	regmap_update_bits(regmap, 0x4201c, BIT(21), BIT(21));
+	return ret;
+}
 
-	return qcom_cc_really_probe(pdev, &gcc_sm4450_desc, regmap);
+static void gcc_sm4450_sync_state(struct device *dev)
+{
+	qcom_cc_sync_state(dev, &gcc_sm4450_desc);
 }
 
 static struct platform_driver gcc_sm4450_driver = {
@@ -2869,6 +3183,7 @@ static struct platform_driver gcc_sm4450_driver = {
 	.driver = {
 		.name = "gcc-sm4450",
 		.of_match_table = gcc_sm4450_match_table,
+		.sync_state = gcc_sm4450_sync_state,
 	},
 };
 
