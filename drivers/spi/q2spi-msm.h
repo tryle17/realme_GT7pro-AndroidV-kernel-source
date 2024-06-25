@@ -11,6 +11,7 @@
 #include <linux/ipc_logging.h>
 #include <linux/kthread.h>
 #include <linux/msm_gpi.h>
+#include <linux/pm_runtime.h>
 #include <linux/poll.h>
 #include <linux/soc/qcom/geni-se.h>
 #include <linux/qcom-geni-se-common.h>
