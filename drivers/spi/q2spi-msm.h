@@ -169,6 +169,9 @@
 #define Q2SPI_AUTOSUSPEND_DELAY		(XFER_TIMEOUT_OFFSET + 50)
 #define Q2SPI_SLAVE_SLEEP_TIME_MSECS	100
 
+#define Q2SPI_SOFT_RESET_CMD_BIT	BIT(0)
+#define Q2SPI_SLEEP_CMD_BIT		BIT(1)
+
 #define PINCTRL_DEFAULT		"default"
 #define PINCTRL_ACTIVE		"active"
 #define PINCTRL_SLEEP		"sleep"
@@ -507,6 +510,7 @@ struct q2spi_dma_transfer {
  * @slave_sleep_timer: used for initiating sleep command to slave
  * @slave_in_sleep: reflects sleep command sent to slave
  * @sys_mem_read_in_progress: reflects system memory read request is in progress
+ * @q2spi_sleep_cmd_enable: reflects start sending the sleep command to slave
  */
 struct q2spi_geni {
 	struct device *wrapper_dev;
@@ -610,6 +614,7 @@ struct q2spi_geni {
 	struct timer_list slave_sleep_timer;
 	atomic_t slave_in_sleep;
 	bool sys_mem_read_in_progress;
+	bool q2spi_sleep_cmd_enable;
 };
 
 /**
