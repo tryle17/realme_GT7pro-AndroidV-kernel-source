@@ -21,6 +21,7 @@
 #include <linux/spinlock.h>
 #include <linux/log2.h>
 #include <linux/sizes.h>
+#include <linux/arch_topology.h>
 #include <linux/cpufreq.h>
 #include <linux/sched/walt.h>
 #include <soc/qcom/dcvs.h>
@@ -276,6 +277,43 @@ static ssize_t show_second_vote_limit(struct kobject *kobj,
 
 	return scnprintf(buf, PAGE_SIZE, "%u\n", hw->second_vote_limit);
 }
+
+static ssize_t store_max_low_power_cluster_freqs(struct kobject *kobj,
+			struct attribute *attr, const char *buf,
+			size_t count)
+{
+	struct hwmon_node *node = to_hwmon_node(kobj);
+	int ret, numvals;
+	unsigned int i = 0, val;
+	char **strlist;
+
+	strlist = argv_split(GFP_KERNEL, buf, &numvals);
+	if (!strlist)
+		return -ENOMEM;
+	if (numvals != cpumask_weight(&node->hw->low_power_cluster_cpus)) {
+		dev_err(node->hw->dev, "invalid num of low power cpufreqs\n");
+		ret = -EINVAL;
+		goto out;
+	}
+	node->low_power_io_percent_enabled = true;
+	for (i = 0; i < numvals; i++) {
+		ret = kstrtouint(strlist[i], 10, &val);
+		if (ret < 0)
+			goto out;
+		node->max_low_power_cluster_freqs[i] = val;
+		/* if any value is 0, disable the feature */
+		if (!val) {
+			node->low_power_io_percent_enabled = false;
+			break;
+		}
+	}
+	ret = count;
+
+out:
+	argv_free(strlist);
+	return ret;
+}
+
 show_attr(min_freq);
 static BWMON_ATTR_RW(min_freq);
 show_attr(max_freq);
@@ -301,9 +339,8 @@ static BWMON_ATTR_RW(io_percent);
 show_attr(low_power_io_percent);
 store_attr(low_power_io_percent, 1U, 400U);
 static BWMON_ATTR_RW(low_power_io_percent);
-show_attr(low_power_cpufreq_thres);
-store_attr(low_power_cpufreq_thres, 0U, 6000000U);
-static BWMON_ATTR_RW(low_power_cpufreq_thres);
+show_list_attr(max_low_power_cluster_freqs, MAX_LOW_POWER_CLUSTERS);
+static BWMON_ATTR_RW(max_low_power_cluster_freqs);
 show_attr(bw_step);
 store_attr(bw_step, 50U, 1000U);
 static BWMON_ATTR_RW(bw_step);
@@ -359,7 +396,7 @@ static struct attribute *bwmon_attrs[] = {
 	&decay_rate.attr,
 	&io_percent.attr,
 	&low_power_io_percent.attr,
-	&low_power_cpufreq_thres.attr,
+	&max_low_power_cluster_freqs.attr,
 	&bw_step.attr,
 	&sample_ms.attr,
 	&up_scale.attr,
@@ -557,7 +594,7 @@ static unsigned long get_bw_and_set_irq(struct hwmon_node *node,
 
 	spin_lock_irqsave(&sample_irq_lock, flags);
 
-	if (node->cur_low_power_cpufreq <= node->low_power_cpufreq_thres)
+	if (node->use_low_power_io_percent)
 		io_percent = node->low_power_io_percent;
 
 	if (!hw->set_hw_events) {
@@ -805,26 +842,31 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 	return ret;
 }
 
-static bool should_trigger_cpufreq_update(struct hwmon_node *node)
+static bool should_trigger_low_power_update(struct hwmon_node *node)
 {
 	struct bw_hwmon *hw = node->hw;
 	struct cpufreq_policy *policy;
 	u32 cur_cpufreq;
-	bool ret = false;
+	bool ret = false, next_use_low_power_io_percent = true;
+	int cpu, i = 0;
 
-	policy = cpufreq_cpu_get_raw(hw->low_power_cpu);
-	if (!policy)
-		return false;
-
-	cur_cpufreq = policy->cur;
-	if (node->cur_low_power_cpufreq <= node->low_power_cpufreq_thres
-			&& cur_cpufreq > node->low_power_cpufreq_thres)
+	for_each_cpu(cpu, &hw->low_power_cluster_cpus) {
+		policy = cpufreq_cpu_get_raw(cpu);
+		if (!policy) {
+			next_use_low_power_io_percent = false;
+			break;
+		}
+		cur_cpufreq = policy->cur;
+		/* if any cpufreq > max then don't use low power io percent */
+		if (cur_cpufreq > node->max_low_power_cluster_freqs[i]) {
+			next_use_low_power_io_percent = false;
+			break;
+		}
+		i++;
+	}
+	if (next_use_low_power_io_percent != node->use_low_power_io_percent)
 		ret = true;
-	else if (node->cur_low_power_cpufreq > node->low_power_cpufreq_thres
-			&& cur_cpufreq <= node->low_power_cpufreq_thres)
-		ret = true;
-
-	node->cur_low_power_cpufreq = cur_cpufreq;
+	node->use_low_power_io_percent = next_use_low_power_io_percent;
 
 	return ret;
 }
@@ -837,7 +879,7 @@ static void bwmon_jiffies_update_cb(void *unused, void *extra)
 	unsigned long flags;
 	ktime_t now = ktime_get();
 	s64 delta_ns;
-	bool sched_update = false, cpufreq_update = false;
+	bool sched_update = false, low_power_update = false;
 	int new_boost_state = -1;
 
 	spin_lock_irqsave(&list_lock, flags);
@@ -854,13 +896,13 @@ static void bwmon_jiffies_update_cb(void *unused, void *extra)
 		} else {
 			node->cur_sched_boost = false;
 		}
-		if (hw->low_power_supported && node->low_power_cpufreq_thres)
-			cpufreq_update = should_trigger_cpufreq_update(node);
+		if (node->low_power_io_percent_enabled)
+			low_power_update = should_trigger_low_power_update(node);
 		else
-			node->cur_low_power_cpufreq = U32_MAX;
+			node->use_low_power_io_percent = false;
 		delta_ns = now - hw->last_update_ts + HALF_TICK_NS;
 		if (delta_ns > ms_to_ktime(hw->node->window_ms)
-				|| sched_update || cpufreq_update) {
+				|| sched_update || low_power_update) {
 			queue_work(bwmon_wq, &hw->work);
 			hw->last_update_ts = now;
 		}
@@ -1915,8 +1957,9 @@ static int configure_bwmon_resources(struct platform_device *pdev, struct bwmon 
 static int configure_bwmon_hw(struct platform_device *pdev, struct bwmon *m)
 {
 	struct device *dev = &pdev->dev;
+	struct cpu_topology *cpu_topo;
+	int ret, cpu, cluster = -1;
 	u32 count_unit;
-	int ret;
 
 	if (m->spec->hw_sampling) {
 		ret = of_property_read_u32(dev->of_node, "qcom,hw-timer-hz",
@@ -1963,6 +2006,15 @@ static int configure_bwmon_hw(struct platform_device *pdev, struct bwmon *m)
 		m->hw.get_throttle_adj = mon_get_throttle_adj;
 	}
 
+	/* set cpus to track for low power io percent */
+	for_each_possible_cpu(cpu) {
+		cpu_topo = &cpu_topology[cpu];
+		if (cpu_topo->cluster_id == cluster)
+			continue;
+		cpumask_set_cpu(cpu, &m->hw.low_power_cluster_cpus);
+		cluster = cpu_topo->cluster_id;
+	}
+
 	m->hw.is_active = false;
 
 	return 0;
@@ -1974,7 +2026,6 @@ static int bwmon_dcvs_register(struct platform_device *pdev, struct bwmon *m)
 	struct device_node *of_node, *tmp_of_node;
 	struct device *dev = &pdev->dev;
 	struct hwmon_node *node;
-	u32 low_power_cpu;
 	int ret;
 
 	of_node = of_parse_phandle(dev->of_node, "qcom,target-dev", 0);
@@ -2000,12 +2051,6 @@ static int bwmon_dcvs_register(struct platform_device *pdev, struct bwmon *m)
 	}
 	m->hw.dcvs_path = DCVS_SLOW_PATH;
 	of_node_put(of_node);
-
-	ret = of_property_read_u32(dev->of_node, "qcom,low-power-cpu", &low_power_cpu);
-	if (ret >= 0) {
-		m->hw.low_power_supported = true;
-		m->hw.low_power_cpu = low_power_cpu;
-	}
 
 	of_node = of_parse_phandle(dev->of_node, "qcom,second-vote", 0);
 	if (of_node) {
