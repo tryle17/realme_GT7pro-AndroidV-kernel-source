@@ -548,8 +548,6 @@ void smart_freq_init(const char *name)
 				/* Legacy */
 				cluster->smart_freq_info->legacy_reason_config[0].freq_allowed =
 					2400000;
-				cluster->smart_freq_info->legacy_reason_config[5].freq_allowed =
-					2400000;
 				cluster->smart_freq_info->legacy_reason_config[2].hyst_ns =
 					1000000000;
 				cluster->smart_freq_info->legacy_reason_config[3].hyst_ns =
@@ -578,8 +576,6 @@ void smart_freq_init(const char *name)
 			} else if (cluster->id == 1) {
 				/* Legacy */
 				cluster->smart_freq_info->legacy_reason_config[0].freq_allowed =
-					3513600;
-				cluster->smart_freq_info->legacy_reason_config[5].freq_allowed =
 					3513600;
 				cluster->smart_freq_info->legacy_reason_config[2].hyst_ns =
 					1000000000;
