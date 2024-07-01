@@ -145,6 +145,7 @@ def define_monaco():
         "drivers/thermal/qcom/cpu_hotplug.ko",
         "drivers/thermal/qcom/lmh_cpu_vdd_cdev.ko",
         "drivers/thermal/qcom/msm-tsens-driver.ko",
+        "drivers/thermal/qcom/msm_lmh_dcvs.ko",
         "drivers/thermal/qcom/qcom-spmi-temp-alarm.ko",
         "drivers/thermal/qcom/qti_cpufreq_cdev.ko",
         "drivers/thermal/qcom/qti_devfreq_cdev.ko",
