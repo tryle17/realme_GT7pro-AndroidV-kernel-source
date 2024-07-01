@@ -1129,6 +1129,7 @@ static int q2spi_open(struct inode *inode, struct file *filp)
 		}
 	}
 	filp->private_data = q2spi;
+	q2spi->q2spi_sleep_cmd_enable = false;
 	Q2SPI_DEBUG(q2spi, "%s End PID:%d, allocs:%d\n",
 		    __func__, current->pid, atomic_read(&q2spi->alloc_count));
 err:
@@ -1983,7 +1984,7 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 			mod_timer(&q2spi->slave_sleep_timer,
 				  jiffies + msecs_to_jiffies(Q2SPI_SLAVE_SLEEP_TIME_MSECS));
 			/* Should not perform SOFT RESET when UWB sets reserved[0] bit 0 set */
-			if (!(q2spi_req.reserved[0] & BIT(0)) && i == 1)
+			if (!(q2spi_req.reserved[0] & Q2SPI_SOFT_RESET_CMD_BIT) && i == 1)
 				q2spi_transfer_soft_reset(q2spi);
 
 			cur_q2spi_pkt->state = IN_DELETION;
@@ -2128,6 +2129,13 @@ static int q2spi_transfer_check(struct q2spi_geni *q2spi, struct q2spi_request *
 	if (q2spi_req->addr > Q2SPI_SLAVE_END_ADDR) {
 		Q2SPI_DEBUG(q2spi, "%s Err Invalid address:%x\n", __func__, q2spi_req->addr);
 		return -EINVAL;
+	}
+
+	if (q2spi_req->reserved[0] & Q2SPI_SLEEP_CMD_BIT) {
+		Q2SPI_DEBUG(q2spi, "%s allow_sleep\n", __func__);
+		q2spi->q2spi_sleep_cmd_enable = true;
+	} else {
+		q2spi->q2spi_sleep_cmd_enable = false;
 	}
 	return 0;
 }
@@ -3198,7 +3206,7 @@ void q2spi_geni_resources_off(struct q2spi_geni *q2spi)
 	se = &q2spi->se;
 	mutex_lock(&q2spi->geni_resource_lock);
 	if (!q2spi->resources_on) {
-		Q2SPI_DEBUG(q2spi, "%s: Err Resources already off\n", __func__);
+		Q2SPI_DEBUG(q2spi, "%s: Resources already off\n", __func__);
 		goto exit_resource_off;
 	}
 
@@ -3240,7 +3248,7 @@ int q2spi_geni_resources_on(struct q2spi_geni *q2spi)
 	mutex_lock(&q2spi->geni_resource_lock);
 	Q2SPI_DEBUG(q2spi, "%s PID=%d\n", __func__, current->pid);
 	if (q2spi->resources_on) {
-		Q2SPI_DEBUG(q2spi, "%s: Err Resources already on\n", __func__);
+		Q2SPI_DEBUG(q2spi, "%s: Resources already on\n", __func__);
 		goto exit_resource_on;
 	}
 
@@ -4290,6 +4298,7 @@ static int q2spi_geni_probe(struct platform_device *pdev)
 	mutex_init(&q2spi->send_msgs_lock);
 	spin_lock_init(&q2spi->cr_queue_lock);
 	q2spi->port_release = true;
+	q2spi->q2spi_sleep_cmd_enable = false;
 
 	q2spi->kworker = kthread_create_worker(0, "kthread_q2spi");
 	if (IS_ERR(q2spi->kworker)) {
@@ -4508,15 +4517,20 @@ int q2spi_put_slave_to_sleep(struct q2spi_geni *q2spi)
 	struct q2spi_request q2spi_req;
 	int ret = 0;
 
-	Q2SPI_DEBUG(q2spi, "%s: PID=%d\n", __func__, current->pid);
+	Q2SPI_DEBUG(q2spi, "%s: PID=%d q2spi_sleep_cmd_enable:%d\n",
+		    __func__, current->pid, q2spi->q2spi_sleep_cmd_enable);
+	if (!q2spi->q2spi_sleep_cmd_enable)
+		return 0;
+
 	if (atomic_read(&q2spi->slave_in_sleep)) {
 		Q2SPI_DEBUG(q2spi, "%s: Client in sleep\n", __func__);
 		return 0;
 	}
 	if (mutex_is_locked(&q2spi->port_lock) || q2spi->port_release) {
-		Q2SPI_DEBUG(q2spi, "%s: port_release is in progress\n", __func__);
+		Q2SPI_DEBUG(q2spi, "%s: port_lock acquired or release is in progress\n", __func__);
 		return 0;
 	}
+
 	q2spi_req.cmd = Q2SPI_HRF_SLEEP_CMD;
 	q2spi_req.sync = 1;
 
