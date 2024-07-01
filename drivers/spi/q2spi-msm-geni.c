@@ -1041,6 +1041,15 @@ struct q2spi_cr_packet *q2spi_prepare_cr_pkt(struct q2spi_geni *q2spi)
 			q2spi_cr_pkt->cr_hdr_type[i] = CR_HDR_VAR3;
 			Q2SPI_DEBUG(q2spi, "%s i:%d cr_hdr_type:0x%x\n",
 				    __func__, i, q2spi_cr_pkt->cr_hdr_type[i]);
+			if (q2spi_cr_pkt->var3_pkt[i].arg1 == Q2SPI_CR_TRANSACTION_ERROR) {
+				Q2SPI_DEBUG(q2spi, "%s arg1:0x%x arg2:0x%x arg3:0x%x\n",
+					    __func__, q2spi_cr_pkt->var3_pkt[i].arg1,
+					    q2spi_cr_pkt->var3_pkt[i].arg2,
+					    q2spi_cr_pkt->var3_pkt[i].arg3);
+				q2spi->q2spi_cr_txn_err = true;
+				spin_unlock_irqrestore(&q2spi->cr_queue_lock, flags);
+				return 0;
+			}
 			Q2SPI_DEBUG(q2spi, "%s var3_pkt:%p var3_flow_id:%d\n",
 				    __func__, &q2spi_cr_pkt->var3_pkt[i],
 				    q2spi_cr_pkt->var3_pkt[i].flow_id);
@@ -1129,6 +1138,7 @@ static int q2spi_open(struct inode *inode, struct file *filp)
 		}
 	}
 	filp->private_data = q2spi;
+	q2spi->q2spi_cr_txn_err = false;
 	q2spi->q2spi_sleep_cmd_enable = false;
 	Q2SPI_DEBUG(q2spi, "%s End PID:%d, allocs:%d\n",
 		    __func__, current->pid, atomic_read(&q2spi->alloc_count));
@@ -1787,6 +1797,12 @@ static int q2spi_wakeup_hw_from_sleep(struct q2spi_geni *q2spi)
 	long timeout = 0;
 	int ret = 0;
 
+	if (q2spi->q2spi_cr_txn_err) {
+		q2spi_transfer_abort(q2spi);
+		q2spi->q2spi_cr_txn_err = false;
+		return 0;
+	}
+
 	xfer_timeout = msecs_to_jiffies(EXT_CR_TIMEOUT_MSECS);
 	reinit_completion(&q2spi->wait_for_ext_cr);
 	/* Send gpio wakeup signal on q2spi lines to hw */
@@ -1980,11 +1996,14 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 					return ret;
 				}
 			}
+			q2spi->q2spi_cr_txn_err = false;
+
 			/* Reset 100msec client sleep timer */
 			mod_timer(&q2spi->slave_sleep_timer,
 				  jiffies + msecs_to_jiffies(Q2SPI_SLAVE_SLEEP_TIME_MSECS));
 			/* Should not perform SOFT RESET when UWB sets reserved[0] bit 0 set */
-			if (!(q2spi_req.reserved[0] & Q2SPI_SOFT_RESET_CMD_BIT) && i == 1)
+			if (!q2spi->q2spi_cr_txn_err &&
+			    (!(q2spi_req.reserved[0] & Q2SPI_SOFT_RESET_CMD_BIT)) && i == 1)
 				q2spi_transfer_soft_reset(q2spi);
 
 			cur_q2spi_pkt->state = IN_DELETION;
@@ -2045,6 +2064,38 @@ transfer_exit:
 }
 
 /*
+ * q2spi_transfer_abort - Add Abort request in tx_queue list and submit q2spi transfer
+ * @q2spi: Pointer to main q2spi_geni structure
+ *
+ * Return: 0 on success. Error code on failure.
+ */
+void q2spi_transfer_abort(struct q2spi_geni *q2spi)
+{
+	struct q2spi_packet *cur_q2spi_abort_pkt;
+	struct q2spi_request abort_request;
+	int ret = 0;
+
+	Q2SPI_DEBUG(q2spi, "%s ABORT\n", __func__);
+	abort_request.cmd = ABORT;
+	abort_request.sync = 1;
+	mutex_lock(&q2spi->queue_lock);
+	ret = q2spi_add_req_to_tx_queue(q2spi, abort_request, &cur_q2spi_abort_pkt);
+	mutex_unlock(&q2spi->queue_lock);
+	if (ret < 0) {
+		Q2SPI_DEBUG(q2spi, "%s Err q2spi_add_req_to_tx_queue ret:%d\n", __func__, ret);
+		return;
+	}
+	__q2spi_transfer(q2spi, abort_request, cur_q2spi_abort_pkt, 0);
+	if (ret)
+		Q2SPI_DEBUG(q2spi, "%s __q2spi_transfer q2spi_pkt:%p ret%d\n",
+			    __func__, cur_q2spi_abort_pkt, ret);
+	cur_q2spi_abort_pkt->state = IN_DELETION;
+	q2spi_del_pkt_from_tx_queue(q2spi, cur_q2spi_abort_pkt);
+	q2spi_kfree(q2spi, cur_q2spi_abort_pkt->xfer, __LINE__);
+	cur_q2spi_abort_pkt->xfer = NULL;
+}
+
+/*
  * q2spi_transfer_soft_reset - Add soft-reset request in tx_queue list and submit q2spi transfer
  *
  * @q2spi: Pointer to main q2spi_geni structure
@@ -2057,6 +2108,7 @@ void q2spi_transfer_soft_reset(struct q2spi_geni *q2spi)
 	struct q2spi_request soft_reset_request;
 	int ret = 0;
 
+	Q2SPI_DEBUG(q2spi, "%s SOFT_RESET\n", __func__);
 	soft_reset_request.cmd = SOFT_RESET;
 	soft_reset_request.sync = 1;
 	mutex_lock(&q2spi->queue_lock);
@@ -2067,6 +2119,9 @@ void q2spi_transfer_soft_reset(struct q2spi_geni *q2spi)
 		return;
 	}
 	__q2spi_transfer(q2spi, soft_reset_request, cur_q2spi_sr_pkt, 0);
+	if (ret)
+		Q2SPI_DEBUG(q2spi, "%s __q2spi_transfer q2spi_pkt:%p ret%d\n",
+			    __func__, cur_q2spi_sr_pkt, ret);
 	cur_q2spi_sr_pkt->state = IN_DELETION;
 	q2spi_del_pkt_from_tx_queue(q2spi, cur_q2spi_sr_pkt);
 	q2spi_kfree(q2spi, cur_q2spi_sr_pkt->xfer, __LINE__);
@@ -3941,6 +3996,7 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 	ret = check_gsi_transfer_completion_db_rx(q2spi);
 	if (ret) {
 		Q2SPI_DEBUG(q2spi, "%s db rx completion timeout: %d\n", __func__, ret);
+		q2spi_unmap_doorbell_rx_buf(q2spi);
 		goto exit_doorbell_work;
 	}
 
@@ -3948,6 +4004,7 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 	q2spi_cr_pkt = q2spi_prepare_cr_pkt(q2spi);
 	if (!q2spi_cr_pkt) {
 		Q2SPI_DEBUG(q2spi, "Err q2spi_prepare_cr_pkt failed\n");
+		q2spi_unmap_doorbell_rx_buf(q2spi);
 		goto exit_doorbell_work;
 	}
 
