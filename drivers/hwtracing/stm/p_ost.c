@@ -4,7 +4,7 @@
  * ("stm class: Add MIPI SyS-T protocol support").
  *
  * Copyright (c) 2022 2024 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Intel Corporation.
  *
  * MIPI OST framing protocol for STM devices.
@@ -109,7 +109,7 @@ static struct configfs_attribute *ost_t_policy_attrs[] = {
 	NULL,
 };
 
-static ssize_t notrace ost_write(struct stm_data *data,
+static ssize_t notrace __nocfi ost_write(struct stm_data *data,
 		struct stm_output *output, unsigned int chan,
 		const char *buf, size_t count)
 {
