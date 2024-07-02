@@ -372,10 +372,10 @@ show_attr(idle_mbps);
 store_attr(idle_mbps, 0U, 2000U);
 static BWMON_ATTR_RW(idle_mbps);
 show_attr(ab_scale);
-store_attr(ab_scale, 0U, 100U);
+store_attr(ab_scale, 0U, 200U);
 static BWMON_ATTR_RW(ab_scale);
 show_attr(second_ab_scale);
-store_attr(second_ab_scale, 0U, 100U);
+store_attr(second_ab_scale, 0U, 200U);
 static BWMON_ATTR_RW(second_ab_scale);
 show_attr(use_sched_boost);
 store_attr(use_sched_boost, 0U, 1U);
@@ -795,12 +795,13 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 {
 	struct bw_hwmon *hw = node->hw;
 	struct dcvs_freq new_freq;
-	u32 primary_mbps;
+	u32 primary_ib_mbps, primary_ab_mbps;
 	bool ret = false;
 
 	get_bw_and_set_irq(node, &new_freq);
 
 	/* first convert freq from mbps to khz */
+	primary_ab_mbps = new_freq.ab;
 	new_freq.ab = MBPS_TO_KHZ(new_freq.ab, hw->dcvs_width);
 	new_freq.ib = MBPS_TO_KHZ(new_freq.ib, hw->dcvs_width);
 	new_freq.ib = max(new_freq.ib, node->min_freq);
@@ -808,7 +809,7 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 	/* sched_boost_freq is intentionally not limited by max_freq */
 	if (node->cur_sched_boost)
 		new_freq.ib = max(new_freq.ib, node->sched_boost_freq);
-	primary_mbps = KHZ_TO_MBPS(new_freq.ib, hw->dcvs_width);
+	primary_ib_mbps = KHZ_TO_MBPS(new_freq.ib, hw->dcvs_width);
 
 	if (new_freq.ib != node->cur_freqs[0].ib ||
 			new_freq.ab != node->cur_freqs[0].ab) {
@@ -819,14 +820,19 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 				node->cur_freqs[1].ib = get_dst_from_map(hw,
 								new_freq.ib);
 			else if (hw->second_dcvs_width)
-				node->cur_freqs[1].ib = MBPS_TO_KHZ(primary_mbps,
+				node->cur_freqs[1].ib = MBPS_TO_KHZ(primary_ib_mbps,
 							hw->second_dcvs_width);
 			else
 				node->cur_freqs[1].ib = 0;
 			if (!node->cur_sched_boost)
 				node->cur_freqs[1].ib = min(node->cur_freqs[1].ib,
 							hw->second_vote_limit);
-			node->cur_freqs[1].ab = mult_frac(new_freq.ab,
+			if (hw->second_dcvs_width)
+				node->cur_freqs[1].ab = MBPS_TO_KHZ(primary_ab_mbps,
+							hw->second_dcvs_width);
+			else
+				node->cur_freqs[1].ab = 0;
+			node->cur_freqs[1].ab = mult_frac(node->cur_freqs[1].ab,
 							node->second_ab_scale, 100);
 		}
 		ret = true;
@@ -834,8 +840,7 @@ static bool bwmon_update_cur_freq(struct hwmon_node *node)
 
 	if (hw->second_vote_supported)
 		trace_bw_hwmon_update(hw->second_dev_name,
-				/* use original hw width for ab to get true mbps */
-				KHZ_TO_MBPS(node->cur_freqs[1].ab, hw->dcvs_width),
+				KHZ_TO_MBPS(node->cur_freqs[1].ab, hw->second_dcvs_width),
 				KHZ_TO_MBPS(node->cur_freqs[1].ib, hw->second_dcvs_width),
 				0, 0);
 
