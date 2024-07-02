@@ -574,4 +574,16 @@ config QCOM_LAZY_MAPPING
 
 	  If unsure, say N here.
 
+config QTVM_IOMMU_TRACE_HOOKS
+	bool "Trace hooks used for QTVM"
+	depends on QCOM_IOMMU_UTIL
+	depends on !ANDROID_VENDOR_HOOKS
+	help
+	  When Android vendor hooks isn't available in a non Android
+	  environment, enable this config to call certain vendor hooks
+	  in the absence of Android vendor hooks. This helps to enable
+	  certain feature in the non Android environment.
+
+	  If unsure, say N here.
+
 endif # IOMMU_SUPPORT
