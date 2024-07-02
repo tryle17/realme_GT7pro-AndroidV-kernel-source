@@ -176,7 +176,7 @@ static ssize_t txn_id_show(struct device *dev, struct device_attribute *attr,
 	struct qcom_slate *slate_data =
 			(struct qcom_slate *)platform_get_drvdata(pdev);
 
-	return sysfs_emit(buf, "%zu\n",
+	return sysfs_emit(buf, "%u\n",
 			qcom_sysmon_get_txn_id(slate_data->sysmon));
 }
 static DEVICE_ATTR_RO(txn_id);
@@ -633,7 +633,7 @@ static int slate_start(struct rproc *rproc)
 
 	slate_data->address_fw = slate_data->region_start;
 	slate_data->size_fw = slate_data->region_end - slate_data->region_start;
-	pr_debug("SLATE PIL loads firmware blobs at 0x%x with size 0x%x\n",
+	pr_debug("SLATE PIL loads firmware blobs at 0x%llx with size 0x%zx\n",
 		slate_data->address_fw, slate_data->size_fw);
 
 	ret = slate_auth_and_xfer(slate_data);
@@ -785,7 +785,7 @@ static void slate_coredump(struct rproc *rproc)
 		ns_vm_perms, 1, PERM_READ | PERM_WRITE, &shm_bridge_handle);
 
 	if (ret) {
-		pr_err("Failed to create shm bridge. ret=[%d]\n",
+		pr_err("%s Failed to create shm bridge. ret=[%d]\n",
 			__func__, ret);
 		goto dma_free;
 	}
