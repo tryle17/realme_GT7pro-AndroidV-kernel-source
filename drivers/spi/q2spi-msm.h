@@ -172,6 +172,8 @@
 #define Q2SPI_SOFT_RESET_CMD_BIT	BIT(0)
 #define Q2SPI_SLEEP_CMD_BIT		BIT(1)
 
+#define Q2SPI_CR_TRANSACTION_ERROR	1
+
 #define PINCTRL_DEFAULT		"default"
 #define PINCTRL_ACTIVE		"active"
 #define PINCTRL_SLEEP		"sleep"
@@ -510,6 +512,7 @@ struct q2spi_dma_transfer {
  * @slave_sleep_timer: used for initiating sleep command to slave
  * @slave_in_sleep: reflects sleep command sent to slave
  * @sys_mem_read_in_progress: reflects system memory read request is in progress
+ * @q2spi_cr_txn_err: reflects Q2SPI_CR_TRANSACTION_ERROR in CR body
  * @q2spi_sleep_cmd_enable: reflects start sending the sleep command to slave
  */
 struct q2spi_geni {
@@ -614,6 +617,7 @@ struct q2spi_geni {
 	struct timer_list slave_sleep_timer;
 	atomic_t slave_in_sleep;
 	bool sys_mem_read_in_progress;
+	bool q2spi_cr_txn_err;
 	bool q2spi_sleep_cmd_enable;
 };
 
@@ -742,6 +746,7 @@ int __q2spi_send_messages(struct q2spi_geni *q2spi, void *ptr);
 int q2spi_wakeup_slave_through_gpio(struct q2spi_geni *q2spi);
 int q2spi_process_hrf_flow_after_lra(struct q2spi_geni *q2spi, struct q2spi_packet *q2spi_pkt);
 void q2spi_transfer_soft_reset(struct q2spi_geni *q2spi);
+void q2spi_transfer_abort(struct q2spi_geni *q2spi);
 int q2spi_put_slave_to_sleep(struct q2spi_geni *q2spi);
 
 #endif /* _SPI_Q2SPI_MSM_H_ */
