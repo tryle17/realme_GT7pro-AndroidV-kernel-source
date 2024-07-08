@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -34,7 +34,9 @@ struct pe_sensor_data {
 	struct mutex			mutex;
 };
 
-static int pe_sensor_get_trend(struct thermal_zone_device *tz, int trip, enum thermal_trend *trend)
+static int pe_sensor_get_trend(struct thermal_zone_device *tz,
+					const struct thermal_trip *trip,
+					enum thermal_trend *trend)
 {
 	int value, last_value;
 
