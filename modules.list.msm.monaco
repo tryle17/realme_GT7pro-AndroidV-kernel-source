@@ -58,3 +58,6 @@ icc-debug.ko
 icc-rpm.ko
 qnoc-monaco.ko
 qnoc-qos-rpm.ko
+spmi-pmic-arb.ko
+regmap-spmi.ko
+nvmem_qcom-spmi-sdam.ko

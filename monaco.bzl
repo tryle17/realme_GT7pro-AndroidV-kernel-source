@@ -141,6 +141,7 @@ def define_monaco():
         "drivers/soc/qcom/socinfo.ko",
         "drivers/soc/qcom/wcd_usbss_i2c.ko",
         "drivers/spi/spi-msm-geni.ko",
+        "drivers/spmi/spmi-pmic-arb.ko",
         "drivers/thermal/qcom/bcl_off_cdev.ko",
         "drivers/thermal/qcom/bcl_pmic5.ko",
         "drivers/thermal/qcom/bcl_soc.ko",
