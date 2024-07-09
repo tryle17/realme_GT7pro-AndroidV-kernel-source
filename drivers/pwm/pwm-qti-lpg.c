@@ -205,7 +205,6 @@ struct qpnp_lpg_channel {
 	u32				lpg_sdam_base;
 	u8				src_sel;
 	u8				subtype;
-	bool				force_low_pwm_size;
 	bool				lut_written;
 	bool				enable_pfm;
 	u64				current_period_ns;
@@ -439,7 +438,7 @@ static int qpnp_lpg_set_pwm_config(struct qpnp_lpg_channel *lpg)
 	u8 val, mask, shift;
 	int pwm_size_idx, pwm_clk_idx, prediv_idx, clk_exp_idx;
 
-	if ((lpg->subtype == SUBTYPE_HI_RES_PWM) && !lpg->force_low_pwm_size) {
+	if (lpg->subtype == SUBTYPE_HI_RES_PWM) {
 		pwm_size_idx = __find_index_in_array(lpg->pwm_config.pwm_size,
 				pwm_hi_res_size, ARRAY_SIZE(pwm_hi_res_size));
 		pwm_clk_idx = __find_index_in_array(lpg->pwm_config.pwm_clk,
@@ -465,8 +464,7 @@ static int qpnp_lpg_set_pwm_config(struct qpnp_lpg_channel *lpg)
 	if (lpg->subtype == SUBTYPE_PWM) {
 		shift = LPG_PWM_SIZE_PWM_SHIFT;
 		mask = LPG_PWM_SIZE_PWM_MASK | LPG_PWM_CLK_FREQ_SEL_MASK;
-	} else if ((lpg->subtype == SUBTYPE_HI_RES_PWM)
-				 && !lpg->force_low_pwm_size) {
+	} else if (lpg->subtype == SUBTYPE_HI_RES_PWM) {
 		shift = LPG_PWM_SIZE_PWM_HI_RES_SHIFT;
 		mask = LPG_PWM_SIZE_PWM_HI_RES_MASK | LPG_PWM_HI_RES_CLK_FREQ_SEL_MASK;
 	} else {
@@ -495,7 +493,7 @@ static int qpnp_lpg_set_pwm_config(struct qpnp_lpg_channel *lpg)
 		return 0;
 
 	val = lpg->pwm_config.pwm_value >> 8;
-	if ((lpg->subtype == SUBTYPE_HI_RES_PWM) && !lpg->force_low_pwm_size)
+	if (lpg->subtype == SUBTYPE_HI_RES_PWM)
 		mask = LPG_PWM_HI_RES_VALUE_MSB_MASK;
 	else
 		mask = LPG_PWM_VALUE_MSB_MASK;
@@ -531,7 +529,7 @@ static int qpnp_lpg_set_pfm_config(struct qpnp_lpg_channel *lpg)
 	u8 val, mask;
 	int pwm_clk_idx, clk_exp_idx;
 
-	if ((lpg->subtype == SUBTYPE_HI_RES_PWM) && !lpg->force_low_pwm_size)
+	if (lpg->subtype == SUBTYPE_HI_RES_PWM)
 		pwm_clk_idx = __find_index_in_array(lpg->pwm_config.pwm_clk,
 				clk_freq_hz_hi_res, ARRAY_SIZE(clk_freq_hz_hi_res));
 	else
@@ -548,7 +546,7 @@ static int qpnp_lpg_set_pfm_config(struct qpnp_lpg_channel *lpg)
 	pwm_clk_idx += 1;
 
 	val = pwm_clk_idx;
-	if ((lpg->subtype == SUBTYPE_HI_RES_PWM) && !lpg->force_low_pwm_size)
+	if (lpg->subtype == SUBTYPE_HI_RES_PWM)
 		mask = LPG_PWM_HI_RES_CLK_FREQ_SEL_MASK;
 	else
 		mask = LPG_PWM_CLK_FREQ_SEL_MASK;
@@ -887,7 +885,7 @@ static int __qpnp_lpg_calc_pwm_period(u64 period_ns,
 	 *
 	 * Searching the closest settings for the requested PWM period.
 	 */
-	if ((lpg->subtype == SUBTYPE_HI_RES_PWM) && !lpg->force_low_pwm_size) {
+	if (lpg->subtype == SUBTYPE_HI_RES_PWM) {
 		pwm_size_arr = pwm_hi_res_size;
 		pwm_size_len = NUM_PWM_HI_RES_SIZE;
 		clk_freq_hz_arr = clk_freq_hz_hi_res;
@@ -1006,7 +1004,7 @@ static int __qpnp_lpg_calc_pfm_period(u64 period_ns,
 	 * desired period.
 	 */
 
-	if ((lpg->subtype == SUBTYPE_HI_RES_PWM) && !lpg->force_low_pwm_size) {
+	if (lpg->subtype == SUBTYPE_HI_RES_PWM) {
 		clk_freq_hz_arr = clk_freq_hz_hi_res;
 		clk_period_ns_arr = clk_period_ns_hi_res;
 		clk_len = NUM_PWM_HI_RES_CLK;
@@ -1898,10 +1896,6 @@ static int qpnp_lpg_parse_dt(struct qpnp_lpg_chip *chip)
 		chip->lpgs[i].lpg_idx = i;
 		chip->lpgs[i].reg_base = base + i * REG_SIZE_PER_LPG;
 		chip->lpgs[i].src_sel = PWM_VALUE;
-		chip->lpgs[i].force_low_pwm_size =
-				of_property_read_bool(chip->dev->of_node,
-					"qcom,force-low-pwm-size");
-
 		rc = qpnp_lpg_read(&chip->lpgs[i], REG_LPG_PERPH_SUBTYPE,
 				&chip->lpgs[i].subtype);
 		if (rc < 0) {
