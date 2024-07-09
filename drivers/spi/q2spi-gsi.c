@@ -441,11 +441,17 @@ int check_gsi_transfer_completion_db_rx(struct q2spi_geni *q2spi)
 	if (!timeout) {
 		Q2SPI_DEBUG(q2spi, "%s Rx[%d] timeout%lu\n", __func__, i, timeout);
 		ret = -ETIMEDOUT;
-		goto err_gsi_geni_transfer;
 	} else {
 		Q2SPI_DEBUG(q2spi, "%s rx completed\n", __func__);
 	}
-err_gsi_geni_transfer:
+
+	if (q2spi->gsi->qup_gsi_err) {
+		ret = -EIO;
+		Q2SPI_DEBUG(q2spi, "%s Err QUP GSI Error\n", __func__);
+		q2spi->gsi->qup_gsi_err = false;
+		q2spi->setup_config0 = false;
+		dmaengine_terminate_all(q2spi->gsi->tx_c);
+	}
 	return ret;
 }
 
@@ -675,7 +681,7 @@ void q2spi_gsi_ch_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb, void *
 	struct q2spi_geni *q2spi = ptr;
 	int num_crs, i = 0;
 
-	Q2SPI_DEBUG(q2spi, "%s event:%d\n", __func__, cb->cb_event);
+	Q2SPI_DEBUG(q2spi, "%s event:%s\n", __func__, TO_GPI_CB_EVENT_STR(cb->cb_event));
 	switch (cb->cb_event) {
 	case MSM_GPI_QUP_NOTIFY:
 	case MSM_GPI_QUP_MAX_EVENT:
@@ -688,8 +694,8 @@ void q2spi_gsi_ch_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb, void *
 	case MSM_GPI_QUP_PENDING_EVENT:
 	case MSM_GPI_QUP_EOT_DESC_MISMATCH:
 	case MSM_GPI_QUP_SW_ERROR:
-		Q2SPI_DEBUG(q2spi, "%s cb_ev %d status %llu ts %llu count %llu\n",
-			    __func__, cb->cb_event, cb->status,
+		Q2SPI_DEBUG(q2spi, "%s cb_ev %s status %llu ts %llu count %llu\n",
+			    __func__, TO_GPI_CB_EVENT_STR(cb->cb_event), cb->status,
 			    cb->timestamp, cb->count);
 		Q2SPI_DEBUG(q2spi, "%s err_routine:%u err_type:%u err.code%u\n",
 			    __func__, cb->error_log.routine, cb->error_log.type,
@@ -699,8 +705,19 @@ void q2spi_gsi_ch_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb, void *
 		complete_all(&q2spi->rx_cb);
 		break;
 	case MSM_GPI_QUP_CR_HEADER:
+		/* Update last access time of a device for autosuspend */
+		pm_runtime_mark_last_busy(q2spi->dev);
 		q2spi_cr_hdr_event = &cb->q2spi_cr_header_event;
 		num_crs = q2spi_cr_hdr_event->byte0_len;
+		if (q2spi_cr_hdr_event->code == Q2SPI_CR_HEADER_LEN_ZERO ||
+		    q2spi_cr_hdr_event->code == Q2SPI_CR_HEADER_INCORRECT ||
+		    num_crs > MAX_RX_CRS) {
+			Q2SPI_DEBUG(q2spi, "%s Invalid num_crs:%d or Negative DB header code:%d\n",
+				    __func__, num_crs, q2spi_cr_hdr_event->code);
+			q2spi->q2spi_cr_hdr_err = true;
+			break;
+		}
+
 		for (i = 0; i < num_crs; i++) {
 			if (q2spi_cr_hdr_event->cr_hdr[i] == CR_ADDR_LESS_RD) {
 				reinit_completion(&q2spi->sma_rd_comp);

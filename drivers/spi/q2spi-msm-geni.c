@@ -19,7 +19,6 @@
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 #include <linux/pinctrl/consumer.h>
-#include <linux/pm_runtime.h>
 #include <linux/uaccess.h>
 #include "q2spi-msm.h"
 #include "q2spi-slave-reg.h"
@@ -1140,6 +1139,7 @@ static int q2spi_open(struct inode *inode, struct file *filp)
 	filp->private_data = q2spi;
 	q2spi->q2spi_cr_txn_err = false;
 	q2spi->q2spi_sleep_cmd_enable = false;
+	q2spi->q2spi_cr_hdr_err = false;
 	Q2SPI_DEBUG(q2spi, "%s End PID:%d, allocs:%d\n",
 		    __func__, current->pid, atomic_read(&q2spi->alloc_count));
 err:
@@ -1797,9 +1797,10 @@ static int q2spi_wakeup_hw_from_sleep(struct q2spi_geni *q2spi)
 	long timeout = 0;
 	int ret = 0;
 
-	if (q2spi->q2spi_cr_txn_err) {
+	if (q2spi->q2spi_cr_txn_err || q2spi->q2spi_cr_hdr_err) {
 		q2spi_transfer_abort(q2spi);
 		q2spi->q2spi_cr_txn_err = false;
+		q2spi->q2spi_cr_hdr_err = false;
 		return 0;
 	}
 
@@ -1992,6 +1993,7 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 				}
 			}
 			q2spi->q2spi_cr_txn_err = false;
+			q2spi->q2spi_cr_hdr_err = false;
 
 			/* Reset 100msec client sleep timer */
 			mod_timer(&q2spi->slave_sleep_timer,
@@ -3985,7 +3987,12 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 	ret = check_gsi_transfer_completion_db_rx(q2spi);
 	if (ret) {
 		Q2SPI_DEBUG(q2spi, "%s db rx completion timeout: %d\n", __func__, ret);
+		atomic_set(&q2spi->doorbell_pending, 0);
 		q2spi_unmap_doorbell_rx_buf(q2spi);
+		atomic_set(&q2spi->sma_wr_pending, 0);
+		atomic_set(&q2spi->doorbell_pending, 0);
+		q2spi_geni_se_dump_regs(q2spi);
+		gpi_dump_for_geni(q2spi->gsi->tx_c);
 		goto exit_doorbell_work;
 	}
 
@@ -3993,6 +4000,7 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 	q2spi_cr_pkt = q2spi_prepare_cr_pkt(q2spi);
 	if (!q2spi_cr_pkt) {
 		Q2SPI_DEBUG(q2spi, "Err q2spi_prepare_cr_pkt failed\n");
+		atomic_set(&q2spi->doorbell_pending, 0);
 		q2spi_unmap_doorbell_rx_buf(q2spi);
 		goto exit_doorbell_work;
 	}
@@ -4639,6 +4647,13 @@ static int q2spi_geni_runtime_suspend(struct device *dev)
 	}
 
 	Q2SPI_DEBUG(q2spi, "%s PID=%d\n", __func__, current->pid);
+	if (atomic_read(&q2spi->doorbell_pending)) {
+		Q2SPI_DEBUG(q2spi, "%s CR Doorbell Pending\n", __func__);
+		/* Update last access time of a device for autosuspend */
+		pm_runtime_mark_last_busy(q2spi->dev);
+		return -EBUSY;
+	}
+
 	if (!atomic_read(&q2spi->is_suspend)) {
 		q2spi_put_slave_to_sleep(q2spi);
 
