@@ -4344,9 +4344,6 @@ static void walt_sched_init_rq(struct rq *rq)
 
 	wrq->num_mvp_tasks = 0;
 	INIT_LIST_HEAD(&wrq->mvp_tasks);
-	wrq->mvp_arrival_time = 0;
-	wrq->mvp_throttle_time = 0;
-	wrq->skip_mvp = false;
 }
 
 void sched_window_nr_ticks_change(void)
