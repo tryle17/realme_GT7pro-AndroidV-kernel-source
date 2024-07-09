@@ -42,8 +42,12 @@ unsigned int sysctl_sched_coloc_busy_hyst_cpu[WALT_NR_CPUS];
 unsigned int sysctl_sched_coloc_busy_hyst_max_ms;
 unsigned int sysctl_sched_coloc_busy_hyst_cpu_busy_pct[WALT_NR_CPUS];
 unsigned int sysctl_sched_util_busy_hyst_enable_cpus;
+unsigned int sysctl_sched_pipeline_hyst_enable_cpus;
+unsigned int sysctl_sched_trailblazer_hyst_enable_cpus;
 unsigned int sysctl_sched_util_busy_hyst_cpu[WALT_NR_CPUS];
 unsigned int sysctl_sched_util_busy_hyst_cpu_util[WALT_NR_CPUS];
+unsigned int sysctl_sched_pipeline_hyst_cpu_ns[WALT_NR_CPUS];
+unsigned int sysctl_sched_trailblazer_hyst_cpu_ns[WALT_NR_CPUS];
 unsigned int sysctl_sched_boost;
 unsigned int sysctl_sched_wake_up_idle[2];
 unsigned int sysctl_input_boost_ms;
@@ -84,15 +88,19 @@ unsigned int sysctl_em_inflate_pct;
 unsigned int sysctl_em_inflate_thres;
 unsigned int sysctl_sched_heavy_nr;
 unsigned int sysctl_max_freq_partial_halt;
-unsigned int sysctl_fmax_cap[MAX_CLUSTERS];
+unsigned int sysctl_freq_cap[MAX_CLUSTERS];
 unsigned int sysctl_sched_sbt_pause_cpus;
 unsigned int sysctl_sched_sbt_enable = 1;
 unsigned int sysctl_sched_sbt_delay_windows;
 unsigned int high_perf_cluster_freq_cap[MAX_CLUSTERS];
 unsigned int sysctl_sched_pipeline_cpus;
-unsigned int fmax_cap[MAX_FREQ_CAP][MAX_CLUSTERS];
+unsigned int freq_cap[MAX_FREQ_CAP][MAX_CLUSTERS];
 unsigned int sysctl_sched_pipeline_special;
 unsigned int sysctl_sched_pipeline_util_thres;
+unsigned int sysctl_ipc_freq_levels_cluster0[SMART_FMAX_IPC_MAX];
+unsigned int sysctl_ipc_freq_levels_cluster1[SMART_FMAX_IPC_MAX];
+unsigned int sysctl_ipc_freq_levels_cluster2[SMART_FMAX_IPC_MAX];
+unsigned int sysctl_ipc_freq_levels_cluster3[SMART_FMAX_IPC_MAX];
 
 /* range is [1 .. INT_MAX] */
 static int sysctl_task_read_pid = 1;
@@ -278,6 +286,8 @@ static int sched_pipeline_special_handler(struct ctl_table *table,
 	pipeline_special_local =
 		get_pid_task(find_vpid(sysctl_sched_pipeline_special), PIDTYPE_PID);
 	if (!pipeline_special_local) {
+		remove_special_task();
+		sysctl_sched_pipeline_special = 0;
 		ret = -ENOENT;
 		goto unlock;
 	}
@@ -726,7 +736,7 @@ unlock_mutex:
 	return ret;
 }
 
-int sched_fmax_cap_handler(struct ctl_table *table, int write,
+int sched_freq_cap_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos)
 {
@@ -890,7 +900,104 @@ unlock_mutex:
 
 	return ret;
 }
+
 #endif /* CONFIG_PROC_SYSCTL */
+
+static struct ctl_table smart_freq_cluster0[] = {
+	{
+		.procname	= "ipc_freq_levels",
+		.data		= &sysctl_ipc_freq_levels_cluster0,
+		.maxlen		= SMART_FMAX_IPC_MAX * sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= sched_smart_freq_ipc_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_legacy_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_legacy_dump_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_ipc_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_ipc_dump_handler,
+	},
+};
+
+static struct ctl_table smart_freq_cluster1[] = {
+	{
+		.procname	= "ipc_freq_levels",
+		.data		= &sysctl_ipc_freq_levels_cluster1,
+		.maxlen		= SMART_FMAX_IPC_MAX * sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= sched_smart_freq_ipc_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_legacy_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_legacy_dump_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_ipc_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_ipc_dump_handler,
+	},
+};
+
+static struct ctl_table smart_freq_cluster2[] = {
+	{
+		.procname	= "ipc_freq_levels",
+		.data		= &sysctl_ipc_freq_levels_cluster2,
+		.maxlen		= SMART_FMAX_IPC_MAX * sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= sched_smart_freq_ipc_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_legacy_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_legacy_dump_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_ipc_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_ipc_dump_handler,
+	},
+};
+
+static struct ctl_table smart_freq_cluster3[] = {
+	{
+		.procname	= "ipc_freq_levels",
+		.data		= &sysctl_ipc_freq_levels_cluster3,
+		.maxlen		= SMART_FMAX_IPC_MAX * sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= sched_smart_freq_ipc_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_legacy_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_legacy_dump_handler,
+	},
+	{
+		.procname	= "sched_smart_freq_dump_ipc_reason",
+		.data		= &reason_dump,
+		.maxlen		= 1024 * sizeof(char),
+		.mode		= 0444,
+		.proc_handler	= sched_smart_freq_ipc_dump_handler,
+	},
+};
 
 static struct ctl_table input_boost_sysctls[] = {
 	{
@@ -920,7 +1027,6 @@ static struct ctl_table input_boost_sysctls[] = {
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_INT_MAX,
 	},
-	{ }
 };
 
 static struct ctl_table walt_table[] = {
@@ -1115,6 +1221,42 @@ static struct ctl_table walt_table[] = {
 		.proc_handler	= sched_busy_hyst_handler,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= &one_thousand,
+	},
+	{
+		.procname	= "sched_pipeline_hysteresis_enable_cpus",
+		.data		= &sysctl_sched_pipeline_hyst_enable_cpus,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= sched_busy_hyst_handler,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= &two_hundred_fifty_five,
+	},
+	{
+		.procname	= "sched_pipeline_hyst_cpu_ns",
+		.data		= &sysctl_sched_pipeline_hyst_cpu_ns,
+		.maxlen		= sizeof(unsigned int) * WALT_NR_CPUS,
+		.mode		= 0644,
+		.proc_handler	= sched_busy_hyst_handler,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= &ns_per_sec,
+	},
+	{
+		.procname	= "sched_trailblazer_hysteresis_enable_cpus",
+		.data		= &sysctl_sched_trailblazer_hyst_enable_cpus,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= sched_busy_hyst_handler,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= &two_hundred_fifty_five,
+	},
+	{
+		.procname	= "sched_trailblazer_hyst_cpu_ns",
+		.data		= &sysctl_sched_trailblazer_hyst_cpu_ns,
+		.maxlen		= sizeof(unsigned int) * WALT_NR_CPUS,
+		.mode		= 0644,
+		.proc_handler	= sched_busy_hyst_handler,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= &ns_per_sec,
 	},
 	{
 		.procname	= "sched_ravg_window_nr_ticks",
@@ -1462,18 +1604,11 @@ static struct ctl_table walt_table[] = {
 		.extra2		= SYSCTL_INT_MAX,
 	},
 	{
-		.procname	= "sched_fmax_cap",
-		.data		= &sysctl_fmax_cap,
-		.maxlen		= sizeof(unsigned int) * MAX_CLUSTERS,
-		.mode		= 0644,
-		.proc_handler	= sched_fmax_cap_handler,
-	},
-	{
 		.procname	= "sched_high_perf_cluster_freq_cap",
 		.data		= &high_perf_cluster_freq_cap,
 		.maxlen		= sizeof(unsigned int) * MAX_CLUSTERS,
 		.mode		= 0644,
-		.proc_handler	= sched_fmax_cap_handler,
+		.proc_handler	= sched_freq_cap_handler,
 	},
 	{
 		.procname	= "mpam_part_id",
@@ -1503,10 +1638,33 @@ static struct ctl_table walt_table[] = {
 
 void walt_register_sysctl(void)
 {
-	struct ctl_table_header *hdr, *hdr2;
+	struct ctl_table_header *hdr, *hdr2,
+		*hdr3 = NULL, *hdr4 = NULL,
+		*hdr5 = NULL, *hdr6 = NULL;
 
 	hdr = register_sysctl("walt", walt_table);
 	hdr2 = register_sysctl("walt/input_boost", input_boost_sysctls);
+
+	if (num_sched_clusters >= 1) {
+		hdr3 = register_sysctl("walt/cluster0/smart_freq",
+				smart_freq_cluster0);
+		kmemleak_not_leak(hdr3);
+	}
+	if (num_sched_clusters >= 2) {
+		hdr4 = register_sysctl("walt/cluster1/smart_freq",
+				smart_freq_cluster1);
+		kmemleak_not_leak(hdr4);
+	}
+	if (num_sched_clusters >= 3) {
+		hdr5 = register_sysctl("walt/cluster2/smart_freq",
+				smart_freq_cluster2);
+		kmemleak_not_leak(hdr5);
+	}
+	if (num_sched_clusters >= 4) {
+		hdr6 = register_sysctl("walt/cluster3/smart_freq",
+				smart_freq_cluster3);
+		kmemleak_not_leak(hdr6);
+	}
 
 	kmemleak_not_leak(hdr);
 	kmemleak_not_leak(hdr2);

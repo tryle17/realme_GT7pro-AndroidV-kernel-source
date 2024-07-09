@@ -18,6 +18,7 @@
 
 static DEFINE_PER_CPU(u64, nr_prod_sum);
 static DEFINE_PER_CPU(u64, last_time);
+static DEFINE_PER_CPU(int, last_time_cpu);
 static DEFINE_PER_CPU(u64, nr_big_prod_sum);
 static DEFINE_PER_CPU(u64, nr_trailblazer_prod_sum);
 static DEFINE_PER_CPU(u64, nr);
@@ -32,6 +33,8 @@ static DEFINE_PER_CPU(u64, hyst_time);
 static DEFINE_PER_CPU(u64, coloc_hyst_busy);
 static DEFINE_PER_CPU(u64, coloc_hyst_time);
 static DEFINE_PER_CPU(u64, util_hyst_time);
+static DEFINE_PER_CPU(u64, pipeline_time);
+static DEFINE_PER_CPU(u64, trailblazer_time);
 
 #define NR_THRESHOLD_PCT		40
 #define MAX_RTGB_TIME (sysctl_sched_coloc_busy_hyst_max_ms * NSEC_PER_MSEC)
@@ -95,7 +98,12 @@ struct sched_avg_stats *sched_get_nr_running_avg(void)
 		spin_lock_irqsave(&per_cpu(nr_lock, cpu), flags);
 		curr_time = sched_clock();
 		diff = curr_time - per_cpu(last_time, cpu);
-		BUG_ON((s64)diff < 0);
+		if ((s64)diff < 0) {
+			printk_deferred("WALT-BUG CPU%d; curr_time=%llu(0x%llx) is lesser than per_cpu_last_time=%llu(0x%llx) last_time_cpu=%d",
+				cpu, curr_time, curr_time, per_cpu(last_time, cpu),
+				per_cpu(last_time, cpu), per_cpu(last_time_cpu, cpu));
+			WALT_PANIC(1);
+		}
 
 		tmp_nr = per_cpu(nr_prod_sum, cpu);
 		tmp_nr += per_cpu(nr, cpu) * diff;
@@ -129,6 +137,7 @@ struct sched_avg_stats *sched_get_nr_running_avg(void)
 				stats[cpu].nr_scaled, trailblazer_cpu);
 
 		per_cpu(last_time, cpu) = curr_time;
+		per_cpu(last_time_cpu, cpu) = raw_smp_processor_id();
 		per_cpu(nr_prod_sum, cpu) = 0;
 		per_cpu(nr_big_prod_sum, cpu) = 0;
 		per_cpu(nr_trailblazer_prod_sum, cpu) = 0;
@@ -199,6 +208,13 @@ void sched_update_hyst_times(void)
 		per_cpu(util_hyst_time, cpu) = (BIT(cpu)
 				& sysctl_sched_util_busy_hyst_enable_cpus) ?
 				sysctl_sched_util_busy_hyst_cpu[cpu] : 0;
+		per_cpu(pipeline_time, cpu) = (BIT(cpu)
+				& sysctl_sched_pipeline_hyst_enable_cpus) ?
+				sysctl_sched_pipeline_hyst_cpu_ns[cpu] : 0;
+		per_cpu(trailblazer_time, cpu) = (BIT(cpu)
+				& sysctl_sched_trailblazer_hyst_enable_cpus) ?
+				sysctl_sched_trailblazer_hyst_cpu_ns[cpu] : 0;
+
 	}
 }
 
@@ -219,7 +235,8 @@ static inline void update_busy_hyst_end_time(int cpu, int enq,
 		return;
 
 	if (!per_cpu(hyst_time, cpu) && !per_cpu(coloc_hyst_time, cpu) &&
-	    !per_cpu(util_hyst_time, cpu))
+	    !per_cpu(util_hyst_time, cpu) && !per_cpu(pipeline_time, cpu) &&
+	    !per_cpu(trailblazer_time, cpu))
 		return;
 
 	if (prev_nr_run >= BUSY_NR_RUN && per_cpu(nr, cpu) < BUSY_NR_RUN)
@@ -249,9 +266,14 @@ static inline void update_busy_hyst_end_time(int cpu, int enq,
 	hyst_trigger = nr_run_trigger || load_trigger;
 #endif
 
-	agg_hyst_time = max(max(hyst_trigger ? per_cpu(hyst_time, cpu) : 0,
+	agg_hyst_time = max(max(max(hyst_trigger ? per_cpu(hyst_time, cpu) : 0,
 			    coloc_trigger ? per_cpu(coloc_hyst_time, cpu) : 0),
-			    util_load_trigger ?	per_cpu(util_hyst_time, cpu) : 0);
+			    util_load_trigger ?	per_cpu(util_hyst_time, cpu) : 0),
+			    (pipeline_nr || sysctl_sched_heavy_nr ||
+			    sysctl_sched_pipeline_util_thres) ? per_cpu(pipeline_time, cpu) : 0);
+
+	agg_hyst_time = max(agg_hyst_time, trailblazer_state ?
+			per_cpu(trailblazer_time, cpu) : 0);
 
 	if (agg_hyst_time) {
 		atomic64_set(&per_cpu(busy_hyst_end_time, cpu),
@@ -259,7 +281,9 @@ static inline void update_busy_hyst_end_time(int cpu, int enq,
 		trace_sched_busy_hyst_time(cpu, agg_hyst_time, prev_nr_run,
 					cpu_util(cpu), per_cpu(hyst_time, cpu),
 					per_cpu(coloc_hyst_time, cpu),
-					per_cpu(util_hyst_time, cpu));
+					per_cpu(util_hyst_time, cpu),
+					per_cpu(pipeline_time, cpu),
+					per_cpu(trailblazer_time, cpu));
 	}
 }
 
@@ -297,8 +321,14 @@ void sched_update_nr_prod(int cpu, int enq)
 	nr_running = per_cpu(nr, cpu);
 	curr_time = sched_clock();
 	diff = curr_time - per_cpu(last_time, cpu);
-	BUG_ON((s64)diff < 0);
+	if ((s64)diff < 0) {
+		printk_deferred("WALT-BUG CPU%d; curr_time=%llu(0x%llx) is lesser than per_cpu_last_time=%llu(0x%llx) last_time_cpu=%d",
+			cpu, curr_time, curr_time, per_cpu(last_time, cpu),
+			per_cpu(last_time, cpu), per_cpu(last_time_cpu, cpu));
+		WALT_PANIC(1);
+	}
 	per_cpu(last_time, cpu) = curr_time;
+	per_cpu(last_time_cpu, cpu) = raw_smp_processor_id();
 	per_cpu(nr, cpu) = cpu_rq(cpu)->nr_running + enq;
 
 	if (per_cpu(nr, cpu) > per_cpu(nr_max, cpu))

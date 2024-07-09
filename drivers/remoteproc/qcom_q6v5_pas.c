@@ -351,42 +351,20 @@ static int adsp_unprepare(struct rproc *rproc)
 
 	return 0;
 }
+
 static void adsp_add_coredump_segments(struct qcom_adsp *adsp, const struct firmware *fw)
 {
 	struct rproc *rproc = adsp->rproc;
 	struct rproc_dump_segment *entry;
-	struct elf32_hdr *ehdr = (struct elf32_hdr *)fw->data;
-	struct elf32_phdr *phdr, *phdrs = (struct elf32_phdr *)(fw->data + ehdr->e_phoff);
-	uint32_t elf_min_addr = U32_MAX;
-	bool relocatable = false;
-	int ret;
-	int i;
 
-	for (i = 0; i < ehdr->e_phnum; i++) {
-		phdr = &phdrs[i];
-		if (phdr->p_type != PT_LOAD ||
-		   (phdr->p_flags & QCOM_MDT_TYPE_MASK) == QCOM_MDT_TYPE_HASH ||
-		   !phdr->p_memsz)
-			continue;
-
-		if (phdr->p_flags & QCOM_MDT_RELOCATABLE)
-			relocatable = true;
-
-		elf_min_addr = min(phdr->p_paddr, elf_min_addr);
-
-		ret = rproc_coredump_add_segment(rproc, phdr->p_paddr, phdr->p_memsz);
-		if (ret) {
-			dev_err(adsp->dev, "failed to add rproc segment: %d\n", ret);
-			rproc_coredump_cleanup(adsp->rproc);
-			return;
-		}
+	rproc_coredump_cleanup(rproc);
+	if (qcom_register_dump_segments(rproc, fw) < 0) {
+		rproc_coredump_cleanup(adsp->rproc);
+		return;
 	}
 
 	list_for_each_entry(entry, &rproc->dump_segments, node)
-		entry->da = adsp->mem_phys + entry->da - elf_min_addr;
-
-	if (relocatable)
-		adsp->mem_reloc = adsp->mem_phys + adsp->mem_reloc - elf_min_addr;
+		entry->da = adsp->mem_phys + entry->da - adsp->mem_reloc;
 }
 
 static int adsp_load(struct rproc *rproc, const struct firmware *fw)
@@ -399,8 +377,6 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
 
 	if (adsp->dma_phys_below_32b)
 		dev = adsp->dev;
-
-	rproc_coredump_cleanup(adsp->rproc);
 
 	/* Store firmware handle to be used in adsp_start() */
 	adsp->firmware = fw;
@@ -426,8 +402,6 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
 		if (ret)
 			goto release_dtb_metadata;
 	}
-
-	adsp_add_coredump_segments(adsp, fw);
 
 	goto exit_load;
 
@@ -636,7 +610,7 @@ static int adsp_start(struct rproc *rproc)
 	ret = qcom_mdt_pas_init(adsp->dev, adsp->firmware, rproc->firmware, adsp->pas_id,
 				adsp->mem_phys, &adsp->pas_metadata, adsp->dma_phys_below_32b);
 	if (ret)
-		goto disable_px_supply;
+		goto release_dtb_pas_id;
 
 	ret = qcom_mdt_load_no_init(adsp->dev, adsp->firmware, rproc->firmware, adsp->pas_id,
 				    adsp->mem_region, adsp->mem_phys, adsp->mem_size,
@@ -645,7 +619,7 @@ static int adsp_start(struct rproc *rproc)
 		goto release_pas_metadata;
 
 	qcom_pil_info_store(adsp->info_name, adsp->mem_phys, adsp->mem_size);
-
+	adsp_add_coredump_segments(adsp, adsp->firmware);
 	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_auth_reset", "enter");
 
 	ret = qcom_scm_pas_auth_and_reset(adsp->pas_id);
@@ -679,8 +653,11 @@ static int adsp_start(struct rproc *rproc)
 
 release_pas_metadata:
 	qcom_scm_pas_metadata_release(&adsp->pas_metadata, dev);
-	if (adsp->dtb_pas_id)
+release_dtb_pas_id:
+	if (adsp->dtb_pas_id) {
+		qcom_scm_pas_shutdown(adsp->dtb_pas_id);
 		qcom_scm_pas_metadata_release(&adsp->dtb_pas_metadata, dev);
+	}
 disable_px_supply:
 	if (adsp->px_supply)
 		regulator_disable(adsp->px_supply);
@@ -703,6 +680,14 @@ exit_start:
 	return ret;
 }
 
+static irqreturn_t soccp_running_ack(int irq, void *data)
+{
+	struct qcom_q6v5 *q6v5 = data;
+
+	complete(&q6v5->running_ack);
+
+	return IRQ_HANDLED;
+}
 /*
  * rproc_config_check: Check back the config register
  *
@@ -837,6 +822,8 @@ int rproc_set_state(struct rproc *rproc, bool state)
 			goto soccp_out;
 		}
 
+		reinit_completion(&(adsp->q6v5.running_ack));
+
 		ret = qcom_smem_state_update_bits(adsp->wake_state,
 					    SOCCP_STATE_MASK,
 					    BIT(adsp->wake_bit));
@@ -847,9 +834,19 @@ int rproc_set_state(struct rproc *rproc, bool state)
 
 		ret = rproc_config_check(adsp, SOCCP_D0);
 		if (ret) {
-			dev_err(adsp->dev, "failed to change from D3 to D0\n");
+			dev_err(adsp->dev, "%s requested D3->D0: soccp failed to update tcsr val=%d\n",
+				current->comm, readl(adsp->config_addr));
 			goto soccp_out;
 		}
+
+		ret = wait_for_completion_timeout(&adsp->q6v5.running_ack, msecs_to_jiffies(5));
+		if (!ret) {
+			dev_err(adsp->dev, "%s requested D3->D0: failed to get wake ack\n",
+				current->comm);
+			ret = -ETIMEDOUT;
+			goto soccp_out;
+		} else
+			ret = 0;
 
 		refcount_set(&adsp->current_users, 1);
 	} else {
@@ -868,7 +865,8 @@ int rproc_set_state(struct rproc *rproc, bool state)
 
 			ret = rproc_config_check(adsp, SOCCP_D3);
 			if (ret) {
-				dev_err(adsp->dev, "failed to change from D0 to D3\n");
+				dev_err(adsp->dev, "%s requested D0->D3 failed: TCSR value:%d\n",
+					current->comm, readl(adsp->config_addr));
 				goto soccp_out;
 			}
 			disable_regulators(adsp);
@@ -878,9 +876,15 @@ int rproc_set_state(struct rproc *rproc, bool state)
 	}
 
 soccp_out:
+	if (ret && (adsp->rproc->state != RPROC_RUNNING)) {
+		dev_err(adsp->dev, "SOCCP has crashed while processing a D transition req by %s\n",
+			current->comm);
+		ret = -EBUSY;
+	}
+
 	mutex_unlock(&adsp->adsp_lock);
 
-	return ret ? -ETIMEDOUT : 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(rproc_set_state);
 
@@ -973,7 +977,7 @@ static void *adsp_da_to_va(struct rproc *rproc, u64 da, size_t len, bool *is_iom
 	struct qcom_adsp *adsp = rproc->priv;
 	int offset;
 
-	offset = da - adsp->mem_reloc;
+	offset = da - adsp->mem_phys;
 	if (offset < 0 || offset + len > adsp->mem_size)
 		return NULL;
 
@@ -1370,7 +1374,24 @@ static int adsp_probe(struct platform_device *pdev)
 			goto detach_proxy_pds;
 		}
 
+		adsp->q6v5.active_state_ack_irq = platform_get_irq_byname(pdev, "wake-ack");
+		if (adsp->q6v5.active_state_ack_irq < 0) {
+			dev_err(&pdev->dev, "failed to acquire readyack irq\n");
+			goto detach_proxy_pds;
+		}
+
+		ret = devm_request_threaded_irq(&pdev->dev, adsp->q6v5.active_state_ack_irq,
+						NULL, soccp_running_ack,
+						IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+						"qcom_q6v5_pas", &adsp->q6v5);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to acquire ready ack IRQ\n");
+			goto detach_proxy_pds;
+		}
+
 		mutex_init(&adsp->adsp_lock);
+
+		init_completion(&(adsp->q6v5.running_ack));
 
 		refcount_set(&adsp->current_users, 0);
 	}

@@ -127,6 +127,7 @@ struct csr_drvdata {
 	bool			timestamp_support;
 	bool			enable_flush;
 	bool			msr_support;
+	bool			aodbg_csr_support;
 	uint32_t		atid_offset;
 };
 
@@ -494,6 +495,7 @@ static ssize_t timestamp_show(struct device *dev,
 	uint32_t val, time_val0, time_val1;
 	int ret;
 	unsigned long flags;
+	unsigned long csr_ts_offset = 0;
 
 	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
 
@@ -502,6 +504,9 @@ static ssize_t timestamp_show(struct device *dev,
 		return 0;
 	}
 
+	if (drvdata->aodbg_csr_support)
+		csr_ts_offset = 0x14;
+
 	ret = clk_prepare_enable(drvdata->clk);
 	if (ret)
 		return ret;
@@ -509,16 +514,16 @@ static ssize_t timestamp_show(struct device *dev,
 	spin_lock_irqsave(&drvdata->spin_lock, flags);
 	CSR_UNLOCK(drvdata);
 
-	val = csr_readl(drvdata, CSR_TIMESTAMPCTRL);
+	val = csr_readl(drvdata, CSR_TIMESTAMPCTRL - csr_ts_offset);
 
 	val  = val & ~BIT(0);
-	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL);
+	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL - csr_ts_offset);
 
 	val  = val | BIT(0);
-	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL);
+	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL - csr_ts_offset);
 
-	time_val0 = csr_readl(drvdata, CSR_QDSSTIMEVAL0);
-	time_val1 = csr_readl(drvdata, CSR_QDSSTIMEVAL1);
+	time_val0 = csr_readl(drvdata, CSR_QDSSTIMEVAL0 - csr_ts_offset);
+	time_val1 = csr_readl(drvdata, CSR_QDSSTIMEVAL1 - csr_ts_offset);
 
 	CSR_LOCK(drvdata);
 	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
@@ -533,6 +538,40 @@ static ssize_t timestamp_show(struct device *dev,
 }
 
 static DEVICE_ATTR_RO(timestamp);
+
+static ssize_t timestamp_ctrl_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf,
+				 size_t size)
+{
+	uint32_t val;
+	int ret;
+	unsigned long flags;
+	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
+
+	if (IS_ERR_OR_NULL(drvdata) || !drvdata->timestamp_support) {
+		dev_err(dev, "Invalid param\n");
+		return 0;
+	}
+
+	ret = sscanf(buf, "%x", &val);
+	if (ret != 1)
+		return -EINVAL;
+
+	ret = clk_prepare_enable(drvdata->clk);
+	if (ret)
+		return ret;
+
+	spin_lock_irqsave(&drvdata->spin_lock, flags);
+	CSR_UNLOCK(drvdata);
+	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL);
+	CSR_LOCK(drvdata);
+	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
+	clk_disable_unprepare(drvdata->clk);
+	return size;
+}
+
+static DEVICE_ATTR_WO(timestamp_ctrl);
 
 static ssize_t msr_show(struct device *dev,
 				struct device_attribute *attr,
@@ -876,6 +915,7 @@ static struct attribute *swao_csr_attrs[] = {
 	&dev_attr_hbeat_val1.attr,
 	&dev_attr_hbeat_mask0.attr,
 	&dev_attr_hbeat_mask1.attr,
+	&dev_attr_timestamp_ctrl.attr,
 	NULL,
 };
 
@@ -970,6 +1010,13 @@ static int csr_probe(struct platform_device *pdev)
 		dev_dbg(dev, "timestamp_support handled by other subsystem\n");
 	else
 		dev_dbg(dev, "timestamp_support operation supported\n");
+
+	drvdata->aodbg_csr_support = of_property_read_bool(pdev->dev.of_node,
+						"qcom,aodbg-csr-support");
+	if (!drvdata->aodbg_csr_support)
+		dev_dbg(dev, "aodbg_csr_support operation not supported\n");
+	else
+		dev_dbg(dev, "aodbg_csr_support operation supported\n");
 
 	drvdata->perflsheot_set_support = of_property_read_bool(
 			pdev->dev.of_node, "qcom,perflsheot-set-support");

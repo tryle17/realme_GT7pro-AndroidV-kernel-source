@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -175,7 +175,7 @@ static int tpda_alloc_trace_id(struct coresight_device *csdev)
 
 static void tpda_release_trace_id(struct coresight_device *csdev)
 {
-	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);/*  */
+	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	int i, nr_conns;
 
 	nr_conns = csdev->pdata->nr_inconns;
@@ -197,6 +197,14 @@ static int tpda_enable(struct coresight_device *csdev,
 	struct tpda_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 
 	mutex_lock(&drvdata->lock);
+
+	if (drvdata->dclk) {
+		ret = clk_prepare_enable(drvdata->dclk);
+		if (ret) {
+			mutex_unlock(&drvdata->lock);
+			return ret;
+		}
+	}
 
 	ret = tpda_alloc_trace_id(csdev);
 	if (ret < 0) {
@@ -237,6 +245,8 @@ static void tpda_disable(struct coresight_device *csdev,
 	drvdata->enable = false;
 	atomic_dec(&in->dest_refcnt);
 	tpda_release_trace_id(csdev);
+	if (drvdata->dclk)
+		clk_disable_unprepare(drvdata->dclk);
 	mutex_unlock(&drvdata->lock);
 
 	dev_info(drvdata->dev, "TPDA inport %d disabled\n", in->dest_port);
@@ -787,6 +797,16 @@ static int tpda_probe(struct amba_device *adev, const struct amba_id *id)
 	drvdata->dev = &adev->dev;
 	dev_set_drvdata(dev, drvdata);
 
+
+
+	drvdata->dclk = devm_clk_get(dev, "dynamic_clk");
+	if (!IS_ERR(drvdata->dclk)) {
+		ret = clk_prepare_enable(drvdata->dclk);
+		if (ret)
+			return ret;
+	} else
+		drvdata->dclk = NULL;
+
 	drvdata->base = devm_ioremap_resource(dev, &adev->res);
 	if (!drvdata->base)
 		return -ENOMEM;
@@ -813,7 +833,8 @@ static int tpda_probe(struct amba_device *adev, const struct amba_id *id)
 		return PTR_ERR(drvdata->csdev);
 
 	pm_runtime_put_sync(&adev->dev);
-
+	if (drvdata->dclk)
+		clk_disable_unprepare(drvdata->dclk);
 	dev_dbg(drvdata->dev, "TPDA initialized\n");
 	return 0;
 err:

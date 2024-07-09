@@ -262,3 +262,4 @@ config THERMAL_TSENS_LEGACY
 	  to set threshold temperature for both warm and cool and update
 	  thermal userspace client when a threshold is reached. Warm/Cool
 	  temperature thresholds can be set independently for each sensor.
+

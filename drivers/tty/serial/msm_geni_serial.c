@@ -89,7 +89,7 @@ static bool con_enabled = IS_ENABLED(CONFIG_SERIAL_MSM_GENI_CONSOLE_DEFAULT_ENAB
 
 /* SE_UART_RX_TRANS_CFG */
 #define UART_RX_INS_STATUS_BIT	(BIT(2))
-#define UART_RX_PAR_EN		(BIT(3))
+#define UART_RX_PAR_EN		(BIT(4))
 
 /* SE_UART_RX_WORD_LEN */
 #define RX_WORD_LEN_MASK	(GENMASK(9, 0))
@@ -731,11 +731,16 @@ int msm_geni_serial_resources_off(struct msm_geni_serial_port *port)
 		return ret;
 	}
 
-	ret = pinctrl_select_state(rsc->geni_pinctrl, rsc->geni_gpio_sleep);
-	if (ret) {
-		UART_LOG_DBG(port->ipc_log_misc, port->uport.dev,
-			"%s: Error %d pinctrl_select_state failed\n", __func__, ret);
-		return ret;
+	if (port->port_state == UART_PORT_CLOSED_SHUTDOWN) {
+		ret = pinctrl_select_state(rsc->geni_pinctrl, rsc->geni_gpio_shutdown);
+		if (ret)
+			UART_LOG_DBG(port->ipc_log_misc, port->uport.dev,
+				     "%s: Error %d pinctrl shutdown state failed\n", __func__, ret);
+	} else {
+		ret = pinctrl_select_state(rsc->geni_pinctrl, rsc->geni_gpio_sleep);
+		if (ret)
+			UART_LOG_DBG(port->ipc_log_misc, port->uport.dev,
+				     "%s: Error %d pinctrl sleep failed\n", __func__, ret);
 	}
 	return ret;
 }
@@ -3296,6 +3301,11 @@ static int msm_geni_serial_handle_dma_rx(struct uart_port *uport, bool drop_rx)
 	 */
 	memset(msm_port->rx_buf, 0, rx_bytes_copied);
 
+	if (msm_port->uart_error == UART_ERROR_RX_PARITY_ERROR ||
+		msm_port->uart_error == UART_ERROR_RX_BREAK_ERROR ||
+		msm_port->uart_error == UART_ERROR_RX_FRAMING_ERR)
+		msm_geni_update_uart_error_code(msm_port, UART_ERROR_DEFAULT);
+
 	geni_capture_stop_time(&msm_port->se, msm_port->ipc_log_kpi, __func__,
 			       msm_port->uart_kpi, start_time, rx_bytes, msm_port->cur_baud);
 	return rx_bytes_copied;
@@ -4124,6 +4134,10 @@ static void msm_geni_serial_termios_cfg(struct uart_port *uport,
 		rx_trans_cfg |= UART_RX_PAR_EN;
 		tx_parity_cfg |= PAR_CALC_EN;
 		rx_parity_cfg |= PAR_CALC_EN;
+
+		tx_parity_cfg &= ~PAR_MODE_MSK;
+		rx_parity_cfg &= ~PAR_MODE_MSK;
+
 		if (termios->c_cflag & PARODD) {
 			tx_parity_cfg |= PAR_ODD << PAR_MODE_SHFT;
 			rx_parity_cfg |= PAR_ODD << PAR_MODE_SHFT;
@@ -4199,6 +4213,11 @@ static void msm_geni_serial_termios_cfg(struct uart_port *uport,
 						rx_trans_cfg, rx_parity_cfg);
 	UART_LOG_DBG(port->ipc_log_misc, uport->dev, "BitsChar%d stop bit%d\n",
 				bits_per_char, stop_bit_len);
+
+	/* check if MSM CTS line signal is being ignored */
+	if (tx_trans_cfg & UART_CTS_MASK)
+		UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+			     "Check : MSM CTS line signal is being ignored during Tx\n");
 }
 
 /*

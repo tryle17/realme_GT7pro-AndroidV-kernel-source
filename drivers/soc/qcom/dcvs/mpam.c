@@ -733,6 +733,7 @@ static struct platform_driver qcom_mpam_driver = {
 	.driver = {
 		.name = "qcom-mpam",
 		.of_match_table = qcom_mpam_table,
+		.suppress_bind_attrs = true,
 	},
 	.probe = qcom_mpam_probe,
 	.remove = qcom_mpam_remove,

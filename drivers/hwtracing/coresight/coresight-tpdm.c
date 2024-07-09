@@ -282,6 +282,7 @@ struct tpdm_drvdata {
 	bool			msr_support;
 	bool			msr_fix_req;
 	bool			cmb_msr_skip;
+	struct clk		*dclk;
 };
 
 static void tpdm_init_default_data(struct tpdm_drvdata *drvdata);
@@ -693,10 +694,18 @@ static int tpdm_enable(struct coresight_device *csdev, struct perf_event *event,
 		return ret;
 	}
 
+	if (drvdata->dclk) {
+		ret = clk_prepare_enable(drvdata->dclk);
+		if (ret)
+			return ret;
+	}
+
 	mutex_lock(&drvdata->lock);
 	ret = coresight_get_aggre_atid(csdev);
 	if (ret < 0) {
 		mutex_unlock(&drvdata->lock);
+		if (drvdata->dclk)
+			clk_disable_unprepare(drvdata->dclk);
 		return ret;
 	}
 	drvdata->traceid = ret;
@@ -783,6 +792,8 @@ static void tpdm_disable(struct coresight_device *csdev,
 	drvdata->enable = false;
 	coresight_csr_set_etr_atid(csdev, drvdata->traceid, false);
 	drvdata->traceid = 0;
+	if (drvdata->dclk)
+		clk_disable_unprepare(drvdata->dclk);
 	mutex_unlock(&drvdata->lock);
 
 	dev_info(drvdata->dev, "TPDM tracing disabled\n");
@@ -4313,6 +4324,14 @@ static int tpdm_probe(struct amba_device *adev, const struct amba_id *id)
 	drvdata->dev = &adev->dev;
 	dev_set_drvdata(dev, drvdata);
 
+	drvdata->dclk = devm_clk_get(dev, "dynamic_clk");
+	if (!IS_ERR(drvdata->dclk)) {
+		ret = clk_prepare_enable(drvdata->dclk);
+		if (ret)
+			return ret;
+	} else
+		drvdata->dclk = NULL;
+
 	drvdata->base = devm_ioremap_resource(dev, &adev->res);
 	if (!drvdata->base)
 		return -ENOMEM;
@@ -4370,7 +4389,8 @@ static int tpdm_probe(struct amba_device *adev, const struct amba_id *id)
 		coresight_enable(drvdata->csdev);
 
 	pm_runtime_put_sync(&adev->dev);
-
+	if (drvdata->dclk)
+		clk_disable_unprepare(drvdata->dclk);
 	return 0;
 }
 

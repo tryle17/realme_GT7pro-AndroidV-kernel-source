@@ -22,6 +22,7 @@ qcom_hwspinlock.ko
 phy-qcom-ufs.ko
 debug_symbol.ko
 qcom-reboot-reason.ko
+qcom_soc_wdt.ko
 qcom_wdt_core.ko
 qcom_aoss.ko
 qcom-dload-mode.ko
@@ -48,3 +49,12 @@ qcom-dcvs.ko
 qcom_llcc_pmu.ko
 qcom-pmu-lib.ko
 mdt_loader.ko
+gdsc-regulator.ko
+clk-smd-rpm.ko
+gcc-monaco.ko
+qcom-cpufreq-hw.ko
+dispcc-monaco.ko
+icc-debug.ko
+icc-rpm.ko
+qnoc-monaco.ko
+qnoc-qos-rpm.ko

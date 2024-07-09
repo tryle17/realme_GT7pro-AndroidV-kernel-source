@@ -981,16 +981,18 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	struct qrtr_sock *ipc;
 	struct sk_buff *skb;
 	struct qrtr_cb *cb;
-	size_t size;
 	unsigned int ver;
 	size_t hdrlen;
+	size_t size;
 	int errcode;
 	int svc_id;
+	gfp_t flag;
 
 	if (len == 0 || len & 3)
 		return -EINVAL;
 
-	skb = alloc_skb_with_frags(sizeof(*v1), len, 0, &errcode, GFP_ATOMIC |  __GFP_NOWARN);
+	flag = (ep->in_thread ? GFP_KERNEL : GFP_ATOMIC) | __GFP_NOWARN;
+	skb = alloc_skb_with_frags(sizeof(*v1), len, 0, &errcode, flag);
 	if (!skb) {
 		skb = qrtr_get_backup(len);
 		if (!skb) {
@@ -2265,6 +2267,7 @@ static int qrtr_create(struct net *net, struct socket *sock,
 		return -ENOMEM;
 
 	sock_set_flag(sk, SOCK_ZAPPED);
+	sk->sk_allocation |= __GFP_RETRY_MAYFAIL;
 
 	sock_init_data(sock, sk);
 	sock->ops = &qrtr_proto_ops;
