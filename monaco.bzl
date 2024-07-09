@@ -47,6 +47,7 @@ def define_monaco():
         "drivers/iio/adc/qcom-spmi-adc5-gen3.ko",
         "drivers/iio/adc/qcom-vadc-common.ko",
         "drivers/input/misc/qcom-hv-haptics.ko",
+        "drivers/input/misc/qpnp-power-on.ko",
         "drivers/interconnect/qcom/icc-debug.ko",
         "drivers/interconnect/qcom/icc-rpm.ko",
         "drivers/interconnect/qcom/qnoc-monaco.ko",
