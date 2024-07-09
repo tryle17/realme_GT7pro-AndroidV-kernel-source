@@ -440,7 +440,6 @@ struct q2spi_dma_transfer {
  * q2spi_chrdev: cdev structure
  * @geni_se: stores info parsed from device tree
  * @gsi: stores GSI structure information
- * @qup_gsi_err: flahg to set incase of gsi errors
  * @db_xfer: reference to q2spi_dma_transfer structure for doorbell
  * @req: reference to q2spi request structure
  * @c_req: reference to q2spi client request structure
@@ -530,7 +529,6 @@ struct q2spi_geni {
 	struct q2spi_chrdev chrdev;
 	struct geni_se se;
 	struct q2spi_gsi *gsi;
-	bool qup_gsi_err;
 	struct q2spi_dma_transfer *db_xfer;
 	struct q2spi_request *req;
 	struct q2spi_client_request *c_req;
