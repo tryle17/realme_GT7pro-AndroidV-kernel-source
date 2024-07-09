@@ -991,10 +991,8 @@ static void update_running_avg(u64 window_start, u32 wakeup_ctr_sum)
 	spin_unlock_irqrestore(&state_lock, flags);
 
 	last_nr_big = big_avg;
-
 	walt_rotation_checkpoint(big_avg);
-	/* Update the SMART freq configuration for NON-IPC reasons. */
-	smart_freq_update_reason_common(window_start, big_avg, wakeup_ctr_sum);
+	fmax_uncap_checkpoint(big_avg, window_start, wakeup_ctr_sum);
 }
 
 #define MAX_NR_THRESHOLD	4
