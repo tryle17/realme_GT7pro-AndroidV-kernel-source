@@ -5266,6 +5266,12 @@ static int haptics_auto_brake_manual_config(struct haptics_chip *chip)
 	u8 val[2];
 	int rc;
 
+	if (chip->config.brake.mode != AUTO_BRAKE)
+		return 0;
+
+	if (!chip->hap_cfg_nvmem)
+		return -EOPNOTSUPP;
+
 	rc = nvmem_device_read(chip->hap_cfg_nvmem,
 				HAP_AUTO_BRAKE_CAL_DONE_OFFSET, 1, val);
 	if (rc <= 0) {
@@ -5536,6 +5542,10 @@ restore:
 
 static int haptics_start_auto_brake_calibration(struct haptics_chip *chip)
 {
+	/* Auto brake calibration is supported only if AUTO_BRAKE mode is specified */
+	if (chip->config.brake.mode != AUTO_BRAKE)
+		return 0;
+
 	/* Ignore calibration if nvmem is not assigned */
 	if (!chip->hap_cfg_nvmem)
 		return -EOPNOTSUPP;
