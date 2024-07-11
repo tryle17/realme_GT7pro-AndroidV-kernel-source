@@ -181,6 +181,7 @@ def define_sun():
         "drivers/soc/qcom/mpam/platform_mpam.ko",
         "drivers/soc/qcom/mpam/mpam_msc.ko",
         "drivers/soc/qcom/mpam/mpam_msc_slc.ko",
+        "drivers/soc/qcom/mpam/slc_mpam.ko",
         "drivers/soc/qcom/msm_performance.ko",
         "drivers/soc/qcom/msm_show_epoch.ko",
         "drivers/soc/qcom/panel_event_notifier.ko",
