@@ -115,7 +115,7 @@ struct mpam_config_val {
 } __packed;
 
 struct monitors_value {
-	uint32_t capture_in_progress;
+	uint32_t capture_status;
 	uint32_t msc_id;
 	uint32_t csu_mon_enable_map[MAX_MONITOR_INSTANCES];
 	uint32_t csu_mon_value[MAX_MONITOR_INSTANCES];
@@ -159,7 +159,7 @@ struct platform_mpam_bw_ctrl_config {
 
 /* NOC Monitor structure in shared memory */
 struct platform_monitor_value {
-	uint32_t capture_in_progress;
+	uint32_t capture_status;
 	uint32_t msc_id;
 	uint32_t client_id;
 	uint32_t bwmon_byte_count;

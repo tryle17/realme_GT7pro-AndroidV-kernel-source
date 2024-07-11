@@ -374,7 +374,7 @@ static ssize_t cpu_mpam_monitor_data_show(struct config_item *item,
 	int i, monitor_id, retry_cnt = 0;
 	ssize_t len = 0;
 	uint32_t csu_value, mscid;
-	uint64_t mbw_value, timestamp;
+	uint64_t mbw_value, timestamp, capture_status;
 	struct monitors_value *mpam_mon_data;
 
 	monitor_id = get_monitor_id(item);
@@ -383,17 +383,18 @@ static ssize_t cpu_mpam_monitor_data_show(struct config_item *item,
 			mscid = mpam_mscs[i].msc_id;
 			mpam_mon_data = &mpam_mon_base[mscid];
 			do {
-				timestamp = mpam_mon_data->last_capture_time;
-				while (unlikely(mpam_mon_data->capture_in_progress) &&
+				while (unlikely((capture_status =
+						mpam_mon_data->capture_status) % 2) &&
 						(retry_cnt < MPAM_MAX_RETRY))
 					retry_cnt++;
+				timestamp = mpam_mon_data->last_capture_time;
 				csu_value = mpam_mon_data->csu_mon_value[monitor_id];
 				mbw_value = mpam_mon_data->mbw_mon_value[monitor_id];
-			} while (timestamp != mpam_mon_data->last_capture_time);
+			} while (capture_status != mpam_mon_data->capture_status);
 			len += scnprintf(page + len, PAGE_SIZE - len,
-			"%s:timestamp=%llu,csu=%u,mbwu=%llu\n",
-			mpam_mscs[i]. msc_name, timestamp,
-			csu_value, mbw_value);
+				"%s:timestamp=%llu,csu=%u,mbwu=%llu\n",
+				mpam_mscs[i]. msc_name, timestamp,
+				csu_value, mbw_value);
 		}
 		return len;
 	} else

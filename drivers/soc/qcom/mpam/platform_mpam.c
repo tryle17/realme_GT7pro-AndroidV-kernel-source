@@ -126,19 +126,20 @@ static ssize_t platform_mpam_monitor_data_show(struct config_item *item,
 		char *page)
 {
 	int index, retry_cnt = 0;
-	uint64_t byte_cnt, timestamp;
+	uint64_t byte_cnt, timestamp, capture_status;
 	struct platform_monitor_value *mpam_mon_data;
 
 	if (get_pm_item(item)->monitor_enabled) {
 		index = get_pm_item(item)->monitor_index;
 		mpam_mon_data = &mpam_mon_base[index];
 		do {
-			timestamp = mpam_mon_data->last_capture_time;
-			while (unlikely(mpam_mon_data->capture_in_progress) &&
+			while (unlikely((capture_status =
+					mpam_mon_data->capture_status) % 2) &&
 					(retry_cnt < MPAM_MAX_RETRY))
 				retry_cnt++;
+			timestamp = mpam_mon_data->last_capture_time;
 			byte_cnt = mpam_mon_data->bwmon_byte_count;
-		} while (timestamp != mpam_mon_data->last_capture_time);
+		} while (capture_status != mpam_mon_data->capture_status);
 
 		return scnprintf(page, PAGE_SIZE, "timestamp=%llu,byte_cnt=%llu\n",
 			timestamp, byte_cnt);
