@@ -214,5 +214,6 @@ static inline int qcom_mpam_set_platform_bw_monitor(struct platform_mpam_bw_moni
 	return 0;
 }
 #endif
+struct config_group *platform_mpam_get_root_group(void);
 
 #endif /* _QCOM_MPAM_H */
