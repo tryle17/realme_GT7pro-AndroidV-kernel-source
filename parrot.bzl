@@ -79,6 +79,7 @@ def define_parrot():
         "drivers/iommu/qcom_iommu_util.ko",
         "drivers/irqchip/msm_show_resume_irq.ko",
         "drivers/irqchip/qcom-pdc.ko",
+        "drivers/leds/leds-qpnp-flash-v2.ko",
         "drivers/leds/leds-qpnp-vibrator-ldo.ko",
         "drivers/leds/leds-qti-tri-led.ko",
         "drivers/mailbox/msm_qmp.ko",
