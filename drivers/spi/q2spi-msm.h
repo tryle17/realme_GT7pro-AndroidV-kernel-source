@@ -465,6 +465,7 @@ struct q2spi_dma_transfer {
  * @tx_cb: completion for tx dma
  * @rx_cb: completion for rx dma
  * @db_rx_cb: completion for doobell rx dma
+ * @restart_handler: notifier callback for restart
  * @wait_for_ext_cr: completion for extension cr
  * @rx_avail: used to notify the client for available rx data
  * @tid_idr: tid id allocator
@@ -562,6 +563,7 @@ struct q2spi_geni {
 	struct completion tx_cb;
 	struct completion rx_cb;
 	struct completion db_rx_cb;
+	struct notifier_block restart_handler;
 	struct completion wait_for_ext_cr;
 	atomic_t rx_avail;
 	struct idr tid_idr;
