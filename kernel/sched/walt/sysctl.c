@@ -10,8 +10,9 @@
 #include "walt.h"
 #include "trace.h"
 
-static int neg_four = -4;
+static int neg_five = -5;
 static int four = 4;
+static int five = 5;
 static int two_hundred_fifty_five = 255;
 static unsigned int ns_per_sec = NSEC_PER_SEC;
 static unsigned int one_hundred_thousand = 100000;
@@ -42,10 +43,10 @@ unsigned int sysctl_sched_coloc_busy_hyst_cpu[WALT_NR_CPUS];
 unsigned int sysctl_sched_coloc_busy_hyst_max_ms;
 unsigned int sysctl_sched_coloc_busy_hyst_cpu_busy_pct[WALT_NR_CPUS];
 unsigned int sysctl_sched_util_busy_hyst_enable_cpus;
-unsigned int sysctl_sched_pipeline_hyst_enable_cpus;
+unsigned int sysctl_sched_legacy_smart_freq_hyst_enable_cpus;
 unsigned int sysctl_sched_util_busy_hyst_cpu[WALT_NR_CPUS];
 unsigned int sysctl_sched_util_busy_hyst_cpu_util[WALT_NR_CPUS];
-unsigned int sysctl_sched_pipeline_hyst_cpu_ns[WALT_NR_CPUS];
+unsigned int sysctl_sched_legacy_smart_freq_hyst_cpu_ns[WALT_NR_CPUS];
 unsigned int sysctl_sched_boost;
 unsigned int sysctl_sched_wake_up_idle[2];
 unsigned int sysctl_input_boost_ms;
@@ -1067,8 +1068,8 @@ static struct ctl_table walt_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= sched_boost_handler,
-		.extra1		= &neg_four,
-		.extra2		= &four,
+		.extra1		= &neg_five,
+		.extra2		= &five,
 	},
 	{
 		.procname	= "sched_conservative_pl",
@@ -1222,8 +1223,8 @@ static struct ctl_table walt_table[] = {
 		.extra2		= &one_thousand,
 	},
 	{
-		.procname	= "sched_pipeline_hysteresis_enable_cpus",
-		.data		= &sysctl_sched_pipeline_hyst_enable_cpus,
+		.procname	= "sched_legacy_smart_freq_hysteresis_enable_cpus",
+		.data		= &sysctl_sched_legacy_smart_freq_hyst_enable_cpus,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= sched_busy_hyst_handler,
@@ -1231,8 +1232,8 @@ static struct ctl_table walt_table[] = {
 		.extra2		= &two_hundred_fifty_five,
 	},
 	{
-		.procname	= "sched_pipeline_hyst_cpu_ns",
-		.data		= &sysctl_sched_pipeline_hyst_cpu_ns,
+		.procname	= "sched_legacy_smart_freq_hyst_cpu_ns",
+		.data		= &sysctl_sched_legacy_smart_freq_hyst_cpu_ns,
 		.maxlen		= sizeof(unsigned int) * WALT_NR_CPUS,
 		.mode		= 0644,
 		.proc_handler	= sched_busy_hyst_handler,

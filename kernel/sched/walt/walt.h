@@ -169,6 +169,7 @@ DECLARE_PER_CPU(unsigned long, intr_cnt);
 DECLARE_PER_CPU(unsigned long, cycle_cnt);
 DECLARE_PER_CPU(u64, last_ipc_update);
 DECLARE_PER_CPU(u64, ipc_deactivate_ns);
+DECLARE_PER_CPU(bool, tickless_mode);
 
 struct smart_freq_legacy_reason_status {
 	u64 deactivate_ns;
@@ -674,6 +675,11 @@ static inline bool is_storage_boost(void)
 	return sched_boost_type == STORAGE_BOOST;
 }
 
+static inline bool is_balance_boost(void)
+{
+	return sched_boost_type == BALANCE_BOOST;
+}
+
 static inline bool task_sched_boost(struct task_struct *p)
 {
 	struct cgroup_subsys_state *css;
@@ -723,6 +729,9 @@ static inline enum sched_boost_policy task_boost_policy(struct task_struct *p)
 		if (sched_boost_type == CONSERVATIVE_BOOST &&
 			task_util(p) <= sysctl_sched_min_task_util_for_boost &&
 			!walt_pipeline_low_latency_task(p))
+			policy = SCHED_BOOST_NONE;
+		if (sched_boost_type == BALANCE_BOOST &&
+			task_util(p) <= sysctl_sched_min_task_util_for_boost)
 			policy = SCHED_BOOST_NONE;
 	}
 
@@ -1392,8 +1401,6 @@ extern void remove_special_task(void);
 extern void set_special_task(struct task_struct *pipeline_special_local);
 extern unsigned int sysctl_sched_pipeline_util_thres;
 #define MAX_NR_PIPELINE 3
-extern unsigned int sysctl_sched_pipeline_hyst_cpu_ns[WALT_NR_CPUS];
-extern unsigned int sysctl_sched_pipeline_hyst_enable_cpus;
 extern int pipeline_nr;
 /* smart freq */
 #define SMART_FREQ_LEGACY_TUPLE_SIZE		3
@@ -1412,4 +1419,6 @@ extern unsigned int sysctl_ipc_freq_levels_cluster3[SMART_FMAX_IPC_MAX];
 extern int sched_smart_freq_ipc_handler(struct ctl_table *table, int write,
 				      void __user *buffer, size_t *lenp,
 				      loff_t *ppos);
+extern unsigned int sysctl_sched_legacy_smart_freq_hyst_cpu_ns[WALT_NR_CPUS];
+extern unsigned int sysctl_sched_legacy_smart_freq_hyst_enable_cpus;
 #endif /* _WALT_H */
