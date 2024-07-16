@@ -218,6 +218,7 @@ def define_sun():
         "drivers/thermal/qcom/cpu_hotplug.ko",
         "drivers/thermal/qcom/ddr_cdev.ko",
         "drivers/thermal/qcom/gpu_dump_skip_cdev.ko",
+        "drivers/thermal/qcom/max31760_fan.ko",
         "drivers/thermal/qcom/qcom-spmi-temp-alarm.ko",
         "drivers/thermal/qcom/qcom_tsens.ko",
         "drivers/thermal/qcom/qti_cpufreq_cdev.ko",

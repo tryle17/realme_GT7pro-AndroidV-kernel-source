@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
@@ -432,7 +432,7 @@ static void max31760_remove(struct i2c_client *client)
 	gpio_free(pdata->pwr_en_gpio);
 }
 
-static int max31760_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int max31760_probe(struct i2c_client *client)
 {
 	int ret = 0;
 	struct max31760_data *pdata;
