@@ -10,6 +10,8 @@ clk-qcom.ko
 gdsc-regulator.ko
 gcc-parrot.ko
 dispcc-parrot.ko
+gcc-sm4450.ko
+dispcc-sm4450.ko
 sched-walt.ko
 sched-walt-debug.ko
 qcom_wdt_core.ko
@@ -28,6 +30,7 @@ icc-bcm-voter.ko
 icc-debug.ko
 qnoc-qos.ko
 qnoc-parrot.ko
+qnoc-ravelin.ko
 iommu-logger.ko
 mem_buf_dev.ko
 mem_buf.ko
