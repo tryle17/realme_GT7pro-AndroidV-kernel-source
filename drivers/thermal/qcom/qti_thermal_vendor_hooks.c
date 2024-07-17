@@ -6,12 +6,6 @@
 #include <linux/thermal.h>
 #include <trace/hooks/thermal.h>
 
-static void qti_thermal_pm_notify(void *unused,
-		struct thermal_zone_device *tz, int *irq_wakeable)
-{
-	*irq_wakeable = true;
-}
-
 static void disable_cdev_stats(void *unused,
 		struct thermal_cooling_device *cdev, bool *disable)
 {
@@ -24,15 +18,10 @@ static int __init qcom_thermal_vendor_hook_driver_init(void)
 
 	ret = register_trace_android_vh_disable_thermal_cooling_stats(
 			disable_cdev_stats, NULL);
-	if (ret)
-		pr_err("Failed to register disable cdev stats hook, err:%d\n",
-			ret);
-
-	ret = register_trace_android_vh_thermal_pm_notify_suspend(
-			qti_thermal_pm_notify, NULL);
-	if (ret)
-		pr_err("Failed to register thermal_pm_notify hook, err:%d\n",
-			ret);
+	if (ret) {
+		pr_err("Failed to register disable thermal cdev stats hooks\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -41,9 +30,6 @@ static void __exit qcom_thermal_vendor_hook_driver_exit(void)
 {
 	unregister_trace_android_vh_disable_thermal_cooling_stats(
 			disable_cdev_stats, NULL);
-
-	unregister_trace_android_vh_thermal_pm_notify_suspend(
-			qti_thermal_pm_notify, NULL);
 }
 
 #if IS_MODULE(CONFIG_QTI_THERMAL_VENDOR_HOOK)
