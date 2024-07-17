@@ -264,9 +264,6 @@ int qcom_mdt_pas_init(struct device *dev, const struct firmware *fw,
 		if (ret) {
 			/* Unable to set up relocation */
 			dev_err(dev, "error %d setting up firmware %s\n", ret, fw_name);
-			if (dma_phys_below_32b)
-				qcom_scm_pas_shutdown(pas_id);
-			qcom_scm_pas_metadata_release(ctx, dev);
 			goto out;
 		}
 	}

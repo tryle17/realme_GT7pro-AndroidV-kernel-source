@@ -406,11 +406,8 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
 	goto exit_load;
 
 release_dtb_metadata:
-	if (adsp->dtb_pas_id && adsp->dma_phys_below_32b)
-		qcom_scm_pas_shutdown(adsp->dtb_pas_id);
+	qcom_scm_pas_metadata_release(&adsp->dtb_pas_metadata, dev);
 
-	if (adsp->dtb_pas_id)
-		qcom_scm_pas_metadata_release(&adsp->dtb_pas_metadata, dev);
 release_dtb_firmware:
 	release_firmware(adsp->dtb_firmware);
 
@@ -549,8 +546,7 @@ static int adsp_start(struct rproc *rproc)
 {
 	struct qcom_adsp *adsp = rproc->priv;
 	struct device *dev = NULL;
-	bool auth_reset_ret = false;
-	int ret, err;
+	int ret;
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_start", "enter");
 
@@ -574,7 +570,7 @@ static int adsp_start(struct rproc *rproc)
 
 	ret = adsp_pds_enable(adsp, adsp->proxy_pds, adsp->proxy_pd_count);
 	if (ret < 0)
-		goto unassign_memory;
+		goto disable_irqs;
 
 	ret = clk_prepare_enable(adsp->xo);
 	if (ret)
@@ -607,8 +603,6 @@ static int adsp_start(struct rproc *rproc)
 		if (ret)
 			panic("Panicking, auth and reset failed for remoteproc %s dtb ret=%d\n",
 				rproc->name, ret);
-
-		auth_reset_ret = true;
 	}
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "Q6_firmware_loading", "enter");
@@ -616,13 +610,13 @@ static int adsp_start(struct rproc *rproc)
 	ret = qcom_mdt_pas_init(adsp->dev, adsp->firmware, rproc->firmware, adsp->pas_id,
 				adsp->mem_phys, &adsp->pas_metadata, adsp->dma_phys_below_32b);
 	if (ret)
-		goto disable_regulator;
+		goto release_dtb_pas_id;
 
 	ret = qcom_mdt_load_no_init(adsp->dev, adsp->firmware, rproc->firmware, adsp->pas_id,
 				    adsp->mem_region, adsp->mem_phys, adsp->mem_size,
 				    &adsp->mem_reloc);
 	if (ret)
-		goto unlock_pas_metadata;
+		goto release_pas_metadata;
 
 	qcom_pil_info_store(adsp->info_name, adsp->mem_phys, adsp->mem_size);
 	adsp_add_coredump_segments(adsp, adsp->firmware);
@@ -642,32 +636,28 @@ static int adsp_start(struct rproc *rproc)
 			panic("Panicking, remoteproc %s failed to bootup.\n", adsp->rproc->name);
 		else if (ret == -ETIMEDOUT) {
 			dev_err(adsp->dev, "start timed out\n");
+			qcom_scm_pas_shutdown(adsp->pas_id);
 			goto release_pas_metadata;
 		}
 	}
 
 	qcom_scm_pas_metadata_release(&adsp->pas_metadata, dev);
+
+	if (adsp->dtb_pas_id)
+		qcom_scm_pas_metadata_release(&adsp->dtb_pas_metadata, dev);
+
+	/* Remove pointer to the loaded firmware, only valid in adsp_load() & adsp_start() */
+	adsp->firmware = NULL;
+
 	goto exit_start;
 
-unlock_pas_metadata:
-	/*
-	 * Unlocking of pas meta data only required either the call to
-	 * auth and reset is not reached after qcom_mdt_pas_init() success.
-	 * In case auth and reset is success, no need to call shutdown or
-	 * unlock pas meta data.
-	 */
-	if (adsp->dma_phys_below_32b) {
-		err = qcom_scm_pas_shutdown(adsp->pas_id);
-		if (err && adsp->decrypt_shutdown)
-			err = adsp_shutdown_poll_decrypt(adsp);
-		if (err)
-			panic("Panicking, remoteproc %s failed to unlock pas_metadata.\n",
-			      rproc->name);
-	}
 release_pas_metadata:
 	qcom_scm_pas_metadata_release(&adsp->pas_metadata, dev);
-disable_regulator:
-	disable_regulators(adsp);
+release_dtb_pas_id:
+	if (adsp->dtb_pas_id) {
+		qcom_scm_pas_shutdown(adsp->dtb_pas_id);
+		qcom_scm_pas_metadata_release(&adsp->dtb_pas_metadata, dev);
+	}
 disable_px_supply:
 	if (adsp->px_supply)
 		regulator_disable(adsp->px_supply);
@@ -680,21 +670,12 @@ disable_xo_clk:
 	clk_disable_unprepare(adsp->xo);
 disable_proxy_pds:
 	adsp_pds_disable(adsp, adsp->proxy_pds, adsp->proxy_pd_count);
-unassign_memory:
-	adsp->region_assigned = false;
-	adsp_unassign_memory_region(adsp);
 disable_irqs:
 	qcom_q6v5_unprepare(&adsp->q6v5);
-exit_start:
-	if (adsp->dtb_pas_id && adsp->dma_phys_below_32b && !auth_reset_ret)
-		qcom_scm_pas_shutdown(adsp->dtb_pas_id);
 
-	if (adsp->dtb_pas_id)
-		qcom_scm_pas_metadata_release(&adsp->dtb_pas_metadata, dev);
-
-	release_firmware(adsp->dtb_firmware);
 	/* Remove pointer to the loaded firmware, only valid in adsp_load() & adsp_start() */
 	adsp->firmware = NULL;
+exit_start:
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_start", "exit");
 	return ret;
 }
