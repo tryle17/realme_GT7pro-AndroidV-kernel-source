@@ -79,6 +79,7 @@ struct delay_probe_arg {
 	struct amba_device	*adev;
 	struct cpumask		*cpumask;
 	struct list_head	link;
+	const struct amba_id	*id;
 };
 
 enum etm_addr_type {
