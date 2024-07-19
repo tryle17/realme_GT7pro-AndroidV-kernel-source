@@ -140,6 +140,7 @@ obj-$(CONFIG_SM_GCC_8550) += gcc-sm8550.o
 obj-$(CONFIG_SM_GCC_PARROT) += gcc-parrot.o
 obj-$(CONFIG_SM_GCC_PINEAPPLE) += gcc-pineapple.o
 obj-$(CONFIG_SM_GCC_TUNA) += gcc-tuna.o
+obj-$(CONFIG_SM_GPUCC_TUNA) += gpucc-tuna.o
 obj-$(CONFIG_SM_VIDEOCC_PINEAPPLE) += videocc-pineapple.o
 obj-$(CONFIG_SM_CAMCC_PARROT) += camcc-parrot.o
 obj-$(CONFIG_SM_CAMCC_PINEAPPLE) += camcc-pineapple.o
