@@ -4592,8 +4592,10 @@ static void dwc3_pwr_event_handler(struct dwc3_msm *mdwc)
 	struct dwc3 *dwc = NULL;
 	u32 irq_stat, irq_clear = 0;
 
-	if (mdwc->dwc3)
-		dwc = platform_get_drvdata(mdwc->dwc3);
+	if (!mdwc->dwc3 || !mdwc->use_pwr_event_for_wakeup)
+		return;
+
+	dwc = platform_get_drvdata(mdwc->dwc3);
 
 	irq_stat = dwc3_msm_read_reg(mdwc->base, PWR_EVNT_IRQ_STAT_REG);
 	dev_dbg(mdwc->dev, "%s irq_stat=%X\n", __func__, irq_stat);
