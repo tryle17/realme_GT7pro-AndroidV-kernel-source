@@ -784,7 +784,7 @@ static int tmc_online_cpu(unsigned int cpu)
 			ret = pm_runtime_resume_and_get(&init_arg->adev->dev);
 			if (ret < 0)
 				return ret;
-			ret = tmc_add_coresight_dev(init_arg->adev, 0);
+			ret = tmc_add_coresight_dev(init_arg->adev, init_arg->id);
 			if (ret)
 				pm_runtime_put_sync(&init_arg->adev->dev);
 		}
@@ -833,6 +833,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 		spin_lock(&delay_lock);
 		init_arg->adev = adev;
 		init_arg->cpumask = pd->cpus;
+		init_arg->id = id;
 		list_add(&init_arg->link, &delay_probe_list);
 		drvdata->delayed = init_arg;
 		spin_unlock(&delay_lock);
