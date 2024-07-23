@@ -19,7 +19,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 #include <linux/pinctrl/consumer.h>
-#include <linux/pm_runtime.h>
+#include <linux/reboot.h>
 #include <linux/uaccess.h>
 #include "q2spi-msm.h"
 #include "q2spi-slave-reg.h"
@@ -1140,6 +1140,7 @@ static int q2spi_open(struct inode *inode, struct file *filp)
 	filp->private_data = q2spi;
 	q2spi->q2spi_cr_txn_err = false;
 	q2spi->q2spi_sleep_cmd_enable = false;
+	q2spi->q2spi_cr_hdr_err = false;
 	Q2SPI_DEBUG(q2spi, "%s End PID:%d, allocs:%d\n",
 		    __func__, current->pid, atomic_read(&q2spi->alloc_count));
 err:
@@ -1797,9 +1798,10 @@ static int q2spi_wakeup_hw_from_sleep(struct q2spi_geni *q2spi)
 	long timeout = 0;
 	int ret = 0;
 
-	if (q2spi->q2spi_cr_txn_err) {
+	if (q2spi->q2spi_cr_txn_err || q2spi->q2spi_cr_hdr_err) {
 		q2spi_transfer_abort(q2spi);
 		q2spi->q2spi_cr_txn_err = false;
+		q2spi->q2spi_cr_hdr_err = false;
 		return 0;
 	}
 
@@ -1969,13 +1971,7 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 				q2spi->hw_state_is_bad = true;
 				q2spi_dump_client_error_regs(q2spi);
 			}
-			pm_runtime_mark_last_busy(q2spi->dev);
-			Q2SPI_DEBUG(q2spi, "%s PM put_autosuspend count:%d line:%d\n", __func__,
-				    atomic_read(&q2spi->dev->power.usage_count), __LINE__);
-			pm_runtime_put_autosuspend(q2spi->dev);
-			Q2SPI_DEBUG(q2spi, "%s PM after put_autosuspend count:%d\n", __func__,
-				    atomic_read(&q2spi->dev->power.usage_count));
-			return ret;
+			goto pm_put_exit;
 		} else if (ret == -ERESTARTSYS) {
 			Q2SPI_DEBUG(q2spi, "%s system is in restart\n", __func__);
 			return ret;
@@ -1983,20 +1979,22 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 			/* Upon transfer failure's retry here */
 			Q2SPI_DEBUG(q2spi, "%s ret:%d retry_count:%d retrying cur_q2spi_pkt:%p\n",
 				    __func__, ret, i + 1, cur_q2spi_pkt);
+			if (q2spi->gsi->qup_gsi_global_err) {
+				Q2SPI_DEBUG(q2spi, "%s GSI global error, No retry\n", __func__);
+				ret = -EIO;
+				goto transfer_exit;
+			}
+
 			if (i == 0) {
 				ret = q2spi_wakeup_hw_from_sleep(q2spi);
 				if (ret) {
 					Q2SPI_DEBUG(q2spi, "%s Err q2spi_wakeup_hw_from_sleep\n",
 						    __func__);
-					pm_runtime_mark_last_busy(q2spi->dev);
-					pm_runtime_put_autosuspend(q2spi->dev);
-					Q2SPI_DEBUG(q2spi, "%s PM after put_autosuspend cnt:%d\n",
-						    __func__,
-						    atomic_read(&q2spi->dev->power.usage_count));
-					return ret;
+					goto pm_put_exit;
 				}
 			}
 			q2spi->q2spi_cr_txn_err = false;
+			q2spi->q2spi_cr_hdr_err = false;
 
 			/* Reset 100msec client sleep timer */
 			mod_timer(&q2spi->slave_sleep_timer,
@@ -2015,23 +2013,15 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 				data_buf = q2spi_kzalloc(q2spi, q2spi_req.data_len, __LINE__);
 				if (!data_buf) {
 					Q2SPI_DEBUG(q2spi, "%s Err buf2 alloc failed\n", __func__);
-					pm_runtime_mark_last_busy(q2spi->dev);
-					pm_runtime_put_autosuspend(q2spi->dev);
-					Q2SPI_DEBUG(q2spi, "%s PM after put_autosuspend count:%d\n",
-						    __func__,
-						    atomic_read(&q2spi->dev->power.usage_count));
-					return -ENOMEM;
+					ret = -ENOMEM;
+					goto pm_put_exit;
 				}
 				if (copy_from_user(data_buf, user_buf, q2spi_req.data_len)) {
 					Q2SPI_DEBUG(q2spi, "%s Err copy_from_user to buf2 failed\n",
 						    __func__);
 					q2spi_kfree(q2spi, data_buf, __LINE__);
-					pm_runtime_mark_last_busy(q2spi->dev);
-					pm_runtime_put_autosuspend(q2spi->dev);
-					Q2SPI_DEBUG(q2spi, "%s PM after put_autosuspend count:%d\n",
-						    __func__,
-						    atomic_read(&q2spi->dev->power.usage_count));
-					return -EFAULT;
+					ret = -EFAULT;
+					goto pm_put_exit;
 				}
 				q2spi_req.data_buff = data_buf;
 			}
@@ -2042,7 +2032,8 @@ static int q2spi_transfer_with_retries(struct q2spi_geni *q2spi, struct q2spi_re
 				q2spi_kfree(q2spi, data_buf, __LINE__);
 				Q2SPI_DEBUG(q2spi, "%s Err Failed to add tx req to queue ret:%d\n",
 					    __func__, flow_id);
-				return -ENOMEM;
+				ret = -ENOMEM;
+				goto pm_put_exit;
 			}
 			Q2SPI_DEBUG(q2spi, "%s cur_q2spi_pkt=%p\n", __func__, cur_q2spi_pkt);
 		} else {
@@ -2054,6 +2045,7 @@ transfer_exit:
 	cur_q2spi_pkt->state = IN_DELETION;
 	q2spi_del_pkt_from_tx_queue(q2spi, cur_q2spi_pkt);
 	q2spi_free_q2spi_pkt(cur_q2spi_pkt, __LINE__);
+pm_put_exit:
 	pm_runtime_mark_last_busy(q2spi->dev);
 	Q2SPI_DEBUG(q2spi, "%s PM put_autosuspend count:%d line:%d\n", __func__,
 		    atomic_read(&q2spi->dev->power.usage_count), __LINE__);
@@ -3996,7 +3988,12 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 	ret = check_gsi_transfer_completion_db_rx(q2spi);
 	if (ret) {
 		Q2SPI_DEBUG(q2spi, "%s db rx completion timeout: %d\n", __func__, ret);
+		atomic_set(&q2spi->doorbell_pending, 0);
 		q2spi_unmap_doorbell_rx_buf(q2spi);
+		atomic_set(&q2spi->sma_wr_pending, 0);
+		atomic_set(&q2spi->doorbell_pending, 0);
+		q2spi_geni_se_dump_regs(q2spi);
+		gpi_dump_for_geni(q2spi->gsi->tx_c);
 		goto exit_doorbell_work;
 	}
 
@@ -4004,6 +4001,7 @@ static void q2spi_handle_doorbell_work(struct work_struct *work)
 	q2spi_cr_pkt = q2spi_prepare_cr_pkt(q2spi);
 	if (!q2spi_cr_pkt) {
 		Q2SPI_DEBUG(q2spi, "Err q2spi_prepare_cr_pkt failed\n");
+		atomic_set(&q2spi->doorbell_pending, 0);
 		q2spi_unmap_doorbell_rx_buf(q2spi);
 		goto exit_doorbell_work;
 	}
@@ -4223,6 +4221,29 @@ void q2spi_destroy_workqueue(struct q2spi_geni *q2spi)
 }
 
 /**
+ * q2spi_geni_restart_cb - callback routine for reboot notifier
+ * @nb: pointer to reboot notifier block chain
+ * @action: value passed unmodified to notifier function
+ * @data: pointer passed unmodified to notifier function
+ *
+ * Returns 0 for success and non-zero for failure.
+ */
+static int q2spi_geni_restart_cb(struct notifier_block *nb,
+				 unsigned long action, void *data)
+{
+	struct q2spi_geni *q2spi = container_of(nb, struct q2spi_geni, restart_handler);
+
+	if (!q2spi) {
+		Q2SPI_ERROR(q2spi, "%s Err q2spi is NULL, PID=%d\n", __func__, current->pid);
+		return -EINVAL;
+	}
+	Q2SPI_INFO(q2spi, "%s PID=%d\n", __func__, current->pid);
+	q2spi_sys_restart = true;
+
+	return 0;
+}
+
+/**
  * q2spi_geni_probe - Q2SPI interface driver probe function
  * @pdev: Q2SPI Serial Engine to probe.
  *
@@ -4425,6 +4446,14 @@ static int q2spi_geni_probe(struct platform_device *pdev)
 		goto free_buf;
 	}
 
+	q2spi->restart_handler.notifier_call = q2spi_geni_restart_cb;
+	ret = register_reboot_notifier(&q2spi->restart_handler);
+	if (ret) {
+		Q2SPI_ERROR(q2spi, "%s: Err failed to register reboot notifier, ret:%d\n",
+			    __func__, ret);
+		goto free_buf;
+	}
+
 	Q2SPI_INFO(q2spi, "%s Q2SPI GENI SE Driver probe\n", __func__);
 	pr_info("boot_kpi: M - DRIVER GENI_Q2SPI Ready\n");
 	return 0;
@@ -4461,6 +4490,7 @@ static int q2spi_geni_remove(struct platform_device *pdev)
 	if (!q2spi || !q2spi->base)
 		return 0;
 
+	unregister_reboot_notifier(&q2spi->restart_handler);
 	device_remove_file(&pdev->dev, &dev_attr_max_dump_size);
 
 	destroy_workqueue(q2spi->sleep_wq);
@@ -4650,6 +4680,13 @@ static int q2spi_geni_runtime_suspend(struct device *dev)
 	}
 
 	Q2SPI_DEBUG(q2spi, "%s PID=%d\n", __func__, current->pid);
+	if (atomic_read(&q2spi->doorbell_pending)) {
+		Q2SPI_DEBUG(q2spi, "%s CR Doorbell Pending\n", __func__);
+		/* Update last access time of a device for autosuspend */
+		pm_runtime_mark_last_busy(q2spi->dev);
+		return -EBUSY;
+	}
+
 	if (!atomic_read(&q2spi->is_suspend)) {
 		q2spi_put_slave_to_sleep(q2spi);
 

@@ -84,7 +84,7 @@ enum freq_caps {
 #define	SOC_ENABLE_SW_CYCLE_COUNTER_BIT			BIT(6)
 #define SOC_ENABLE_COLOCATION_PLACEMENT_BOOST_BIT	BIT(7)
 #define SOC_ENABLE_FT_BOOST_TO_ALL			BIT(8)
-#define SOC_ENABLE_OSCILLATE_ON_THERMALS		BIT(9)
+#define SOC_ENABLE_EXPERIMENT3						BIT(9)
 #define SOC_ENABLE_PIPELINE_SWAPPING_BIT		BIT(10)
 
 extern int soc_sched_lib_name_capacity;
@@ -169,6 +169,7 @@ DECLARE_PER_CPU(unsigned long, intr_cnt);
 DECLARE_PER_CPU(unsigned long, cycle_cnt);
 DECLARE_PER_CPU(u64, last_ipc_update);
 DECLARE_PER_CPU(u64, ipc_deactivate_ns);
+DECLARE_PER_CPU(bool, tickless_mode);
 
 struct smart_freq_legacy_reason_status {
 	u64 deactivate_ns;
@@ -674,6 +675,11 @@ static inline bool is_storage_boost(void)
 	return sched_boost_type == STORAGE_BOOST;
 }
 
+static inline bool is_balance_boost(void)
+{
+	return sched_boost_type == BALANCE_BOOST;
+}
+
 static inline bool task_sched_boost(struct task_struct *p)
 {
 	struct cgroup_subsys_state *css;
@@ -723,6 +729,9 @@ static inline enum sched_boost_policy task_boost_policy(struct task_struct *p)
 		if (sched_boost_type == CONSERVATIVE_BOOST &&
 			task_util(p) <= sysctl_sched_min_task_util_for_boost &&
 			!walt_pipeline_low_latency_task(p))
+			policy = SCHED_BOOST_NONE;
+		if (sched_boost_type == BALANCE_BOOST &&
+			task_util(p) <= sysctl_sched_min_task_util_for_boost)
 			policy = SCHED_BOOST_NONE;
 	}
 
@@ -971,6 +980,10 @@ static inline bool task_fits_capacity(struct task_struct *p,
 static inline bool task_fits_max(struct task_struct *p, int dst_cpu)
 {
 	unsigned long task_boost = per_task_boost(p);
+	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
+
+	if (wts->pipeline_cpu != -1)
+		return true;
 
 	if (is_max_possible_cluster_cpu(dst_cpu))
 		return true;
@@ -1291,6 +1304,8 @@ extern bool should_oscillate(void);
 extern bool now_is_sbt;
 extern bool is_sbt_or_oscillate(void);
 
+extern unsigned int sysctl_sched_walt_core_util[WALT_NR_CPUS];
+
 enum WALT_DEBUG_FEAT {
 	WALT_BUG_UPSTREAM,
 	WALT_BUG_WALT,
@@ -1386,12 +1401,7 @@ extern void remove_special_task(void);
 extern void set_special_task(struct task_struct *pipeline_special_local);
 extern unsigned int sysctl_sched_pipeline_util_thres;
 #define MAX_NR_PIPELINE 3
-extern unsigned int sysctl_sched_pipeline_hyst_cpu_ns[WALT_NR_CPUS];
-extern unsigned int sysctl_sched_pipeline_hyst_enable_cpus;
 extern int pipeline_nr;
-extern unsigned int sysctl_sched_trailblazer_hyst_cpu_ns[WALT_NR_CPUS];
-extern unsigned int sysctl_sched_trailblazer_hyst_enable_cpus;
-
 /* smart freq */
 #define SMART_FREQ_LEGACY_TUPLE_SIZE		3
 #define SMART_FREQ_IPC_TUPLE_SIZE		3
@@ -1409,4 +1419,6 @@ extern unsigned int sysctl_ipc_freq_levels_cluster3[SMART_FMAX_IPC_MAX];
 extern int sched_smart_freq_ipc_handler(struct ctl_table *table, int write,
 				      void __user *buffer, size_t *lenp,
 				      loff_t *ppos);
+extern unsigned int sysctl_sched_legacy_smart_freq_hyst_cpu_ns[WALT_NR_CPUS];
+extern unsigned int sysctl_sched_legacy_smart_freq_hyst_enable_cpus;
 #endif /* _WALT_H */

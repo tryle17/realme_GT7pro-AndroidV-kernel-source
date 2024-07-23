@@ -4030,6 +4030,30 @@ static void check_obet_set_boost(void)
 	prev_is_obet = now_is_obet;
 }
 
+#define CORE_UTIL_PERIOD 1000000000
+static void walt_core_utilization(int cpu)
+{
+	static u64 sum[WALT_NR_CPUS];
+	static u64 timestamp;
+	static int nr_windows[WALT_NR_CPUS];
+	struct walt_rq *wrq = &per_cpu(walt_rq, cpu);
+	u64 max_capacity = arch_scale_cpu_capacity(cpu);
+
+	if (wrq->window_start > timestamp + CORE_UTIL_PERIOD) {
+		sysctl_sched_walt_core_util[cpu] = sum[cpu] / nr_windows[cpu];
+		sum[cpu] = 0;
+		nr_windows[cpu] = 0;
+		if (cpu == cpumask_last(cpu_online_mask))
+			timestamp = wrq->window_start;
+	}
+
+	nr_windows[cpu]++;
+	if (max_capacity < wrq->walt_stats.cumulative_runnable_avg_scaled)
+		sum[cpu] += max_capacity;
+	else
+		sum[cpu] += wrq->walt_stats.cumulative_runnable_avg_scaled;
+}
+
 DEFINE_PER_CPU(u32, wakeup_ctr);
 /**
  * walt_irq_work() - perform walt irq work for rollover and migration
@@ -4092,6 +4116,8 @@ static void walt_irq_work(struct irq_work *irq_work)
 		for_each_cpu(cpu, cpu_online_mask) {
 			wakeup_ctr_sum += per_cpu(wakeup_ctr, cpu);
 			per_cpu(wakeup_ctr, cpu) = 0;
+
+			walt_core_utilization(cpu);
 		}
 
 		check_obet();
@@ -4596,6 +4622,7 @@ DEFINE_PER_CPU(unsigned int, ipc_level);
 DEFINE_PER_CPU(unsigned long, ipc_cnt);
 DEFINE_PER_CPU(u64, last_ipc_update);
 DEFINE_PER_CPU(u64, ipc_deactivate_ns);
+DEFINE_PER_CPU(bool, tickless_mode);
 static unsigned long calculate_ipc(int cpu)
 {
 	unsigned long amu_cnt, delta_cycl = 0, delta_intr = 0;
@@ -4738,7 +4765,7 @@ static void android_vh_scheduler_tick(void *unused, struct rq *rq)
 
 	walt_lb_tick(rq);
 
-	if (soc_feat(SOC_ENABLE_OSCILLATE_ON_THERMALS))
+	if (soc_feat(SOC_ENABLE_EXPERIMENT3))
 		should_oscillate_tick();
 
 	/* IPC based smart FMAX */
@@ -4757,7 +4784,7 @@ static void android_vh_scheduler_tick(void *unused, struct rq *rq)
 			i = SMART_FMAX_IPC_MAX - 1;
 
 		curr_ipc_level = i;
-		if (curr_ipc_level != last_ipc_level)
+		if ((curr_ipc_level != last_ipc_level) || per_cpu(tickless_mode, cpu))
 			inform_governor = true;
 
 		if ((curr_ipc_level < last_ipc_level) &&
@@ -4798,7 +4825,7 @@ static void android_rvh_schedule(void *unused, struct task_struct *prev,
 			wts->last_sleep_ts = wallclock;
 		walt_update_task_ravg(prev, rq, PUT_PREV_TASK, wallclock, 0);
 		walt_update_task_ravg(next, rq, PICK_NEXT_TASK, wallclock, 0);
-		if (soc_feat(SOC_ENABLE_OSCILLATE_ON_THERMALS) &&
+		if (soc_feat(SOC_ENABLE_EXPERIMENT3) &&
 				oscillate_cpu == raw_smp_processor_id()) {
 			if (should_oscillate()) {
 				if (!hrtimer_active(&walt_oscillate_timer)) {
@@ -5126,7 +5153,7 @@ static void walt_init(struct work_struct *work)
 		sysctl_sched_features &= ~(1UL << i);
 	}
 
-	if (soc_feat(SOC_ENABLE_OSCILLATE_ON_THERMALS)) {
+	if (soc_feat(SOC_ENABLE_EXPERIMENT3)) {
 		hrtimer_init(&walt_oscillate_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED_HARD);
 		walt_oscillate_timer.function = walt_oscillate_timer_cb;
 	}

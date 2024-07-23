@@ -1,9 +1,10 @@
 ################################################################################
 # Common MSM configuration for building non-GKI-based kernels
 DEFCONFIG="gki_defconfig"
-
+# For allyes target, keeping perf config as common for both debug & perf defconfigs.
+# This has to be changed when debug variant of allyes target is brought up.
 function build_defconfig_fragments() {
-	if [[ "${VARIANT}" =~ ^(perf_defconfig)$ ]]; then
+		if [[ "${VARIANT}" == "perf_defconfig" || "${VARIANT}" == "debug_defconfig" ]]; then
 		apply_defconfig_fragment ${KERNEL_DIR}/arch/${ARCH}/configs/vendor/${MSM_ARCH}_perf.config vendor/${MSM_ARCH}-${DEFCONFIG}
 	fi
 }

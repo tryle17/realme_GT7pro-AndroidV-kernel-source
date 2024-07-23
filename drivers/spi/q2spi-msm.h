@@ -11,6 +11,7 @@
 #include <linux/ipc_logging.h>
 #include <linux/kthread.h>
 #include <linux/msm_gpi.h>
+#include <linux/pm_runtime.h>
 #include <linux/poll.h>
 #include <linux/soc/qcom/geni-se.h>
 #include <linux/qcom-geni-se-common.h>
@@ -440,7 +441,6 @@ struct q2spi_dma_transfer {
  * q2spi_chrdev: cdev structure
  * @geni_se: stores info parsed from device tree
  * @gsi: stores GSI structure information
- * @qup_gsi_err: flahg to set incase of gsi errors
  * @db_xfer: reference to q2spi_dma_transfer structure for doorbell
  * @req: reference to q2spi request structure
  * @c_req: reference to q2spi client request structure
@@ -465,6 +465,7 @@ struct q2spi_dma_transfer {
  * @tx_cb: completion for tx dma
  * @rx_cb: completion for rx dma
  * @db_rx_cb: completion for doobell rx dma
+ * @restart_handler: notifier callback for restart
  * @wait_for_ext_cr: completion for extension cr
  * @rx_avail: used to notify the client for available rx data
  * @tid_idr: tid id allocator
@@ -514,6 +515,7 @@ struct q2spi_dma_transfer {
  * @sys_mem_read_in_progress: reflects system memory read request is in progress
  * @q2spi_cr_txn_err: reflects Q2SPI_CR_TRANSACTION_ERROR in CR body
  * @q2spi_sleep_cmd_enable: reflects start sending the sleep command to slave
+ * @q2spi_cr_hdr_err: reflects CR Header incorrect in CR Header
  */
 struct q2spi_geni {
 	struct device *wrapper_dev;
@@ -530,7 +532,6 @@ struct q2spi_geni {
 	struct q2spi_chrdev chrdev;
 	struct geni_se se;
 	struct q2spi_gsi *gsi;
-	bool qup_gsi_err;
 	struct q2spi_dma_transfer *db_xfer;
 	struct q2spi_request *req;
 	struct q2spi_client_request *c_req;
@@ -562,6 +563,7 @@ struct q2spi_geni {
 	struct completion tx_cb;
 	struct completion rx_cb;
 	struct completion db_rx_cb;
+	struct notifier_block restart_handler;
 	struct completion wait_for_ext_cr;
 	atomic_t rx_avail;
 	struct idr tid_idr;
@@ -619,6 +621,7 @@ struct q2spi_geni {
 	bool sys_mem_read_in_progress;
 	bool q2spi_cr_txn_err;
 	bool q2spi_sleep_cmd_enable;
+	bool q2spi_cr_hdr_err;
 };
 
 /**

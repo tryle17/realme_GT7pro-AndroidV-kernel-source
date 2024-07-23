@@ -22,6 +22,12 @@ enum GPI_EV_TYPE {
 	QUP_TCE_TYPE_Q2SPI_CR_HEADER = 0x36,
 };
 
+enum Q2SPI_CR_HEADER_CODE {
+	Q2SPI_CR_CODE_SUCCESS = 0x1,
+	Q2SPI_CR_HEADER_LEN_ZERO = 0xB,
+	Q2SPI_CR_HEADER_INCORRECT = 0xC,
+};
+
 enum msm_gpi_tre_type {
 	MSM_GPI_TRE_INVALID = 0x00,
 	MSM_GPI_TRE_NOP = 0x01,
@@ -294,6 +300,20 @@ struct msm_gpi_cb {
 	struct __packed qup_q2spi_cr_header_event q2spi_cr_header_event;
 };
 
+static const char *const gpi_cb_event_str[MSM_GPI_QUP_MAX_EVENT] = {
+	[MSM_GPI_QUP_NOTIFY] = "NOTIFY",
+	[MSM_GPI_QUP_ERROR] = "GLOBAL ERROR",
+	[MSM_GPI_QUP_CH_ERROR] = "CHAN ERROR",
+	[MSM_GPI_QUP_FW_ERROR] = "UNHANDLED ERROR",
+	[MSM_GPI_QUP_PENDING_EVENT] = "PENDING EVENT",
+	[MSM_GPI_QUP_EOT_DESC_MISMATCH] = "EOT/DESC MISMATCH",
+	[MSM_GPI_QUP_SW_ERROR] = "SW ERROR",
+	[MSM_GPI_QUP_CR_HEADER] = "Doorbell CR EVENT"
+};
+
+#define TO_GPI_CB_EVENT_STR(event) (((event) >= MSM_GPI_QUP_MAX_EVENT) ? \
+				    "INVALID" : gpi_cb_event_str[(event)])
+
 struct dma_chan;
 
 struct gpi_client_info {
@@ -381,7 +401,7 @@ struct gsi_common {
 	struct gsi_xfer_param rx;
 	void *ipc;
 	bool req_chan;
-	bool err; /* For every gsi error performing gsi reset */
+	bool *err; /* For every gsi error performing gsi reset */
 	int *protocol_err; /* protocol specific error*/
 	void (*ev_cb_fun)(struct dma_chan *ch, struct msm_gpi_cb const *cb_str, void *ptr);
 };

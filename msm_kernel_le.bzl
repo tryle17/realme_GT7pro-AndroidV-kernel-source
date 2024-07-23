@@ -175,9 +175,15 @@ def _define_kernel_dist(target, msm_target, variant):
         ":{}_images".format(target),
         ":{}_merged_kernel_uapi_headers".format(target),
         ":{}_build_config".format(target),
-        ":{}_dummy_files".format(le_target),
-        "//msm-kernel:{}_super_image".format(le_target + "_perf"),
     ]
+
+    # For allyes target, keeping perf super image as common for both debug & perf variants.
+    # This has to be changed when debug variant of allyes target is brought up.
+    if "allyes" in target:
+        msm_dist_targets += [
+            ":{}_dummy_files".format(target),
+            "//msm-kernel:{}_super_image".format(le_target + "_perf"),
+        ]
 
     copy_to_dist_dir(
         name = "{}_dist".format(target),
@@ -266,6 +272,7 @@ def define_msm_le(
 
     define_dtc_dist(target, msm_target, variant)
 
-    gen_allyes_files(le_target, target)
+    if "allyes" in target:
+        gen_allyes_files(le_target, target)
 
     define_extras(target)
