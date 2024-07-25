@@ -1868,6 +1868,11 @@ int tmc_etr_switch_mode(struct tmc_drvdata *drvdata, const char *out_mode)
 		return -EINVAL;
 	}
 
+	if (drvdata->mode == CS_MODE_PERF) {
+		mutex_unlock(&drvdata->mem_lock);
+		return -EINVAL;
+	}
+
 	if (new_mode == drvdata->out_mode) {
 		mutex_unlock(&drvdata->mem_lock);
 		return 0;
