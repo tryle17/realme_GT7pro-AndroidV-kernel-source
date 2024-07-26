@@ -70,6 +70,7 @@ obj-$(CONFIG_QCOM_PBS) +=	qcom-pbs.o
 obj-$(CONFIG_QCOM_DCVS)	+= dcvs/
 obj-$(CONFIG_QTI_MPAM)	+= mpam/
 obj-$(CONFIG_QCOM_CPUCP) += qcom_cpucp.o
+obj-$(CONFIG_QCOM_CPUCP_FAST) += cpucp_fast.o
 obj-$(CONFIG_QTI_CPUCP_LOG) += cpucp_log.o
 obj-$(CONFIG_QTI_SYS_PM_VX) += sys_pm_vx.o
 obj-$(CONFIG_QCOM_MEM_BUF) += mem_buf/
