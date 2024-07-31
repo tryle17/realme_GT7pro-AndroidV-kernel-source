@@ -29,6 +29,7 @@
 #include "trace-cluster-lpm.h"
 #include "qcom-lpm.h"
 
+static DEFINE_PER_CPU(ktime_t, cpu_next_wakeup);
 LIST_HEAD(cluster_dev_list);
 
 static struct lpm_cluster *to_cluster(struct generic_pm_domain *genpd)
@@ -413,7 +414,7 @@ ktime_t get_cluster_sleep_time(struct lpm_cluster *cluster_gov)
 
 	next_wakeup = KTIME_MAX;
 	for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
-		next_cpu_wakeup = cluster_gov->cpu_next_wakeup[cpu];
+		next_cpu_wakeup = per_cpu(cpu_next_wakeup, cpu);
 		if (ktime_before(next_cpu_wakeup, next_wakeup))
 			next_wakeup = next_cpu_wakeup;
 	}
@@ -457,7 +458,7 @@ void update_cluster_select(struct lpm_cpu *cpu_gov)
 		if (cpumask_test_cpu(cpu, genpd->cpus)) {
 			spin_lock(&cluster_gov->lock);
 			cluster_gov->now = cpu_gov->now;
-			cluster_gov->cpu_next_wakeup[cpu] = cpu_gov->next_wakeup;
+			per_cpu(cpu_next_wakeup, cpu) = cpu_gov->next_wakeup;
 			update_cluster_next_wakeup(cluster_gov);
 			spin_unlock(&cluster_gov->lock);
 		}

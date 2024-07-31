@@ -95,7 +95,6 @@ struct lpm_cluster {
 	ktime_t pred_wakeup;
 	ktime_t now;
 	u64 pred_residency;
-	ktime_t cpu_next_wakeup[MAX_LPM_CPUS];
 	bool state_allowed[MAX_CLUSTER_STATES];
 	struct list_head list;
 	spinlock_t lock;
