@@ -250,6 +250,7 @@ def define_parrot():
         "drivers/misc/lkdtm/lkdtm.ko",
         "kernel/locking/locktorture.ko",
         "kernel/rcu/rcutorture.ko",
+        "kernel/sched/walt/sched-walt-debug.ko",
         "kernel/torture.ko",
         "lib/atomic64_test.ko",
         "lib/test_user_copy.ko",
