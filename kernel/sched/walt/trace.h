@@ -1888,6 +1888,43 @@ TRACE_EVENT(sched_boost_bus_dcvs,
 		__entry->storage_boosted)
 );
 
+TRACE_EVENT(sched_yielder,
+	TP_PROTO(u64 wc, u64 start_ts, u8 window_cnt,
+		 unsigned int total_yield_cnt, unsigned int target_threshold_wake,
+		 unsigned int total_sleep_cnt, unsigned int target_threshold_sleep,
+		 unsigned int in_legacy_uncap),
+
+	TP_ARGS(wc, start_ts, window_cnt, total_yield_cnt, target_threshold_wake,
+		total_sleep_cnt, target_threshold_sleep, in_legacy_uncap),
+
+	TP_STRUCT__entry(
+		__field(u64,		wc)
+		__field(u64,		start_ts)
+		 __field(u8,		window_cnt)
+		 __field(unsigned int,	total_yield_cnt)
+		 __field(unsigned int,	target_threshold_wake)
+		 __field(unsigned int,	total_sleep_cnt)
+		 __field(unsigned int,	target_threshold_sleep)
+		 __field(unsigned int,	in_legacy_uncap)
+	),
+
+	TP_fast_assign(
+		__entry->wc			= wc;
+		__entry->start_ts		= start_ts;
+		__entry->window_cnt		= window_cnt;
+		__entry->total_yield_cnt	= total_yield_cnt;
+		__entry->target_threshold_wake	= target_threshold_wake;
+		__entry->total_sleep_cnt	= total_sleep_cnt;
+		__entry->target_threshold_sleep	= target_threshold_sleep;
+		__entry->in_legacy_uncap	= in_legacy_uncap;
+	),
+
+	TP_printk("wallclock=%llu start_ts=%llu continous_windows=%u global_yield_cnt=%u target_yield_th=%u global_sleep_cnt=%u target_induced_sleep_th=%u in_legacy_frequency_uncap=0x%x",
+		  __entry->wc, __entry->start_ts, __entry->window_cnt, __entry->total_yield_cnt,
+		  __entry->target_threshold_wake, __entry->total_sleep_cnt,
+		  __entry->target_threshold_sleep, __entry->in_legacy_uncap)
+);
+
 #endif /* _TRACE_WALT_H */
 
 #undef TRACE_INCLUDE_PATH
