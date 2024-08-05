@@ -261,7 +261,8 @@ static void call_prepare(struct si_object_invoke_ctx *oic,
 
 		object = qtee_get_si_object(object_id);
 
-		/* We do not expect 'object' to be NULL_SI_OBJECT. */
+		if (!object)
+			break;
 
 		if (object->ops->prepare) {
 			unsigned long op = object->ops->prepare(object, args);
