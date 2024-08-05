@@ -103,5 +103,6 @@ obj-$(CONFIG_GH_TLMM_VM_MEM_ACCESS) += gh_tlmm_vm_mem_access.o
 obj-$(CONFIG_QCOM_TLMM_VM_IRQCHIP) += qcom_tlmm_vm_irqchip.o
 obj-$(CONFIG_QCOM_QFPROM_SYS) += qfprom-sys.o
 obj-$(CONFIG_MSM_PERFORMANCE) += msm_performance.o
+obj-$(CONFIG_QCOM_FSA4480_I2C) += fsa4480-i2c.o
 obj-$(CONFIG_SHOW_SUSPEND_EPOCH) += msm_show_epoch.o
 obj-$(CONFIG_QTI_PMIC_LPM)      += qti-pmic-lpm.o

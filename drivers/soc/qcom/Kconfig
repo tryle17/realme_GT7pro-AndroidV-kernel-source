@@ -959,6 +959,16 @@ config QCOM_MEM_HOOKS
 	  If unsure, say 'M' here to ensure that the hooks are compiled
 	  in.
 
+config QCOM_FSA4480_I2C
+	tristate "Fairchild FSA4480 chip with I2C"
+	select REGMAP_I2C
+	depends on I2C
+	help
+	  Support for the Fairchild FSA4480 IC switch chip controlled
+	  using I2C. This driver provides common support
+	  for accessing the device, switching between USB and Audio
+	  modes, changing orientation.
+
 source "drivers/soc/qcom/mem_buf/Kconfig"
 source "drivers/soc/qcom/tmecom/Kconfig"
 
