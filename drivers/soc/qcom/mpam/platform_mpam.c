@@ -220,19 +220,23 @@ static int platform_mpam_probe(struct platform_device *pdev)
 	struct config_group *p_group;
 	struct platform_mpam_item *new_item;
 	struct platform_mpam_read_bw_ctrl bw_ctrl_param;
+	struct mpam_ver_ret mpam_version;
 	struct device_node *np = pdev->dev.of_node;
 
-	if (!root_group) {
-		root_group = &platform_mpam_subsys.su_group;
-		config_group_init(root_group);
-		mutex_init(&platform_mpam_subsys.su_mutex);
+	ret = qcom_mpam_get_version(&mpam_version);
+	if (ret || mpam_version.version < 0x10000) {
+		dev_err(&pdev->dev, "Platform MPAM is not available\n");
+		return -ENODEV;
+	}
 
-		ret = configfs_register_subsystem(&platform_mpam_subsys);
-		if (ret) {
-			mutex_destroy(&platform_mpam_subsys.su_mutex);
-			pr_err("Error while registering subsystem %d\n", ret);
-			return ret;
-		}
+	config_group_init(&platform_mpam_subsys.su_group);
+	mutex_init(&platform_mpam_subsys.su_mutex);
+
+	ret = configfs_register_subsystem(&platform_mpam_subsys);
+	if (ret) {
+		mutex_destroy(&platform_mpam_subsys.su_mutex);
+		pr_err("Error while registering subsystem %d\n", ret);
+		return ret;
 	}
 
 	client_cnt = of_get_child_count(np);
@@ -264,6 +268,7 @@ static int platform_mpam_probe(struct platform_device *pdev)
 	if (ret || mscid >= MSC_MAX || IS_ERR_OR_NULL(msc_name_dt))
 		return -ENODEV;
 
+	root_group = &platform_mpam_subsys.su_group;
 	p_group = configfs_register_default_group(root_group,
 		msc_name_dt, &platform_mpam_base_type);
 	if (IS_ERR(p_group)) {
