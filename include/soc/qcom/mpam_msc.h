@@ -62,9 +62,6 @@ int msc_system_get_device_capability(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_get_partition(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_set_partition(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_reset_partition(uint32_t msc_id, void *arg1, void *arg2);
-int msc_system_mon_read_miss_info(uint32_t msc_id, void *arg1, void *arg2);
-int msc_system_mon_alloc_info(uint32_t msc_id, void *arg1, void *arg2);
-int msc_system_mon_config(uint32_t msc_id, void *arg1, void *arg2);
 int attach_dev(struct device *dev, struct qcom_mpam_msc *qcom_msc, uint32_t msc_type);
 void detach_dev(struct device *dev, struct qcom_mpam_msc *qcom_msc, uint32_t msc_type);
 #endif /* _QCOM_MPAM_MSC_H */

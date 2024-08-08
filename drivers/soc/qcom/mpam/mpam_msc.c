@@ -104,7 +104,7 @@ int msc_system_set_partition(uint32_t msc_id, void *arg1, void *arg2)
 }
 EXPORT_SYMBOL_GPL(msc_system_set_partition);
 
-int msc_system_mon_config(uint32_t msc_id, void *arg1, void *arg2)
+int msc_system_miss_config(uint32_t msc_id, void *arg1, void *arg2)
 {
 	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
@@ -126,7 +126,7 @@ int msc_system_mon_config(uint32_t msc_id, void *arg1, void *arg2)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(msc_system_mon_config);
+EXPORT_SYMBOL_GPL(msc_system_miss_config);
 
 int msc_system_reset_partition(uint32_t msc_id, void *arg1, void *arg2)
 {
@@ -182,121 +182,6 @@ void detach_dev(struct device *dev, struct qcom_mpam_msc *qcom_msc, uint32_t msc
 	list_del(&qcom_msc->node);
 }
 EXPORT_SYMBOL_GPL(detach_dev);
-
-int msc_system_mon_alloc_info(uint32_t msc_id, void *arg1, void *arg2)
-{
-	int i;
-	uint8_t qcom_msc_type;
-	struct qcom_mpam_msc *qcom_msc;
-	int ret = -EINVAL;
-	struct qcom_msc_slc_mon_val val;
-	struct qcom_slc_mon_data_info *info;
-	struct msc_query *query;
-	union mon_values *mon_data;
-
-
-	qcom_msc = qcom_msc_lookup(msc_id);
-	if (qcom_msc == NULL)
-		return ret;
-
-	query = (struct msc_query *) arg1;
-	if (query == NULL)
-		return -EINVAL;
-
-	info = (struct qcom_slc_mon_data_info *) arg2;
-	if (info == NULL)
-		return -EINVAL;
-
-	if (query->qcom_msc_id.qcom_msc_type != SLC)
-		return -EINVAL;
-
-	mon_data = (union mon_values *) arg2;
-	if (mon_data == NULL)
-		return -EINVAL;
-
-	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
-	switch (qcom_msc_type) {
-	case SLC:
-		if (qcom_msc->ops->mon_stats_read)
-			ret = qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, &val);
-		break;
-	default:
-		break;
-	}
-
-	if (ret == 0) {
-		for (i = 0; i < SLC_NUM_PARTIDS; i++) {
-			if ((query->client_id == val.data[i].part_info.client_id) &&
-					(query->part_id == val.data[i].part_info.part_id))
-				mon_data->capacity.num_cache_lines = val.data[i].num_cache_lines;
-		}
-
-		if (i == SLC_NUM_PARTIDS)
-			return -EINVAL;
-	}
-
-	mon_data->capacity.last_capture_time = val.last_capture_time;
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(msc_system_mon_alloc_info);
-
-int msc_system_mon_read_miss_info(uint32_t msc_id, void *arg1, void *arg2)
-{
-	int i;
-	uint8_t qcom_msc_type;
-	struct qcom_mpam_msc *qcom_msc;
-	int ret = -EINVAL;
-	struct qcom_msc_slc_mon_val val;
-	struct qcom_slc_mon_data_info *info;
-	struct msc_query *query;
-	union mon_values *mon_data;
-
-
-	qcom_msc = qcom_msc_lookup(msc_id);
-	if (qcom_msc == NULL)
-		return ret;
-
-	query = (struct msc_query *) arg1;
-	if (query == NULL)
-		return -EINVAL;
-
-	info = (struct qcom_slc_mon_data_info *) arg2;
-	if (info == NULL)
-		return -EINVAL;
-
-	if (query->qcom_msc_id.qcom_msc_type != SLC)
-		return -EINVAL;
-
-	mon_data = (union mon_values *) arg2;
-	if (mon_data == NULL)
-		return -EINVAL;
-
-	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
-	switch (qcom_msc_type) {
-	case SLC:
-		if (qcom_msc->ops->mon_stats_read)
-			ret = qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, &val);
-		break;
-	default:
-		break;
-	}
-
-	if (ret == 0) {
-		for (i = 0; i < SLC_NUM_PARTIDS; i++) {
-			if ((query->client_id == val.data[i].part_info.client_id) &&
-					(query->part_id == val.data[i].part_info.part_id))
-				mon_data->misses.num_rd_misses = val.data[i].rd_misses;
-		}
-
-		if (i == SLC_NUM_PARTIDS)
-			return -EINVAL;
-	}
-
-	mon_data->misses.last_capture_time = val.last_capture_time;
-	return ret;
-}
-EXPORT_SYMBOL_GPL(msc_system_mon_read_miss_info);
 
 static ssize_t slc_dev_capability_show(struct device *dev, struct device_attribute *attr,
 		char *buf)
