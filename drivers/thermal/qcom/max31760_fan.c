@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
@@ -432,7 +432,7 @@ static void max31760_remove(struct i2c_client *client)
 	gpio_free(pdata->pwr_en_gpio);
 }
 
-static int max31760_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int max31760_probe(struct i2c_client *client)
 {
 	int ret = 0;
 	struct max31760_data *pdata;
@@ -536,7 +536,10 @@ static int max31760_resume(struct device *dev)
 
 		max31760_write_byte(pdata, MAX31760_CTRL_REG1, 0x19);
 		max31760_write_byte(pdata, MAX31760_CTRL_REG2, 0x11);
-		max31760_write_byte(pdata, MAX31760_CTRL_REG3, 0x31);
+		if (pdata->fan_num == 1)
+			max31760_write_byte(pdata, MAX31760_CTRL_REG3, 0x31);
+		else if (pdata->fan_num == 2)
+			max31760_write_byte(pdata, MAX31760_CTRL_REG3, 0x33);
 		max31760_set_cur_state_common(pdata, pdata->cur_state);
 		mutex_unlock(&pdata->update_lock);
 	}
