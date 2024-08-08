@@ -33,7 +33,11 @@ EXPORT_SYMBOL_GPL(dmabuf_mem_pool);
 
 #define POOL_MIN_ALLOC_ORDER SUBSECTION_SHIFT
 
-#define RECLAIM_RETRY_DELAY_MS	100
+/* Gunyah RM error codes */
+#define GH_RM_ERR_MEM_INUSE	0x1B
+#define GH_RM_ERR_MEM_RELEASED	0xC
+
+#define RECLAIM_RETRY_DELAY_US	100
 
 int mem_buf_hyp_assign_table(struct sg_table *sgt, u32 *src_vmid, int source_nelems,
 			     int *dest_vmids, int *dest_perms, int dest_nelems)
@@ -104,25 +108,23 @@ int mem_buf_unassign_mem(struct sg_table *sgt, int *src_vmids,
 		 */
 		for (i = 0; i < num_retries; i++) {
 			ret = mem_buf_unassign_mem_gunyah(memparcel_hdl);
-			/*
-			 * Although gunyah returns 11 for the case we want to retry for, this error
-			 * code is overridden with -EINVAL by the time it is passed back to us.
-			 * Retry on all failures instead.
-			 */
-			if (!ret)
+
+			/* retry only for MEM_INUSE cases */
+			if (!ret || ret != GH_RM_ERR_MEM_INUSE)
 				break;
 
-			msleep(RECLAIM_RETRY_DELAY_MS);
+			msleep(RECLAIM_RETRY_DELAY_US);
 		}
 		if (ret) {
-			pr_err_ratelimited("mem_buf_unassign_mem_gunyah: handle %d failed after %d retries\n",
-					    memparcel_hdl, i);
+			if (num_retries)
+				pr_err_ratelimited("mem_buf_unassign_mem_gunyah: handle %d failed after %d retries\n",
+				memparcel_hdl, i);
 			return ret;
 		}
 
-		if (i)
+		if (num_retries)
 			pr_info_ratelimited("mem_buf_unassign_mem_gunyah: handle %d succeeeded after %d retries\n",
-					    memparcel_hdl, i);
+				 memparcel_hdl, i);
 	}
 
 	ret = mem_buf_hyp_assign_table(sgt, src_vmids, nr_acl_entries,
