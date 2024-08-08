@@ -1365,7 +1365,6 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 
 	if (!subs) {
 		uaudio_err("invalid substream\n");
-		ret = -EINVAL;
 		goto response;
 	}
 
