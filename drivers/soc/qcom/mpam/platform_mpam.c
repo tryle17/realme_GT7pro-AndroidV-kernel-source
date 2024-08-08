@@ -320,12 +320,6 @@ static int platform_mpam_remove(struct platform_device *pdev)
 	return 0;
 }
 
-struct config_group *platform_mpam_get_root_group(void)
-{
-	return root_group;
-}
-EXPORT_SYMBOL_GPL(platform_mpam_get_root_group);
-
 static const struct of_device_id platform_mpam_table[] = {
 	{ .compatible = "qcom,platform-mpam" },
 	{}
