@@ -298,69 +298,6 @@ int msc_system_mon_read_miss_info(uint32_t msc_id, void *arg1, void *arg2)
 }
 EXPORT_SYMBOL_GPL(msc_system_mon_read_miss_info);
 
-static int msc_system_mon_read(uint32_t msc_id, void *arg1, void *arg2)
-{
-	uint8_t qcom_msc_type;
-	struct qcom_mpam_msc *qcom_msc;
-	int ret = -EINVAL;
-
-	qcom_msc = qcom_msc_lookup(msc_id);
-	if (qcom_msc == NULL)
-		return ret;
-
-	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
-	switch (qcom_msc_type) {
-	case SLC:
-		if (qcom_msc->ops->mon_stats_read)
-			ret = qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, arg2);
-		break;
-	default:
-		break;
-	}
-
-	return ret;
-}
-
-static ssize_t slc_mon_read_show(struct device *dev, struct device_attribute *attr,
-		char *buf)
-{
-	ssize_t count = 0;
-	struct qcom_mpam_msc *qcom_mpam_msc;
-	struct qcom_msc_slc_mon_val mon_buf;
-	struct msc_query query;
-	int i = 0;
-
-	qcom_mpam_msc = qcom_msc_lookup(2);
-	if (qcom_mpam_msc == NULL)
-		return count;
-
-	query.qcom_msc_id.qcom_msc_type = qcom_mpam_msc->qcom_msc_id.qcom_msc_type;
-	query.qcom_msc_id.qcom_msc_class = qcom_mpam_msc->qcom_msc_id.qcom_msc_class;
-	query.qcom_msc_id.idx = qcom_mpam_msc->qcom_msc_id.idx;
-	msc_system_mon_read(2, &query, &mon_buf);
-
-
-	count += scnprintf(buf + count, PAGE_SIZE - count,
-			"Capacity dump for PART ID\n");
-	for (i = 0; i < SLC_NUM_PARTIDS; i++) {
-		count += scnprintf(buf + count, PAGE_SIZE - count,
-			"\tClient_id:%d, Part id:%d, Cache line used:<%d>\n",
-			mon_buf.data[i].part_info.client_id,
-			mon_buf.data[i].part_info.part_id,
-			mon_buf.data[i].num_cache_lines);
-	}
-	count += scnprintf(buf + count, PAGE_SIZE - count,
-			"Read MISS for PART ID\n");
-	for (i = 0; i < SLC_NUM_PARTIDS; i++) {
-		count += scnprintf(buf + count, PAGE_SIZE - count,
-			"\tClient_id:%d, Part id:%d, Read MISSes:<%lld>\n",
-			mon_buf.data[i].part_info.client_id,
-			mon_buf.data[i].part_info.part_id,
-			mon_buf.data[i].rd_misses);
-	}
-	return count;
-}
-
 static ssize_t slc_dev_capability_show(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
@@ -423,62 +360,6 @@ static ssize_t slc_dev_capability_show(struct device *dev, struct device_attribu
 		}
 	}
 
-	return count;
-}
-
-static ssize_t slc_part_mon_config_store(struct device *dev, struct device_attribute *attr,
-		const char *buf, size_t count)
-{
-	char *token, *delim = DELIM_CHAR;
-	struct msc_query query;
-	struct slc_mon_config_val mon_cfg_val;
-	u32 val;
-	struct qcom_mpam_msc *qcom_mpam_msc;
-
-	qcom_mpam_msc = qcom_msc_lookup(2);
-	if (qcom_mpam_msc == NULL)
-		return count;
-
-	query.qcom_msc_id.qcom_msc_type = qcom_mpam_msc->qcom_msc_id.qcom_msc_type;
-	query.qcom_msc_id.qcom_msc_class = qcom_mpam_msc->qcom_msc_id.qcom_msc_class;
-	query.qcom_msc_id.idx = qcom_mpam_msc->qcom_msc_id.idx;
-
-	token = strsep((char **)&buf, delim);
-	if (token == NULL)
-		return count;
-
-	if (kstrtou32(token, 0, &val))
-		return count;
-
-	query.client_id = (uint16_t) val;
-
-	token = strsep((char **)&buf, delim);
-	if (token == NULL)
-		return count;
-
-	if (kstrtou32(token, 0, &val))
-		return count;
-
-	query.part_id = (uint16_t) val;
-
-	token = strsep((char **)&buf, delim);
-	if (token == NULL)
-		return count;
-
-	if (kstrtou32(token, 0, &val))
-		return count;
-
-	mon_cfg_val.slc_mon_function = (uint32_t) val;
-	token = strsep((char **)&buf, delim);
-	if (token == NULL)
-		return count;
-
-	if (kstrtou32(token, 0, &val))
-		return count;
-
-	mon_cfg_val.enable = (uint32_t) val;
-
-	msc_system_mon_config(qcom_mpam_msc->msc_id, &query, &mon_cfg_val);
 	return count;
 }
 
@@ -572,16 +453,12 @@ static ssize_t slc_dev_reset_store(struct device *dev, struct device_attribute *
 }
 
 static DEVICE_ATTR_RO(slc_dev_capability);
-static DEVICE_ATTR_RO(slc_mon_read);
 static DEVICE_ATTR_WO(slc_part_config);
-static DEVICE_ATTR_WO(slc_part_mon_config);
 static DEVICE_ATTR_WO(slc_dev_reset);
 
 static struct attribute *mpam_slc_sysfs_attrs[] = {
 	&dev_attr_slc_dev_capability.attr,
-	&dev_attr_slc_mon_read.attr,
 	&dev_attr_slc_part_config.attr,
-	&dev_attr_slc_part_mon_config.attr,
 	&dev_attr_slc_dev_reset.attr,
 	NULL,
 };
