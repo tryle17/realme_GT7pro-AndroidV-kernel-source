@@ -301,7 +301,8 @@ bool find_heaviest_topapp(u64 window_start)
 	cpumask_and(&last_available_big_cpus, cpu_online_mask, &cpus_for_pipeline);
 	cpumask_andnot(&last_available_big_cpus, &last_available_big_cpus, cpu_halt_mask);
 
-	if (pipeline_special_task) {
+	/* Ensure the special task is only pinned if there are 3 auto pipeline tasks */
+	if (pipeline_special_task && heavy_wts[MAX_NR_PIPELINE - 1]) {
 		heavy_wts[0]->pipeline_cpu =
 			cpumask_last(&sched_cluster[num_sched_clusters - 1]->cpus);
 		heavy_wts[0]->low_latency |= WALT_LOW_LATENCY_HEAVY_BIT;
@@ -314,7 +315,7 @@ bool find_heaviest_topapp(u64 window_start)
 		if (!wts)
 			continue;
 
-		if (i == 0 && pipeline_special_task)
+		if (i == 0 && pipeline_special_task && heavy_wts[MAX_NR_PIPELINE - 1])
 			continue;
 
 		if (wts->pipeline_cpu != -1) {
@@ -482,7 +483,7 @@ void rearrange_heavy(u64 window_start, bool force)
 	if (delay_rearrange(window_start, AUTO_PIPELINE, force))
 		return;
 
-	if (!soc_feat(SOC_ENABLE_PIPELINE_SWAPPING_BIT))
+	if (!soc_feat(SOC_ENABLE_PIPELINE_SWAPPING_BIT) && !force)
 		return;
 
 	raw_spin_lock_irqsave(&heavy_lock, flags);
@@ -632,5 +633,13 @@ bool enable_load_sync(int cpu)
 			!cpumask_intersects(&pipeline_sync_cpus, &cpus_for_pipeline))
 		return false;
 
-	return true;
+	/* Ensure to load sync only if there are 3 auto pipeline tasks */
+	if (have_heavy_list)
+		return have_heavy_list == MAX_NR_PIPELINE;
+
+	/*
+	 * If auto pipeline is disabled, manual must be on. Ensure to load sync under manual
+	 * pipeline only if there are 3 or more pipeline tasks
+	 */
+	return pipeline_nr >= MAX_NR_PIPELINE;
 }
