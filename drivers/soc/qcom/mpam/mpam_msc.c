@@ -227,10 +227,8 @@ int msc_system_mon_alloc_info(uint32_t msc_id, void *arg1, void *arg2)
 	if (ret == 0) {
 		for (i = 0; i < SLC_NUM_PARTIDS; i++) {
 			if ((query->client_id == val.data[i].part_info.client_id) &&
-					(query->part_id == val.data[i].part_info.part_id)) {
+					(query->part_id == val.data[i].part_info.part_id))
 				mon_data->capacity.num_cache_lines = val.data[i].num_cache_lines;
-				break;
-			}
 		}
 
 		if (i == SLC_NUM_PARTIDS)
@@ -287,10 +285,8 @@ int msc_system_mon_read_miss_info(uint32_t msc_id, void *arg1, void *arg2)
 	if (ret == 0) {
 		for (i = 0; i < SLC_NUM_PARTIDS; i++) {
 			if ((query->client_id == val.data[i].part_info.client_id) &&
-					(query->part_id == val.data[i].part_info.part_id)) {
+					(query->part_id == val.data[i].part_info.part_id))
 				mon_data->misses.num_rd_misses = val.data[i].rd_misses;
-				break;
-			}
 		}
 
 		if (i == SLC_NUM_PARTIDS)

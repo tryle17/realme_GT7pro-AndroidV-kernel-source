@@ -320,7 +320,6 @@ static struct qcom_mpam_msc * slc_config_request_check(struct device *dev, struc
 		case 1:
 			if (slc_capability->slc_mon_configured.capacity_configured >=
 					slc_capability->slc_mon_list.capacity_config_available)
-				return NULL;
 			break;
 		}
 		break;
@@ -338,7 +337,6 @@ static struct qcom_mpam_msc * slc_config_request_check(struct device *dev, struc
 		case 1:
 			if (slc_capability->slc_mon_configured.read_miss_configured >=
 					slc_capability->slc_mon_list.read_miss_config_available)
-				return NULL;
 			break;
 		}
 		break;
