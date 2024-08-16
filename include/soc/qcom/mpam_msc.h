@@ -44,7 +44,6 @@ struct qcom_mpam_msc {
 	const struct qcom_scmi_vendor_ops *scmi_ops;
 	struct scmi_protocol_handle *ph;
 	struct device *dev;
-	void __iomem *mon_base;
 	struct list_head node;
 } __packed;
 
@@ -54,7 +53,6 @@ struct mpam_msc_ops {
 	int (*get_cache_partition_capability)(struct device *dev, void *msc_partid, void *msc_partconfig);
 	int (*reset_cache_partition)(struct device *dev, void *msc_partid, void *msc_partconfig);
 	int (*mon_config)(struct device *dev, void *msc_partid, void *msc_partconfig);
-	int (*mon_stats_read)(struct device *dev, void *msc_partid, void *mon_val);
 };
 
 struct qcom_mpam_msc *qcom_msc_lookup(uint32_t msc_id);
