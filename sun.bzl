@@ -87,6 +87,7 @@ def define_sun():
         "drivers/interconnect/qcom/icc-rpmh.ko",
         "drivers/interconnect/qcom/qnoc-qos.ko",
         "drivers/interconnect/qcom/qnoc-sun.ko",
+        "drivers/interconnect/qcom/qnoc-tuna.ko",
         "drivers/iommu/arm/arm-smmu/arm_smmu.ko",
         "drivers/iommu/iommu-logger.ko",
         "drivers/iommu/msm_dma_iommu_mapping.ko",
@@ -285,6 +286,7 @@ def define_sun():
         # keep sorted
         "drivers/hwtracing/coresight/coresight-etm4x.ko",
         "drivers/misc/lkdtm/lkdtm.ko",
+        "drivers/usb/misc/lvstest.ko",
         "kernel/locking/locktorture.ko",
         "kernel/rcu/rcutorture.ko",
         "kernel/sched/walt/sched-walt-debug.ko",
