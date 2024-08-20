@@ -211,6 +211,7 @@ def define_sun():
         "drivers/soc/qcom/qmi_helpers.ko",
         "drivers/soc/qcom/qsee_ipc_irq_bridge.ko",
         "drivers/soc/qcom/qti_battery_debug.ko",
+        "drivers/soc/qcom/qti_fctl_scmi.ko",
         "drivers/soc/qcom/qti_pmic_glink.ko",
         "drivers/soc/qcom/secure_buffer.ko",
         "drivers/soc/qcom/smem.ko",
@@ -314,6 +315,7 @@ def define_sun():
                 "console=ttyMSM0,115200n8",
                 "qcom_geni_serial.con_enabled=1",
                 "earlycon",
+                "ufshcd_core.uic_cmd_timeout=2000",
             ]
             kernel_vendor_cmdline_extras += [
                 # do not sort
