@@ -23,6 +23,14 @@
 
 #define MSEC_TO_NSEC (1000 * 1000)
 
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
+#include "../../oplus_cpu/sched/sched_assist/sa_fair.h"
+#endif
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
+#include "../kernel/oplus_cpu/sched/frame_boost/frame_group.h"
+#endif
+
 #ifdef CONFIG_HZ_300
 /*
  * Tick interval becomes to 3333333 due to
@@ -1235,6 +1243,16 @@ static inline bool is_state1(void)
 /* determine if this task should be allowed to use a partially halted cpu */
 static inline bool task_reject_partialhalt_cpu(struct task_struct *p, int cpu)
 {
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
+	if (should_ux_task_skip_cpu(p, cpu))
+		return true;
+#endif
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
+	if (fbg_skip_migration(p, task_cpu(p), cpu))
+		return true;
+#endif
+
 	if (p->prio < MAX_RT_PRIO)
 		return false;
 
@@ -1433,6 +1451,50 @@ static inline void walt_lockdep_assert(int cond, int cpu, struct task_struct *p)
 
 #define walt_lockdep_assert_rq(rq, p)			\
 	walt_lockdep_assert_held(&rq->__lock, cpu_of(rq), p)
+
+#ifdef CONFIG_HMBIRD_SCHED_GKI
+struct scx_sched_gki_ops {
+	void (*newidle_balance)(struct rq *this_rq,
+  					struct rq_flags *rf, int *pulled_task, int *done, bool partial_force);
+	void (*replace_next_task_fair)(struct rq *rq, struct task_struct **p,
+			struct sched_entity **se, bool *repick, bool simple, struct task_struct *prev);
+	void (*schedule)(struct task_struct *prev, struct task_struct *next, struct rq *rq);
+	void (*enqueue_task)(struct rq *rq, struct task_struct *p, int enq_flags);
+	void (*dequeue_task)(struct rq *rq, struct task_struct *p, int deq_flags);
+	void (*select_task_rq_rt)(struct task_struct *task, int cpu, int sd_flag, int wake_flags, int *new_cpu);
+	void (*rt_find_lowest_rq)(struct task_struct *task, struct cpumask *lowest_mask, int ret, int *best_cpu);
+	void (*select_task_rq_fair)(struct task_struct *p, int *target_cpu, int wake_flags, int prev_cpu);
+	void (*scheduler_tick)(struct rq *rq);
+	void (*tick_entry)(struct rq *rq);
+	int  (*sched_lpm_disallowed_time)(int cpu, u64 *timeout);
+	void (*nohz_balancer_kick)(struct rq *rq, unsigned int *flags, int *done);
+	void (*cfs_check_preempt_wakeup)(struct rq *rq, struct task_struct *p, bool *preempt, bool *nopreempt);
+	bool (*lb_tick_bypass)(struct rq *rq);
+	bool (*account_for_runnable_bypass)(struct rq *rq, struct task_struct *p, int event);
+	void (*window_rollover_run_once)(struct rq *rq);
+	void (*do_sched_yield_before)(long *skip);
+};
+
+extern struct scx_sched_gki_ops *scx_sched_ops;
+
+#define SCX_CALL_OP(op, args...) 						\
+do {														\
+	if (scx_sched_ops && scx_sched_ops->op) {					\
+		scx_sched_ops->op(args);								\
+	}														\
+}while(0)
+
+#define SCX_CALL_OP_RET(op, args...) 						\
+({																\
+	__typeof__(scx_sched_ops->op(args)) __ret = 0;				\
+	if (scx_sched_ops && scx_sched_ops->op) 							\
+			__ret = scx_sched_ops->op(args);						\
+	__ret; 														\
+})
+
+int register_scx_sched_gki_ops(struct scx_sched_gki_ops *ops);
+
+#endif
 
 extern void pipeline_check(struct walt_rq *wrq);
 extern bool enable_load_sync(int cpu);

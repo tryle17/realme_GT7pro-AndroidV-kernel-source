@@ -889,7 +889,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
 	if (!IS_ERR(drvdata->atclk)) {
 		ret = clk_prepare_enable(drvdata->atclk);
 		if (ret)
-			return ret;
+			return ret == -ETIMEDOUT ? -EPROBE_DEFER : ret;
 	}
 
 	drvdata->cpu = coresight_get_cpu(dev);
