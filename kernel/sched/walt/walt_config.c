@@ -32,7 +32,7 @@ void walt_config(void)
 	sysctl_sched_util_busy_hyst_enable_cpus = 255;
 	sysctl_sched_coloc_busy_hyst_max_ms = 5000;
 	sched_ravg_window = DEFAULT_SCHED_RAVG_WINDOW;
-	sysctl_input_boost_ms = 40;
+	sysctl_input_boost_ms = 60;
 	sysctl_sched_min_task_util_for_boost = 51;
 	sysctl_sched_min_task_util_for_uclamp = 51;
 	sysctl_sched_min_task_util_for_colocation = 35;
@@ -110,22 +110,22 @@ void walt_config(void)
 		soc_feat_unset(SOC_ENABLE_CONSERVATIVE_BOOST_FG_BIT);
 		soc_feat_unset(SOC_ENABLE_UCLAMP_BOOSTED_BIT);
 		soc_feat_unset(SOC_ENABLE_PER_TASK_BOOST_ON_MID_BIT);
-		trailblazer_floor_freq[0] = 1000000;
+		trailblazer_floor_freq[0] = 800000;
 		soc_feat_unset(SOC_ENABLE_COLOCATION_PLACEMENT_BOOST_BIT);
 		soc_feat_set(SOC_ENABLE_FT_BOOST_TO_ALL);
-		oscillate_period_ns = 8000000;
+		oscillate_period_ns = 6000000;
 		soc_feat_unset(SOC_ENABLE_EXPERIMENT3);
 		/*G + P*/
 		cpumask_copy(&pipeline_sync_cpus, cpu_possible_mask);
 		soc_sched_lib_name_capacity = 2;
 		soc_feat_unset(SOC_ENABLE_PIPELINE_SWAPPING_BIT);
 
-		sysctl_cluster01_load_sync[0]	= 350;
-		sysctl_cluster01_load_sync[1]	= 100;
-		sysctl_cluster01_load_sync[2]	= 100;
-		sysctl_cluster10_load_sync[0]	= 512;
-		sysctl_cluster10_load_sync[1]	= 90;
-		sysctl_cluster10_load_sync[2]	= 90;
+		sysctl_cluster01_load_sync[0]	= 300;
+		sysctl_cluster01_load_sync[1]	= 90;
+		sysctl_cluster01_load_sync[2]	= 110;
+		sysctl_cluster10_load_sync[0]	= 450;
+		sysctl_cluster10_load_sync[1]	= 85;
+		sysctl_cluster10_load_sync[2]	= 96;
 		load_sync_util_thres[0][1]	= sysctl_cluster01_load_sync[0];
 		load_sync_low_pct[0][1]		= sysctl_cluster01_load_sync[1];
 		load_sync_high_pct[0][1]	= sysctl_cluster01_load_sync[2];
