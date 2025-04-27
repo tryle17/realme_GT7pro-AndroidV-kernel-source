@@ -62,7 +62,9 @@ static void *find_uac_clock_desc(struct usb_host_interface *iface, int id,
 static bool validate_clock_source(void *p, int id, int proto)
 {
 	union uac23_clock_source_desc *cs = p;
-
+	
+	if (!DESC_LENGTH_CHECK(cs, proto))
+ 		return false;
 	return GET_VAL(cs, proto, bClockID) == id;
 }
 
@@ -70,13 +72,26 @@ static bool validate_clock_selector(void *p, int id, int proto)
 {
 	union uac23_clock_selector_desc *cs = p;
 
-	return GET_VAL(cs, proto, bClockID) == id;
+	if (!DESC_LENGTH_CHECK(cs, proto))
+ 		return false;
+ 	if (GET_VAL(cs, proto, bClockID) != id)
+ 		return false;
+ 	/* additional length check for baCSourceID array (in bNrInPins size)
+ 	 * and two more fields (which sizes depend on the protocol)
+ 	 */
+ 	if (proto == UAC_VERSION_3)
+ 		return cs->v3.bLength >= sizeof(cs->v3) + cs->v3.bNrInPins +
+ 			4 /* bmControls */ + 2 /* wCSelectorDescrStr */;
+ 	else
+ 		return cs->v2.bLength >= sizeof(cs->v2) + cs->v2.bNrInPins +
+ 			1 /* bmControls */ + 1 /* iClockSelector */;
 }
 
 static bool validate_clock_multiplier(void *p, int id, int proto)
 {
 	union uac23_clock_multiplier_desc *cs = p;
-
+	if (!DESC_LENGTH_CHECK(cs, proto))
+ 		return false;
 	return GET_VAL(cs, proto, bClockID) == id;
 }
 
