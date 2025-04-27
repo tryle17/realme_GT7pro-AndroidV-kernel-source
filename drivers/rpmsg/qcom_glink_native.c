@@ -2340,6 +2340,26 @@ static void qcom_glink_work(struct work_struct *work)
 
 void qcom_glink_early_ssr_notify(void *data)
 {
+#if 1
+/* Merge CR3923613 for fix ALM[8638837] */
+ 	struct qcom_glink *glink = data;
+ 	struct glink_channel *channel;
+ 	unsigned long flags;
+ 	int cid;
+ 
+ 	if (!glink)
+ 		return;
+ 
+ 	glink->abort_tx = true;
+ 	/* To wakeup any blocking writers */
+ 	wake_up_all(&glink->tx_avail_notify);
+ 
+ 	spin_lock_irqsave(&glink->idr_lock, flags);
+ 	idr_for_each_entry(&glink->lcids, channel, cid) {
+ 		wake_up(&channel->intent_req_wq);
+ 	}
+ 	spin_unlock_irqrestore(&glink->idr_lock, flags);
+#endif
 }
 EXPORT_SYMBOL(qcom_glink_early_ssr_notify);
 
